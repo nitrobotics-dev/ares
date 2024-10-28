@@ -1,0 +1,35 @@
+{
+    "name": "Python 3",
+    "mounts": [
+        "source=${localEnv:HOME}/cert.pem,target=/etc/ssl/certs/ca-certificates.crt,type=bind,readonly"
+    ],
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.black-formatter"
+            ],
+            "settings": {
+                "python.formatting.provider": "none",
+                "editor.formatOnSave": true,
+                "[python]": {
+                    "editor.formatOnSave": true,
+                    "editor.defaultFormatter": "ms-python.black-formatter"
+                }
+            }
+        }
+    },
+    "forwardPorts": [],
+    "remoteUser": "root",
+    "remoteEnv": {
+        "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
+        "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
+        "CURL_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt"
+    },
+    "postCreateCommand": "pip install black pylint"
+}
