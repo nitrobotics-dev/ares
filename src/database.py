@@ -22,7 +22,7 @@ def add_trajectory(engine: Engine, trajectory: Trajectory):
 
 
 if __name__ == "__main__":
-    from test_configs import TRAJ1, TRAJ2, SQL_TRAJ1, SQL_TRAJ2
+    from test_configs import TRAJ1, TRAJ2
 
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
     add_trajectory(engine, TRAJ1)

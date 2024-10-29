@@ -5,7 +5,6 @@ from sqlmodel import SQLModel, Field
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 from typing import Any, Type
-import uuid
 
 
 class BaseConfig(BaseModel):

@@ -1,7 +1,9 @@
 {
     "name": "Python 3",
     "mounts": [
-        "source=${localEnv:HOME}/cert.pem,target=/etc/ssl/certs/ca-certificates.crt,type=bind,readonly"
+        "source=${localEnv:HOME}/cert.pem,target=/etc/ssl/certs/ca-certificates.crt,type=bind,readonly",
+        "source=${localEnv:HOME}/.config/gcloud,target=/root/.config/gcloud,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/data,target=/workspace/data,type=bind"
     ],
     "build": {
         "dockerfile": "../Dockerfile",
@@ -29,7 +31,8 @@
     "remoteEnv": {
         "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
         "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
-        "CURL_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt"
+        "CURL_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/root/.config/gcloud/application_default_credentials.json"
     },
     "postCreateCommand": "pip install black pylint"
 }
