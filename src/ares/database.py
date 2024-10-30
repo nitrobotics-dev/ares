@@ -2,11 +2,10 @@ import typing as t
 import uuid
 from pydantic import BaseModel
 from sqlmodel import SQLModel, Field, create_engine, Session
-from sqlalchemy import Engine, String, Float, Boolean, DateTime, Integer
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from ares.configs import Robot, Environment, Task, Trajectory
-
+from ares.configs.base import Trajectory
 
 BASE_ROBOT_DB_PATH = "sqlite:///robot_data.db"
 TEST_ROBOT_DB_PATH = "sqlite:///test_robot_data.db"
@@ -56,7 +55,7 @@ def add_trajectory(engine: Engine, trajectory: Trajectory):
 
 
 if __name__ == "__main__":
-    from test_configs import TRAJ1, TRAJ2
+    from ares.configs.test_configs import TRAJ1, TRAJ2
 
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
     add_trajectory(engine, TRAJ1)
