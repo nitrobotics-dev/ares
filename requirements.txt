@@ -1,5 +1,16 @@
-datasets
-transformers
-torch
-Pillow
+# core libraries
+torch>=2.2.0
+torchvision>=0.16.0
+tensorflow==2.15.0
+
+# supporting libraries
+transformers==4.40.1
+tokenizers==0.19.1
 sqlmodel
+timm==0.9.10
+Pillow
+imageio
+
+# datasets and utilities
+datasets
+tensorflow-datasets==4.9.3

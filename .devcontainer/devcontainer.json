@@ -1,9 +1,10 @@
 {
     "name": "Python 3",
     "mounts": [
-        "source=${localEnv:HOME}/cert.pem,target=/etc/ssl/certs/ca-certificates.crt,type=bind,readonly",
+        "source=${localEnv:HOME}/cert.pem,target=/etc/ssl/certs/ca-certificates.crt,type=bind,readonly,consistency=cached",
         "source=${localEnv:HOME}/.config/gcloud,target=/root/.config/gcloud,type=bind,consistency=cached",
-        "source=${localWorkspaceFolder}/data,target=/workspace/data,type=bind"
+        "source=${localWorkspaceFolder}/data,target=/workspace/data,type=bind",
+        "source=/tmp,target=/tmp,type=bind"
     ],
     "build": {
         "dockerfile": "../Dockerfile",
@@ -14,7 +15,8 @@
             "extensions": [
                 "ms-python.python",
                 "ms-python.vscode-pylance",
-                "ms-python.black-formatter"
+                "ms-python.black-formatter",
+                "ms-toolsai.jupyter"
             ],
             "settings": {
                 "python.formatting.provider": "none",
@@ -34,5 +36,5 @@
         "CURL_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
         "GOOGLE_APPLICATION_CREDENTIALS": "/root/.config/gcloud/application_default_credentials.json"
     },
-    "postCreateCommand": "pip install black pylint"
+    "postCreateCommand": "pip install black pylint jupyter ipykernel"
 }

@@ -7,8 +7,6 @@ setup(
     author="Jacob Phillips",
     author_email="jacob.phillips8905@gmail.com",
     url="https://github.com/jacobphillips99/ares",
-    packages=find_packages(),
-    # install_requires=[
-    # ],
-    # python_requires=">",
+    package_dir={"": "src"},
+    packages=find_packages(where="src"),
 )
