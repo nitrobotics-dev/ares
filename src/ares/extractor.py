@@ -42,5 +42,9 @@ class RandomInformationExtractor(InformationExtractor):
         )
 
         return Trajectory(
-            robot=robot, environment=environment, task=task, length=len(episode.steps)
+            path=episode.episode_metadata.file_path,
+            robot=robot,
+            environment=environment,
+            task=task,
+            length=len(episode.steps),
         )

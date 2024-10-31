@@ -3,7 +3,7 @@
     "mounts": [
         "source=${localEnv:HOME}/cert.pem,target=/etc/ssl/certs/ca-certificates.crt,type=bind,readonly,consistency=cached",
         "source=${localEnv:HOME}/.config/gcloud,target=/root/.config/gcloud,type=bind,consistency=cached",
-        "source=${localWorkspaceFolder}/data,target=/workspace/data,type=bind",
+        "source=${localWorkspaceFolder}/data,target=/workspaces/ares/data,type=bind",
         "source=/tmp,target=/tmp,type=bind"
     ],
     "build": {
@@ -16,7 +16,8 @@
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-python.black-formatter",
-                "ms-toolsai.jupyter"
+                "ms-toolsai.jupyter",
+                "ms-azuretools.vscode-docker"
             ],
             "settings": {
                 "python.formatting.provider": "none",

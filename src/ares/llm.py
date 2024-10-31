@@ -38,13 +38,16 @@ class LLM:
         # Render template with information
         return template.render(**info)
 
-    def _construct_messages(self, prompt_filename: str, info: dict) -> list[dict]:
+    def _construct_messages(
+        self,
+        prompt_filename: str,
+        info: dict,
+        images: t.Sequence[str, np.ndarray, Image.Image] | None = None,
+    ) -> list[dict]:
         content = []
-        prompt = self._get_prompt(
-            prompt_filename, {k: v for k, v in info.items() if "image" not in k}
-        )
+        prompt = self._get_prompt(prompt_filename, info)
         content.append({"type": "text", "text": prompt})
-        if "images" in info:
+        if images:
             image_contents = [
                 {
                     "type": "image_url",
@@ -57,10 +60,20 @@ class LLM:
             content.extend(image_contents)
         return [{"role": "user", "content": content}]
 
-    def ask(self, prompt_filename: str, info: dict) -> str:
-        messages = self._construct_messages(prompt_filename, info)
+    def ask(
+        self,
+        prompt_filename: str,
+        info: dict,
+        images: t.Sequence[str, np.ndarray, Image.Image] | None = None,
+    ) -> str:
+        messages = self._construct_messages(prompt_filename, info, images)
         return completion(model=self.llm, messages=messages, **self.llm_kwargs)
 
-    async def aask(self, prompt_filename: str, info: dict) -> str:
-        messages = self._construct_messages(prompt_filename, info)
+    async def aask(
+        self,
+        prompt_filename: str,
+        info: dict,
+        images: t.Sequence[str, np.ndarray, Image.Image] | None = None,
+    ) -> str:
+        messages = self._construct_messages(prompt_filename, info, images)
         return await acompletion(model=self.llm, messages=messages, **self.llm_kwargs)

@@ -12,7 +12,9 @@ TEST_ROBOT_DB_PATH = "sqlite:///test_robot_data.db"
 
 
 # dynamically build flattened SQLModel class
-def create_flattened_model(data_model: t.Type[BaseModel]) -> t.Type[SQLModel]:
+def create_flattened_model(
+    data_model: t.Type[BaseModel], non_nullable_fields: list[str] = ["id"]
+) -> t.Type[SQLModel]:
     fields: t.Dict[str, t.Any] = {
         "__annotations__": {},
         "__tablename__": "trajectory",
@@ -32,13 +34,19 @@ def create_flattened_model(data_model: t.Type[BaseModel]) -> t.Type[SQLModel]:
             else:
                 field_key = f"{prefix}{field_name}"
                 fields["__annotations__"][field_key] = field_type
-                fields[field_key] = Field()
+                # Make fields nullable unless they're in non_nullable_fields
+                if field_key not in non_nullable_fields:
+                    fields[field_key] = Field(nullable=True)
+                else:
+                    fields[field_key] = Field()
 
     flatten_fields("", data_model)
     return type("TrajectorySQLModel", (SQLModel,), fields, table=True)
 
 
-TrajectorySQLModel = create_flattened_model(Trajectory)
+TrajectorySQLModel = create_flattened_model(
+    Trajectory, non_nullable_fields=["id", "path"]
+)
 
 
 def setup_database(path: str = BASE_ROBOT_DB_PATH) -> Engine:
@@ -51,6 +59,15 @@ def add_trajectory(engine: Engine, trajectory: Trajectory):
     trajectory_sql_model = TrajectorySQLModel(**trajectory.flatten_fields(""))
     with Session(engine) as session:
         session.add(trajectory_sql_model)
+        session.commit()
+
+
+def add_trajectories(engine: Engine, trajectories: t.List[Trajectory]):
+    # use add_all; potentially update to bulk_save_objects
+    with Session(engine) as session:
+        session.add_all(
+            [TrajectorySQLModel(**t.flatten_fields("")) for t in trajectories]
+        )
         session.commit()
 
 

@@ -45,6 +45,7 @@ class Task(BaseConfig):
 
 class Trajectory(BaseConfig):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    path: str
     robot: Robot
     environment: Environment
     task: Task

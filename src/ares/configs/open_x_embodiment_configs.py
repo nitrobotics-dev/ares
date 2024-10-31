@@ -35,7 +35,7 @@ class TensorConverterMixin(BaseModel):
         return {k: convert_value(v) for k, v in data.items()}
 
 
-class EpisodeMetadata(TensorConverterMixin, BaseModel):
+class OpenXEmbodimentEpisodeMetadata(TensorConverterMixin, BaseModel):
     file_path: str
 
 
@@ -59,5 +59,5 @@ class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
 
 
 class OpenXEmbodimentEpisode(TensorConverterMixin, BaseModel):
-    episode_metadata: EpisodeMetadata
+    episode_metadata: OpenXEmbodimentEpisodeMetadata
     steps: list[OpenXEmbodimentStep]
