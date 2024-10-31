@@ -4,13 +4,16 @@ from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
 import numpy as np
 import string
 import typing as t
+from tensorflow_datasets.core import DatasetInfo
 
 
 class InformationExtractor:
     def __init__(self):
         pass
 
-    def extract(self, episode: OpenXEmbodimentEpisode) -> Trajectory:
+    def extract(
+        self, episode: OpenXEmbodimentEpisode, dataset_info: DatasetInfo
+    ) -> Trajectory:
         raise NotImplementedError
 
 
@@ -23,7 +26,9 @@ class RandomInformationExtractor(InformationExtractor):
             )
         )
 
-    def extract(self, episode: OpenXEmbodimentEpisode) -> Trajectory:
+    def extract(
+        self, episode: OpenXEmbodimentEpisode, dataset_info: DatasetInfo
+    ) -> Trajectory:
         robot = Robot(
             name=self.random_string(),
             sensor=np.random.choice(["camera", "wrist", "gripper"]),
@@ -47,4 +52,5 @@ class RandomInformationExtractor(InformationExtractor):
             environment=environment,
             task=task,
             length=len(episode.steps),
+            dataset_name=dataset_info.name,
         )

@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from ares.configs.base import Trajectory
 
-BASE_ROBOT_DB_PATH = "sqlite:///robot_data.db"
-TEST_ROBOT_DB_PATH = "sqlite:///test_robot_data.db"
+SQLITE_PREFIX = "sqlite:///"
+BASE_ROBOT_DB_PATH = SQLITE_PREFIX + "robot_data.db"
+TEST_ROBOT_DB_PATH = SQLITE_PREFIX + "test_robot_data.db"
 
 
 # dynamically build flattened SQLModel class
@@ -44,6 +45,8 @@ def create_flattened_model(
     return type("TrajectorySQLModel", (SQLModel,), fields, table=True)
 
 
+# creates the flattened SQLModel class dynamically from the Trajectory config
+# note that all fields are nullable by default, except for id and path
 TrajectorySQLModel = create_flattened_model(
     Trajectory, non_nullable_fields=["id", "path"]
 )

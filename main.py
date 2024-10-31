@@ -20,16 +20,18 @@ from ares.database import (
     add_trajectory,
     add_trajectories,
     TEST_ROBOT_DB_PATH,
+    SQLITE_PREFIX,
 )
 from ares.extractor import RandomInformationExtractor
 
 
-def build_dataset(dataset_name: str, data_dir: str, split: str = "train"):
+def build_dataset(
+    dataset_name: str, data_dir: str
+) -> tuple[tfds.builder, tfds.datasets]:
     builder = tfds.builder(dataset_name, data_dir=data_dir)
     builder.download_and_prepare()
     datasets = builder.as_dataset()
-    ds = datasets[split]
-    return ds
+    return builder, datasets
 
 
 if __name__ == "__main__":
@@ -38,17 +40,23 @@ if __name__ == "__main__":
     dataset_name = "cmu_play_fusion"
     data_dir = "/workspaces/ares/data"
 
-    ds = build_dataset(dataset_name, data_dir, split="train")
+    builder, datasets = build_dataset(dataset_name, data_dir)
+    dataset_info = builder.info
+    ds = datasets["train"]
 
-    breakpoint()
     random_extractor = RandomInformationExtractor()
+
+    os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
 
     trajectories = []
     add_and_commit_times = []
+
     for i, ep in tqdm(enumerate(ds)):
         episode = OpenXEmbodimentEpisode(**ep)
-        trajectory = random_extractor.extract(episode)
+        trajectory = random_extractor.extract(
+            episode=episode, dataset_info=dataset_info
+        )
         trajectories.append(trajectory)
         # just track this
         start_time = time.time()
@@ -61,7 +69,7 @@ if __name__ == "__main__":
         f"mean (sum) --> add and commit time: {np.mean(add_and_commit_times), np.sum(add_and_commit_times)}"
     )
 
-    os.remove(TEST_ROBOT_DB_PATH)
+    os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
 
     tic = time.time()
