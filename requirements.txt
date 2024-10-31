@@ -10,6 +10,7 @@ sqlmodel
 timm==0.9.10
 Pillow
 imageio
+litellm
 
 # datasets and utilities
 datasets

@@ -34,6 +34,7 @@ class Task(BaseConfig):
     description: str
     success_criteria: str
     success: float
+    language_instruction: str
 
     @model_validator(mode="after")
     def check_success(self):
@@ -47,3 +48,4 @@ class Trajectory(BaseConfig):
     robot: Robot
     environment: Environment
     task: Task
+    length: int

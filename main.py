@@ -9,7 +9,7 @@ import imageio
 import os
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-
+from tqdm import tqdm
 
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
 from ares.configs.base import Robot, Environment, Task, Trajectory
@@ -40,21 +40,23 @@ if __name__ == "__main__":
     random_extractor = RandomInformationExtractor()
 
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
-    # for i, ep in enumerate(ds):
+
+    # for i, ep in tqdm(enumerate(ds)):
     #     episode = OpenXEmbodimentEpisode(**ep)
     #     trajectory = random_extractor.extract(episode)
     #     add_trajectory(engine, trajectory)
-    #     if i > 5:
+    #     if i > 50:
     #         break
 
     sess = Session(engine)
-    row_count = sess.execute(
-        select(func.count()).select_from(TrajectorySQLModel)
-    ).scalar_one()
-    res = (
-        sess.query(TrajectorySQLModel)
-        .filter(TrajectorySQLModel.task_success > 0.5)
-        .all()
-    )
-    print(f"mean wins: {len(res) / row_count}")
+    # row_count = sess.execute(
+    #     select(func.count()).select_from(TrajectorySQLModel)
+    # ).scalar_one()
+    # res = (
+    #     sess.query(TrajectorySQLModel)
+    #     .filter(TrajectorySQLModel.task_success > 0.5)
+    #     .all()
+    # )
+    # print(f"mean wins: {len(res) / row_count}")
+    #  res = sess.scalars(sess.query(TrajectorySQLModel.task_language_instruction)).all()
     breakpoint()

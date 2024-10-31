@@ -1,3 +1,4 @@
+import os
 from ares.configs.base import Robot, Environment, Task, Trajectory
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
 import numpy as np
@@ -22,7 +23,7 @@ class RandomInformationExtractor(InformationExtractor):
             )
         )
 
-    def extract(self, _) -> Trajectory:
+    def extract(self, episode: OpenXEmbodimentEpisode) -> Trajectory:
         robot = Robot(
             name=self.random_string(),
             sensor=np.random.choice(["camera", "wrist", "gripper"]),
@@ -37,6 +38,9 @@ class RandomInformationExtractor(InformationExtractor):
             description=self.random_string(),
             success_criteria=self.random_string(),
             success=np.random.uniform(0, 1),
+            language_instruction=episode.steps[0].language_instruction,
         )
 
-        return Trajectory(robot=robot, environment=environment, task=task)
+        return Trajectory(
+            robot=robot, environment=environment, task=task, length=len(episode.steps)
+        )
