@@ -11,7 +11,12 @@ timm==0.9.10
 Pillow
 imageio
 litellm
+opencv-python
+
 
 # datasets and utilities
 datasets
 tensorflow-datasets==4.9.3
+
+# llm providers
+vertexai
