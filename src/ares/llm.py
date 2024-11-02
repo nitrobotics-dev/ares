@@ -152,6 +152,7 @@ def split_video_to_frames(video_path: str) -> list[np.ndarray]:
 
 if __name__ == "__main__":
     os.environ["LITELLM_LOG"] = "DEBUG"
+    litellm.set_verbose=True
 
     # video_path = "https://dnrjl01ydafck.cloudfront.net/v2/upload/processed_towel_fail.mp4"
     video_path = "/workspaces/ares/data/pi_demos/processed_towel_fail.mp4"
@@ -160,64 +161,68 @@ if __name__ == "__main__":
     # vlm = GeminiVideoLLM("gemini", "gemini-1.5-flash", dict())
     # out = vlm.ask(None, prompt, {}, None, video_path)
 
-    frames = split_video_to_frames(video_path)
+    frames = split_video_to_frames(video_path)[::10]
+    if frames[0].shape[0] > 224 or frames[0].shape[1] > 224:
+        # downsample each frame to (224,224)
+        frames = [cv2.resize(frame, (224, 224)) for frame in frames]
 
-    breakpoint()
-    # provider = "gemini"
-    # llm = f"{provider}/gemini-1.5-flash"
-    # llm = LLM(provider=provider, llm=llm)
-    # # if not llm.check_valid_key():
-    # #     print("Invalid key")
-    # #     exit(1)
+    provider = "gemini"
+    llm = f"{provider}/gemini-1.5-flash"
+    llm = LLM(provider=provider, llm=llm)
+    # if not llm.check_valid_key():
+    #     print("Invalid key")
+    #     exit(1)
 
-    # from pydantic import BaseModel, Field
+    from pydantic import BaseModel, Field
 
-    # class TrajectoryDescription(BaseModel):
-    #     robot_setup: t.Literal["one arm", "two arms"]
-    #     environment: t.Literal["floor", "table", "other"]
-    #     lighting_conditions: t.Literal["normal", "dim", "bright"]
-    #     task: str = Field(max_length=50)  # Short task description
-    #     description: str = Field(max_length=500)  # Detailed task description
+    class TrajectoryDescription(BaseModel):
+        robot_setup: t.Literal["one arm", "two arms"]
+        environment: t.Literal["floor", "table", "other"]
+        lighting_conditions: t.Literal["normal", "dim", "bright"]
+        task: str = Field(max_length=50)  # Short task description
+        description: str = Field(max_length=500)  # Detailed task description
 
-    # # Build instruction string dynamically from model fields
-    # field_instructions = []
-    # for field_name, field in TrajectoryDescription.model_fields.items():
-    #     field_instructions.append(f"    - {field_name}: {str(field)}")
+    # Build instruction string dynamically from model fields
+    field_instructions = []
+    for field_name, field in TrajectoryDescription.model_fields.items():
+        field_instructions.append(f"    - {field_name}: {str(field)}")
 
-    # instructions = f"""
-    # Consider all the features of the video. Respond with an answer for each of the features below:
-    # {chr(10).join(field_instructions)}
-    # """.strip()
+    instructions = f"""
+    Consider all the features of the video. Respond with an answer for each of the features below:
+    {chr(10).join(field_instructions)}
+    """.strip()
 
-    # # Build example response dict dynamically from model fields
-    # example_dict = {}
-    # traj_items = list(TrajectoryDescription.model_fields.items())
-    # for field_name, field in [traj_items[0], traj_items[-1]]:
-    #     if hasattr(field.annotation, "__args__"):  # For Literal types
-    #         example_dict[field_name] = field.annotation.__args__[0]
-    #     else:
-    #         example_dict[field_name] = "..."
+    # Build example response dict dynamically from model fields
+    example_dict = {}
+    traj_items = list(TrajectoryDescription.model_fields.items())
+    for field_name, field in [traj_items[0], traj_items[-1]]:
+        if hasattr(field.annotation, "__args__"):  # For Literal types
+            example_dict[field_name] = field.annotation.__args__[0]
+        else:
+            example_dict[field_name] = "..."
 
-    # response_format = f"""
-    # Respond with a python dict, e.g. {example_dict}
+    response_format = f"""
+    Respond with a python dict, e.g. {example_dict}
 
-    # Here is a link to the video: https://dnrjl01ydafck.cloudfront.net/v2/upload/processed_towel_fail.mp4
-    # """.strip()
+    Here is a link to the video: https://dnrjl01ydafck.cloudfront.net/v2/upload/processed_towel_fail.mp4
+    """.strip()
 
-    # # im_path = "data/pi_eggs.png"
+    # im_path = "data/pi_eggs.png"
     # im_path = "https://dnrjl01ydafck.cloudfront.net/v2/upload/processed_towel_fail.mp4"
 
-    # info_dict = {
-    #     "instructions": instructions,
-    #     "response_format": response_format,
-    # }
+    info_dict = {
+        "instructions": instructions,
+        "response_format": response_format,
+    }
     # images = [im_path]
 
-    # messages, res = llm.ask(
-    #     "test_prompt.jinja2",
-    #     info_dict,
-    #     images=[im_path],
-    # )
 
-    # breakpoint()
-    # print(res.choices[0].message.content)
+
+    messages, res = llm.ask(
+        "test_prompt.jinja2",
+        info_dict,
+        images=frames,
+    )
+
+    breakpoint()
+    print(res.choices[0].message.content)
