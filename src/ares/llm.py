@@ -13,23 +13,10 @@ import io
 import vertexai
 from vertexai.generative_models import GenerativeModel, Part
 import cv2
+from pydantic import BaseModel, Field
 
 
-def encode_image(image: t.Union[str, np.ndarray, Image.Image]) -> str:
-    if isinstance(image, str):  # file path
-        with open(image, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode("utf-8")
-    elif isinstance(image, (np.ndarray, Image.Image)):  # numpy array or PIL image
-        if isinstance(image, np.ndarray):
-            image = Image.fromarray(image)
-        buffered = io.BytesIO()
-        image.save(buffered, format="PNG")
-        return base64.b64encode(buffered.getvalue()).decode("utf-8")
-    else:
-        raise TypeError(
-            "Unsupported image format. Use file path, numpy array, or PIL image."
-        )
-
+from ares.image_utils import encode_image, split_video_to_frames, choose_and_preprocess_frames
 
 class LLM:
     def __init__(self, provider: str, llm: str, llm_kwargs: dict = {}):
@@ -91,16 +78,6 @@ class LLM:
             model=self.llm, messages=messages, **self.llm_kwargs
         )
 
-    # async def aask(
-    #     self,
-    #     prompt_filename: str,
-    #     info: dict,
-    #     images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
-    # ) -> str:
-    #     messages = self._construct_messages(prompt_filename, info, images)
-    #     return await acompletion(model=self.llm, messages=messages, **self.llm_kwargs)
-
-
 class GeminiVideoLLM(LLM):
     def __init__(self, provider: str, llm: str, llm_kwargs: dict = {}):
         super().__init__(provider, llm, llm_kwargs)
@@ -138,85 +115,93 @@ class GeminiVideoLLM(LLM):
         )
         breakpoint()
 
-def split_video_to_frames(video_path: str) -> list[np.ndarray]:
-    cap = cv2.VideoCapture(video_path)
-    frames = []
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frames.append(frame)
-    cap.release()
-    return frames
+class TrajectoryDescription(BaseModel):
+    robot_setup: t.Literal["one arm", "two arms"]
+    environment: t.Literal["floor", "table", "other"]
+    lighting_conditions: t.Literal["normal", "dim", "bright"]
+    # task: str = Field(max_length=50, description="Short task description")
+    description: str = Field(max_length=1000, description="A detailed description of the robot's actions over the course of the images.")  # Detailed task description
+    success: str = Field(max_length=1000, description="""
+    A detailed description of whether or not the robot successfully completes the task. 
+    Be very specific and critical about whether or not the robot has met the intended goal state of the task and include lots of details pertaining to partial success.
+    """.strip())
 
+    @classmethod
+    def to_field_instructions(cls):
+        field_instructions = []
+        for field_name, field in cls.model_fields.items():
+            field_instructions.append(f"    - {field_name}: {str(field)}")
+        return field_instructions
+
+    @classmethod
+    def to_example_dict(cls):
+        example_dict = {}
+        traj_items = list(cls.model_fields.items())
+        for field_name, field in [traj_items[0], traj_items[-1]]:
+            if hasattr(field.annotation, "__args__"):  # For Literal types
+                example_dict[field_name] = field.annotation.__args__[0]
+            else:
+                example_dict[field_name] = "..."
+        return example_dict
 
 if __name__ == "__main__":
-    os.environ["LITELLM_LOG"] = "DEBUG"
-    litellm.set_verbose=True
+    import math
+    from ares.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
+    # os.environ["LITELLM_LOG"] = "DEBUG"
+    # litellm.set_verbose=True
+
+    # task = "Paper towel in holder"
+    # task = "Eggs in carton"
+    task = "Grocery Bagging"
 
     # video_path = "https://dnrjl01ydafck.cloudfront.net/v2/upload/processed_towel_fail.mp4"
-    video_path = "/workspaces/ares/data/pi_demos/processed_towel_fail.mp4"
-    # prompt = """please describe the video. specifically, how well the robot succeeds in the task it is attempting -- does it actually achieve the task? if not, why not?"""
-    
+    # video_path = os.path.join(PI_DEMO_PATH, "processed_towel_fail.mp4")   
+    # video_path = os.path.join(PI_DEMO_PATH, "processed_eggs_fail.mp4")
+    # video_path = os.path.join(PI_DEMO_PATH, "processed_eggs_success.mp4")
+    # video_path = os.path.join(PI_DEMO_PATH, f"processed_grocery_bagging_fail.mp4")
+    video_path = os.path.join(PI_DEMO_PATH, f"processed_grocery_bagging_success.mp4")
+
+
+
+    n_frames = 10
+    all_frames = split_video_to_frames(video_path)
+    specified_frames = None
+    frames = choose_and_preprocess_frames(all_frames, n_frames, specified_frames=specified_frames, resize=(224, 224))
+
+    # provider = "gemini"
+    # llm = f"{provider}/gemini-1.5-flash"
+
+    provider = "openai"
+    llm = f"{provider}/gpt-4o"
+    # llm = f"{provider}/gpt-4o-mini"
+    # llm = f"{provider}/gpt-4-turbo"
+
     # vlm = GeminiVideoLLM("gemini", "gemini-1.5-flash", dict())
-    # out = vlm.ask(None, prompt, {}, None, video_path)
-
-    frames = split_video_to_frames(video_path)[::10]
-    if frames[0].shape[0] > 224 or frames[0].shape[1] > 224:
-        # downsample each frame to (224,224)
-        frames = [cv2.resize(frame, (224, 224)) for frame in frames]
-
-    provider = "gemini"
-    llm = f"{provider}/gemini-1.5-flash"
     llm = LLM(provider=provider, llm=llm)
-    # if not llm.check_valid_key():
-    #     print("Invalid key")
-    #     exit(1)
 
-    from pydantic import BaseModel, Field
-
-    class TrajectoryDescription(BaseModel):
-        robot_setup: t.Literal["one arm", "two arms"]
-        environment: t.Literal["floor", "table", "other"]
-        lighting_conditions: t.Literal["normal", "dim", "bright"]
-        task: str = Field(max_length=50)  # Short task description
-        description: str = Field(max_length=500)  # Detailed task description
 
     # Build instruction string dynamically from model fields
-    field_instructions = []
-    for field_name, field in TrajectoryDescription.model_fields.items():
-        field_instructions.append(f"    - {field_name}: {str(field)}")
+    field_instructions = TrajectoryDescription.to_field_instructions()
 
+
+    # Build instructions string, will go into prompt jinja2 template
     instructions = f"""
-    Consider all the features of the video. Respond with an answer for each of the features below:
+    Look at the images provided and consider the following task description:
+    TASK: {PI_DEMO_TASKS[task]}
+
+    Create a response to the task by answering the following questions:
     {chr(10).join(field_instructions)}
     """.strip()
 
     # Build example response dict dynamically from model fields
-    example_dict = {}
-    traj_items = list(TrajectoryDescription.model_fields.items())
-    for field_name, field in [traj_items[0], traj_items[-1]]:
-        if hasattr(field.annotation, "__args__"):  # For Literal types
-            example_dict[field_name] = field.annotation.__args__[0]
-        else:
-            example_dict[field_name] = "..."
-
     response_format = f"""
-    Respond with a python dict, e.g. {example_dict}
-
-    Here is a link to the video: https://dnrjl01ydafck.cloudfront.net/v2/upload/processed_towel_fail.mp4
+    Respond with a python dict, e.g. {TrajectoryDescription.to_example_dict()}. Respond with JUST the necessary text.
     """.strip()
-
-    # im_path = "data/pi_eggs.png"
-    # im_path = "https://dnrjl01ydafck.cloudfront.net/v2/upload/processed_towel_fail.mp4"
 
     info_dict = {
         "instructions": instructions,
         "response_format": response_format,
     }
-    # images = [im_path]
-
-
 
     messages, res = llm.ask(
         "test_prompt.jinja2",
