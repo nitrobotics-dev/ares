@@ -1,8 +1,8 @@
 import base64
 import io
 import os
-import typing as t
 import tempfile
+import typing as t
 
 import cv2
 import numpy as np
@@ -25,7 +25,9 @@ def encode_image(image: t.Union[str, np.ndarray, Image.Image]) -> str:
         )
 
 
-def split_video_to_frames(video_path: str, filesize_limit_mb: int = 20) -> list[np.ndarray | str]:
+def split_video_to_frames(
+    video_path: str, filesize_limit_mb: int = 20
+) -> list[np.ndarray | str]:
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
@@ -40,7 +42,9 @@ def split_video_to_frames(video_path: str, filesize_limit_mb: int = 20) -> list[
         if not ret:
             break
         if write_images_flag:
-            frame_path = os.path.join(tempfile.gettempdir(), f"frame_{cap.get(cv2.CAP_PROP_POS_FRAMES)}.png")
+            frame_path = os.path.join(
+                tempfile.gettempdir(), f"frame_{cap.get(cv2.CAP_PROP_POS_FRAMES)}.png"
+            )
             cv2.imwrite(frame_path, frame)
             frames.append(frame_path)
         else:

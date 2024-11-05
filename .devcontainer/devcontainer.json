@@ -22,18 +22,9 @@
                 "matangover.mypy"
             ],
             "settings": {
-                "editor.formatOnSave": true,
                 "python.formatting.provider": "black",
-                "python.linting.mypyEnabled": true,
-                "python.linting.enabled": true,
-                "isort.args": [
-                    "--profile",
-                    "black"
-                ],
                 "[python]": {
-                    "editor.codeActionsOnSave": {
-                        "source.organizeImports": true
-                    },
+                    "editor.formatOnSave": true,
                     "editor.defaultFormatter": "ms-python.black-formatter"
                 }
             }

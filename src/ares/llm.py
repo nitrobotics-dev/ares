@@ -68,7 +68,7 @@ class LLM:
             ]
             content.extend(image_contents)
         if double_prompt:
-            content.append({"type":"text", "text": prompt})
+            content.append({"type": "text", "text": prompt})
         return [{"role": "user", "content": content}]
 
     def ask(
@@ -81,7 +81,9 @@ class LLM:
     ) -> t.Tuple[t.Any, ModelResponse]:
         if video_path:
             raise NotImplementedError("Video path not implemented for this LLM")
-        messages = self._construct_messages(prompt_filename, info, images, double_prompt)
+        messages = self._construct_messages(
+            prompt_filename, info, images, double_prompt
+        )
         return messages, completion(
             model=self.llm_name, messages=messages, **self.llm_kwargs
         )
@@ -193,7 +195,9 @@ if __name__ == "__main__":
     # success = "fail"
     success = "success"
 
-    video_path = os.path.join(PI_DEMO_PATH, f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success}.mp4")
+    video_path = os.path.join(
+        PI_DEMO_PATH, f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success}.mp4"
+    )
     n_frames = 10
     all_frames = split_video_to_frames(video_path)
     print(f"split video into {len(all_frames)} frames")
@@ -201,7 +205,6 @@ if __name__ == "__main__":
     frames = choose_and_preprocess_frames(
         all_frames, n_frames, specified_frames=specified_frames, resize=(224, 224)
     )
-
 
     # provider = "gemini"
     # llm_name = f"{provider}/gemini-1.5-flash"
