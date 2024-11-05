@@ -48,9 +48,7 @@ def create_flattened_model(
 
 # creates the flattened SQLModel class dynamically from the Rollout config
 # note that all fields are nullable by default, except for id and path
-RolloutSQLModel = create_flattened_model(
-    Rollout, non_nullable_fields=["id", "path"]
-)
+RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
 
 
 def setup_database(path: str = BASE_ROBOT_DB_PATH) -> Engine:
@@ -69,18 +67,16 @@ def add_rollout(engine: Engine, rollout: Rollout) -> None:
 def add_rollouts(engine: Engine, rollouts: t.List[Rollout]) -> None:
     # use add_all; potentially update to bulk_save_objects
     with Session(engine) as session:
-        session.add_all(
-            [RolloutSQLModel(**t.flatten_fields("")) for t in rollouts]
-        )
+        session.add_all([RolloutSQLModel(**t.flatten_fields("")) for t in rollouts])
         session.commit()
 
 
 if __name__ == "__main__":
-    from ares.configs.test_configs import TRAJ1, TRAJ2
+    from ares.configs.test_configs import ROLL1, ROLL2
 
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
-    add_rollout(engine, TRAJ1)
-    add_rollout(engine, TRAJ2)
+    add_rollout(engine, ROLL1)
+    add_rollout(engine, ROLL2)
 
     sess = Session(engine)
     res = sess.query(RolloutSQLModel).filter(RolloutSQLModel.task_success > 0.5)

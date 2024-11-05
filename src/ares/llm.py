@@ -164,8 +164,8 @@ class RolloutDescription(BaseModel):
     @classmethod
     def to_example_dict(cls) -> dict:
         example_dict = {}
-        traj_items = list(cls.model_fields.items())
-        for field_name, field in [traj_items[0], traj_items[-1]]:
+        rollout_fields = list(cls.model_fields.items())
+        for field_name, field in [rollout_fields[0], rollout_fields[-1]]:
             if hasattr(field.annotation, "__args__"):  # For Literal types
                 example_dict[field_name] = field.annotation.__args__[0]
             else:
