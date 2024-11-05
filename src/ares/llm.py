@@ -2,7 +2,6 @@ import base64
 import os
 import typing as t
 
-import litellm
 import numpy as np
 import vertexai
 from jinja2 import Environment, FileSystemLoader

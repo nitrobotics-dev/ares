@@ -58,7 +58,7 @@ def choose_and_preprocess_frames(
     n_frames: int = 10,
     specified_frames: list[int] | None = None,
     resize: tuple[int, int] | None = None,
-) -> list[np.ndarray]:
+)-> list[np.ndarray]:
     if specified_frames is None:
         total_frames = len(all_frames)
         indices = np.linspace(0, total_frames - 1, n_frames, dtype=int, endpoint=True)

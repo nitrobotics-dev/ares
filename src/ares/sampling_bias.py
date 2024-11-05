@@ -7,8 +7,9 @@ Note: individual sampling strategies are not guaranteed to return F frames. Use 
 The `sampling_bias` function will sample extra frames if necessary to reach the target number of frames or uniformly subsample if more frames are sampled than necessary.
 """
 
-import numpy as np
 import typing as t
+
+import numpy as np
 
 
 # linear sampling bias

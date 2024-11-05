@@ -1,10 +1,12 @@
 import os
-from ares.configs.base import Robot, Environment, Task, Trajectory
-from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
-import numpy as np
 import string
 import typing as t
+
+import numpy as np
 from tensorflow_datasets.core import DatasetInfo
+
+from ares.configs.base import Environment, Robot, Task, Trajectory
+from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
 
 
 class InformationExtractor:

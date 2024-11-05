@@ -1,9 +1,10 @@
 import typing as t
 import uuid
+
 from pydantic import BaseModel
-from sqlmodel import SQLModel, Field, create_engine, Session
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
+from sqlmodel import Field, Session, SQLModel, create_engine
 
 from ares.configs.base import Trajectory
 

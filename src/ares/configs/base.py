@@ -1,8 +1,8 @@
-import uuid
-from pydantic import BaseModel, model_validator
 import typing as t
+import uuid
+
+from pydantic import BaseModel, model_validator
 from sqlmodel import Field
-from pydantic import BaseModel
 
 
 class BaseConfig(BaseModel):

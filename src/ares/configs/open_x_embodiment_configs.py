@@ -1,6 +1,6 @@
-from pydantic import BaseModel, model_validator
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
+from pydantic import BaseModel, model_validator
 
 
 class TensorConverterMixin(BaseModel):

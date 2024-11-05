@@ -1,4 +1,4 @@
-from configs import Robot, Environment, Task, Trajectory, TrajectorySQLModel
+from configs import Environment, Robot, Task, Trajectory, TrajectorySQLModel
 
 ROBOT1 = Robot(name="robot1", type="robot", sensor="camera")
 ENV1 = Environment(
