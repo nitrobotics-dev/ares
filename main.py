@@ -1,26 +1,26 @@
-import time
-import datasets
-import os
 import logging
-import tensorflow_datasets as tfds
-import numpy as np
-from PIL import Image
-from IPython import display
-import imageio
 import os
+import time
+
+import datasets
+import imageio
+import numpy as np
+import tensorflow_datasets as tfds
+from IPython import display
+from PIL import Image
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
+from ares.configs.base import Environment, Robot, Task, Trajectory
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
-from ares.configs.base import Robot, Environment, Task, Trajectory
 from ares.database import (
-    TrajectorySQLModel,
-    setup_database,
-    add_trajectory,
-    add_trajectories,
-    TEST_ROBOT_DB_PATH,
     SQLITE_PREFIX,
+    TEST_ROBOT_DB_PATH,
+    TrajectorySQLModel,
+    add_trajectories,
+    add_trajectory,
+    setup_database,
 )
 from ares.extractor import RandomInformationExtractor
 

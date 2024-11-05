@@ -163,5 +163,4 @@ cython_debug/
 
 *.db
 data/*
-graphics
-openvla
+.DS_Store
