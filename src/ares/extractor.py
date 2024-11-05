@@ -5,22 +5,22 @@ import typing as t
 import numpy as np
 from tensorflow_datasets.core import DatasetInfo
 
-from ares.configs.base import Environment, Robot, Task, Trajectory
+from ares.configs.base import Environment, Robot, Task, Rollout
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
 
 
 class InformationExtractor:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def extract(
         self, episode: OpenXEmbodimentEpisode, dataset_info: DatasetInfo
-    ) -> Trajectory:
+    ) -> Rollout:
         raise NotImplementedError
 
 
 class RandomInformationExtractor(InformationExtractor):
-    def random_string(self, length_bound: t.Optional[int] = 10) -> str:
+    def random_string(self, length_bound: int = 10) -> str:
         return "".join(
             np.random.choice(
                 string.ascii_lowercase.split(),
@@ -30,7 +30,7 @@ class RandomInformationExtractor(InformationExtractor):
 
     def extract(
         self, episode: OpenXEmbodimentEpisode, dataset_info: DatasetInfo
-    ) -> Trajectory:
+    ) -> Rollout:
         robot = Robot(
             name=self.random_string(),
             sensor=np.random.choice(["camera", "wrist", "gripper"]),
@@ -48,7 +48,7 @@ class RandomInformationExtractor(InformationExtractor):
             language_instruction=episode.steps[0].language_instruction,
         )
 
-        return Trajectory(
+        return Rollout(
             path=episode.episode_metadata.file_path,
             robot=robot,
             environment=environment,

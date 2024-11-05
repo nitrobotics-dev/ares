@@ -43,7 +43,7 @@ class Task(BaseConfig):
         return self
 
 
-class Trajectory(BaseConfig):
+class Rollout(BaseConfig):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     path: str
     dataset_name: str

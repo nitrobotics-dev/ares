@@ -133,7 +133,7 @@ class GeminiVideoLLM(LLM):
         return messages, responses
 
 
-class TrajectoryDescription(BaseModel):
+class RolloutDescription(BaseModel):
     robot_setup: t.Literal["one arm", "two arms"]
     environment: t.Literal["floor", "table", "other"]
     lighting_conditions: t.Literal["normal", "dim", "bright"]
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     print(f"split video into {len(all_frames)} frames")
     specified_frames: list[int] | None = None
     frames = choose_and_preprocess_frames(
-        all_frames, n_frames, specified_frames=specified_frames, resize=(224, 224)
+        all_frames, n_frames, specified_frames=specified_frames, resize=(512, 512)
     )
 
     # provider = "gemini"
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     llm = LLM(provider=provider, llm_name=llm_name)
 
     # Build instruction string dynamically from model fields
-    field_instructions = TrajectoryDescription.to_field_instructions()
+    field_instructions = RolloutDescription.to_field_instructions()
 
     # Build instructions string, will go into prompt jinja2 template
     instructions = f"""
@@ -231,13 +231,14 @@ if __name__ == "__main__":
     # Build example response dict dynamically from model fields
     response_format = f"""
     For the response, first respond with about 500 words that describe the entire video, focusing on the robot's actions and the task.
-    Then, respond with a python dict, e.g. {TrajectoryDescription.to_example_dict()} that fulfills the above specifications.
+    Then, respond with a python dict, e.g. {RolloutDescription.to_example_dict()} that fulfills the above specifications.
     """.strip()
 
     info_dict = {
         "instructions": instructions,
         "response_format": response_format,
     }
+    breakpoint()
 
     messages, res = llm.ask(
         "test_prompt.jinja2",

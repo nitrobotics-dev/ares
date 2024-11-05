@@ -70,5 +70,5 @@ def choose_and_preprocess_frames(
         frames = [cv2.imread(frame) for frame in frames]
 
     if resize:
-        frames = [cv2.resize(frame, (224, 224)) for frame in frames]
+        frames = [cv2.resize(frame, resize) for frame in frames]
     return frames
