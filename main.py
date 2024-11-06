@@ -9,18 +9,20 @@ from tqdm import tqdm
 
 from ares.configs.base import Environment, Robot, Rollout, Task
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
-from ares.database import (
+from ares.database import (  # RolloutSQLModel,
     SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
-    RolloutSQLModel,
     add_rollout,
     add_rollouts,
+    create_flattened_model,
     setup_database,
 )
 from ares.extractor import (
     LLMInformationExtractor,
     RandomInformationExtractor,
+    hard_coded_dataset_info_extraction,
     hard_coded_episode_info_extraction,
+    merge_dicts,
 )
 
 
@@ -35,8 +37,8 @@ def build_dataset(
 
 if __name__ == "__main__":
     hf_base = "jxu124/OpenX-Embodiment"
-    # dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
-    dataset_name = "cmu_play_fusion"
+    dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
+    # dataset_name = "cmu_play_fusion"
     data_dir = "/workspaces/ares/data"
 
     builder, datasets = build_dataset(dataset_name, data_dir)
@@ -48,13 +50,17 @@ if __name__ == "__main__":
     os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
 
-    rollouts = []
-    add_and_commit_times = []
+    rollouts: list[Rollout] = []
+    add_and_commit_times: list[float] = []
 
     for i, ep in tqdm(enumerate(ds)):
         episode = OpenXEmbodimentEpisode(**ep)
         steps = episode.steps
+        dataset_info_dict = hard_coded_dataset_info_extraction(dataset_info)
         episode_info_dict = hard_coded_episode_info_extraction(episode)
+        hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
+        traj = hardcoded_info["trajectory"]
+        print(traj["is_first"], traj["is_last"], traj["is_terminal"])
 
         breakpoint()
         # rollout = random_extractor.extract(
@@ -82,6 +88,8 @@ if __name__ == "__main__":
     print(f"time to add all rollouts: {np.mean(bunch_time), np.sum(bunch_time)}")
 
     sess = Session(engine)
+    # RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
+
     # row_count = sess.execute(
     #     select(func.count()).select_from(RolloutSQLModel)
     # ).scalar_one()

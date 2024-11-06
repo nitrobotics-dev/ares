@@ -14,7 +14,7 @@ import numpy as np
 
 # linear sampling bias
 def linear_sampling_bias(
-    input_n_frames: int, total_desired_frames: int, **kwargs
+    input_n_frames: int, total_desired_frames: int, **kwargs: t.Any
 ) -> t.Sequence[int]:
     """
     Sample frames with a probability linearly proportional to their index.
@@ -23,7 +23,7 @@ def linear_sampling_bias(
 
 
 def exponential_sampling_bias(
-    input_n_frames: int, total_desired_frames: int, rate: float = 5.0, **kwargs
+    input_n_frames: int, total_desired_frames: int, rate: float = 5.0, **kwargs: t.Any
 ) -> t.Sequence[int]:
     """
     Sample frames with exponentially increasing probability.
@@ -44,7 +44,7 @@ def threshold_sampling_bias(
     total_desired_frames: int,
     frame_threshold: float = 0.75,
     bias_rate: float = 0.5,
-):
+) -> t.Sequence[int]:
     """
     Uniformly sample frames with a proportion coming from before the frame_threshold and the rest coming from after.
     Control the bias rate to control the relative number of frames sampled from before and after.
@@ -63,7 +63,10 @@ def threshold_sampling_bias(
 
 
 def sampling_bias(
-    input_n_frames: int, total_desired_frames: int, strategy: str = "linear", **kwargs
+    input_n_frames: int,
+    total_desired_frames: int,
+    strategy: str = "linear",
+    **kwargs: t.Any,
 ) -> t.Sequence[int]:
     if input_n_frames < total_desired_frames:
         raise ValueError(
@@ -81,12 +84,15 @@ def sampling_bias(
             input_n_frames, total_desired_frames, **kwargs
         )
     if len(sampled) < total_desired_frames:
+        remaining_indices = list(set(range(input_n_frames)) - set(sampled))
         extra_samples = np.random.choice(
-            set(range(input_n_frames)) - set(sampled),
+            remaining_indices,
             size=total_desired_frames - len(sampled),
             replace=False,
         )
         sampled = sorted(sampled + extra_samples)
     elif len(sampled) > total_desired_frames:
-        sampled = np.random.choice(sampled, total_desired_frames, replace=False)
+        sampled = np.random.choice(
+            np.array(sampled), total_desired_frames, replace=False
+        )
     return sorted(sampled)

@@ -17,7 +17,7 @@ def encode_image(image: t.Union[str, np.ndarray, Image.Image]) -> str:
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
         buffered = io.BytesIO()
-        image.save(buffered, format="PNG")
+        image.save(buffered, format="JPEG")
         return base64.b64encode(buffered.getvalue()).decode("utf-8")
     else:
         raise TypeError(
@@ -43,7 +43,7 @@ def split_video_to_frames(
             break
         if write_images_flag:
             frame_path = os.path.join(
-                tempfile.gettempdir(), f"frame_{cap.get(cv2.CAP_PROP_POS_FRAMES)}.png"
+                tempfile.gettempdir(), f"frame_{cap.get(cv2.CAP_PROP_POS_FRAMES)}.jpg"
             )
             cv2.imwrite(frame_path, frame)
             frames.append(frame_path)
@@ -58,7 +58,7 @@ def choose_and_preprocess_frames(
     n_frames: int = 10,
     specified_frames: list[int] | None = None,
     resize: tuple[int, int] | None = None,
-)-> list[np.ndarray]:
+) -> list[np.ndarray]:
     if specified_frames is None:
         total_frames = len(all_frames)
         indices = np.linspace(0, total_frames - 1, n_frames, dtype=int, endpoint=True)

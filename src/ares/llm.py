@@ -11,11 +11,30 @@ from PIL import Image
 from pydantic import BaseModel, Field
 from vertexai.generative_models import GenerativeModel, Part
 
+from ares.configs.base import pydantic_to_example_dict, pydantic_to_field_instructions
 from ares.image_utils import (
     choose_and_preprocess_frames,
     encode_image,
     split_video_to_frames,
 )
+
+
+def structure_image_messages(
+    image: t.Union[str, np.ndarray, Image.Image], provider: str
+) -> dict:
+    if "anthropic" in provider:
+        return {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/jpeg",  # matches the JPEG format above
+                "data": encode_image(image),
+            },
+        }
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:image/jpeg;base64,{encode_image(image)}"},
+    }
 
 
 class LLM:
@@ -57,12 +76,7 @@ class LLM:
         content.append({"type": "text", "text": prompt})
         if images:
             image_contents = [
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{encode_image(images[i])}"
-                    },
-                }
+                structure_image_messages(images[i], provider=self.provider)
                 for i in range(len(images))
             ]
             content.extend(image_contents)
@@ -154,28 +168,8 @@ class RolloutDescription(BaseModel):
         description="A float score between 0 and 1, representing the success of the task. A score of 0 means the task was not completed at all, and a score of 1 means the task was completed absolutely perfectly.",
     )
 
-    @classmethod
-    def to_field_instructions(cls) -> list[str]:
-        field_instructions = []
-        for field_name, field in cls.model_fields.items():
-            field_instructions.append(f"    - {field_name}: {str(field)}")
-        return field_instructions
-
-    @classmethod
-    def to_example_dict(cls) -> dict:
-        example_dict = {}
-        rollout_fields = list(cls.model_fields.items())
-        for field_name, field in [rollout_fields[0], rollout_fields[-1]]:
-            if hasattr(field.annotation, "__args__"):  # For Literal types
-                example_dict[field_name] = field.annotation.__args__[0]
-            else:
-                example_dict[field_name] = "..."
-        return example_dict
-
 
 if __name__ == "__main__":
-    import math
-
     from ares.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 
     # os.environ["LITELLM_LOG"] = "DEBUG"
@@ -189,8 +183,8 @@ if __name__ == "__main__":
     # task = "Items in drawer"
     # task = "Laundry fold (shirts)"
     # task = "Laundry fold (shorts)"
-    # task = "Paper towel in holder"
-    task = "Food in to go box"
+    task = "Paper towel in holder"
+    # task = "Food in to go box"
     # success = "fail"
     success = "success"
 
@@ -213,11 +207,14 @@ if __name__ == "__main__":
     # llm_name = f"{provider}/gpt-4o-mini"
     # llm_name = f"{provider}/gpt-4-turbo"
 
+    # provider = "anthropic"
+    # llm_name = f"{provider}/claude-3-5-sonnet-20240620"
+
     # vlm = GeminiVideoLLM("gemini", "gemini-1.5-flash", dict())
     llm = LLM(provider=provider, llm_name=llm_name)
 
     # Build instruction string dynamically from model fields
-    field_instructions = RolloutDescription.to_field_instructions()
+    field_instructions = pydantic_to_field_instructions(RolloutDescription)
 
     # Build instructions string, will go into prompt jinja2 template
     instructions = f"""
@@ -231,14 +228,14 @@ if __name__ == "__main__":
     # Build example response dict dynamically from model fields
     response_format = f"""
     For the response, first respond with about 500 words that describe the entire video, focusing on the robot's actions and the task.
-    Then, respond with a python dict, e.g. {RolloutDescription.to_example_dict()} that fulfills the above specifications.
+    Then, respond with a python dict, e.g. {pydantic_to_example_dict(RolloutDescription)} that fulfills the above specifications.
     """.strip()
 
     info_dict = {
         "instructions": instructions,
         "response_format": response_format,
     }
-    breakpoint()
+    # breakpoint()
 
     messages, res = llm.ask(
         "test_prompt.jinja2",

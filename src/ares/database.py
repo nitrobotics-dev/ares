@@ -48,7 +48,7 @@ def create_flattened_model(
 
 # creates the flattened SQLModel class dynamically from the Rollout config
 # note that all fields are nullable by default, except for id and path
-RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
+# RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
 
 
 def setup_database(path: str = BASE_ROBOT_DB_PATH) -> Engine:
@@ -74,6 +74,9 @@ def add_rollouts(engine: Engine, rollouts: t.List[Rollout]) -> None:
 if __name__ == "__main__":
     from ares.configs.test_configs import ROLL1, ROLL2
 
+    RolloutSQLModel = create_flattened_model(
+        Rollout, non_nullable_fields=["id", "path"]
+    )
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
     add_rollout(engine, ROLL1)
     add_rollout(engine, ROLL2)

@@ -1,4 +1,4 @@
-from configs import Environment, Robot, Rollout, RolloutSQLModel, Task
+from ares.configs.base import Environment, Robot, Rollout, RolloutSQLModel, Task
 
 ROBOT1 = Robot(name="robot1", type="robot", sensor="camera")
 ENV1 = Environment(
