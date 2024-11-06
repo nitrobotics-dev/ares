@@ -7,17 +7,21 @@ import tensorflow_datasets as tfds
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
-from ares.configs.base import Environment, Robot, Task, Rollout
+from ares.configs.base import Environment, Robot, Rollout, Task
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
 from ares.database import (
     SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
     RolloutSQLModel,
-    add_rollouts,
     add_rollout,
+    add_rollouts,
     setup_database,
 )
-from ares.extractor import RandomInformationExtractor
+from ares.extractor import (
+    LLMInformationExtractor,
+    RandomInformationExtractor,
+    hard_coded_episode_info_extraction,
+)
 
 
 def build_dataset(
@@ -49,16 +53,20 @@ if __name__ == "__main__":
 
     for i, ep in tqdm(enumerate(ds)):
         episode = OpenXEmbodimentEpisode(**ep)
-        rollout = random_extractor.extract(
-            episode=episode, dataset_info=dataset_info
-        )
-        rollouts.append(rollout)
-        # just track this
-        start_time = time.time()
-        add_rollout(engine, rollout)
-        add_and_commit_times.append(time.time() - start_time)
-        if i > 50:
-            break
+        steps = episode.steps
+        episode_info_dict = hard_coded_episode_info_extraction(episode)
+
+        breakpoint()
+        # rollout = random_extractor.extract(
+        #     episode=episode, dataset_info=dataset_info
+        # )
+        # rollouts.append(rollout)
+        # # just track this
+        # start_time = time.time()
+        # add_rollout(engine, rollout)
+        # add_and_commit_times.append(time.time() - start_time)
+        # if i > 50:
+        #     break
 
     print(
         f"mean (sum) --> add and commit time: {np.mean(add_and_commit_times), np.sum(add_and_commit_times)}"
