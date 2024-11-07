@@ -5,18 +5,12 @@ import typing as t
 import numpy as np
 import vertexai
 from jinja2 import Environment, FileSystemLoader
-from litellm import completion, completion_cost
+from litellm import completion
 from litellm.utils import ModelResponse
 from PIL import Image
-from pydantic import BaseModel, Field
 from vertexai.generative_models import GenerativeModel, Part
 
-from ares.configs.base import pydantic_to_example_dict, pydantic_to_field_instructions
-from ares.image_utils import (
-    choose_and_preprocess_frames,
-    encode_image,
-    split_video_to_frames,
-)
+from ares.image_utils import encode_image
 
 
 def structure_image_messages(
@@ -145,104 +139,3 @@ class GeminiVideoLLM(LLM):
             generation_config=self.generation_config,
         )
         return messages, responses
-
-
-class RolloutDescription(BaseModel):
-    robot_setup: t.Literal["one arm", "two arms"]
-    environment: t.Literal["floor", "table", "other"]
-    lighting_conditions: t.Literal["normal", "dim", "bright"]
-    # task: str = Field(max_length=50, description="Short task description")
-    description: str = Field(
-        max_length=1000,
-        description="A detailed description of the robot's actions over the course of the images.",
-    )
-    success_str: str = Field(
-        max_length=1000,
-        description="""
-    A detailed description of whether or not the robot successfully completes the task. 
-    Be very specific and critical about whether or not the robot has met the intended goal state of the task and include lots of details pertaining to partial success.
-    In order to be successful, the robot must have completed the task in a way that is consistent with the task description. Any error or deviation from the task description is a failure.
-    """.strip(),
-    )
-    success_score: float = Field(
-        description="A float score between 0 and 1, representing the success of the task. A score of 0 means the task was not completed at all, and a score of 1 means the task was completed absolutely perfectly.",
-    )
-
-
-if __name__ == "__main__":
-    from ares.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
-
-    # os.environ["LITELLM_LOG"] = "DEBUG"
-    # litellm.set_verbose=True
-    # task = "Eggs in carton"
-    # task = "Grocery Bagging"
-    # task = "Toast out of toaster"
-    # task = "Towel fold"
-    # task = "Stack bowls"
-    # task = "Tupperware in microwave"
-    # task = "Items in drawer"
-    # task = "Laundry fold (shirts)"
-    # task = "Laundry fold (shorts)"
-    task = "Paper towel in holder"
-    # task = "Food in to go box"
-    # success = "fail"
-    success = "success"
-
-    video_path = os.path.join(
-        PI_DEMO_PATH, f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success}.mp4"
-    )
-    n_frames = 10
-    all_frames = split_video_to_frames(video_path)
-    print(f"split video into {len(all_frames)} frames")
-    specified_frames: list[int] | None = None
-    frames = choose_and_preprocess_frames(
-        all_frames, n_frames, specified_frames=specified_frames, resize=(512, 512)
-    )
-
-    # provider = "gemini"
-    # llm_name = f"{provider}/gemini-1.5-flash"
-
-    provider = "openai"
-    llm_name = f"{provider}/gpt-4o"
-    # llm_name = f"{provider}/gpt-4o-mini"
-    # llm_name = f"{provider}/gpt-4-turbo"
-
-    # provider = "anthropic"
-    # llm_name = f"{provider}/claude-3-5-sonnet-20240620"
-
-    # vlm = GeminiVideoLLM("gemini", "gemini-1.5-flash", dict())
-    llm = LLM(provider=provider, llm_name=llm_name)
-
-    # Build instruction string dynamically from model fields
-    field_instructions = pydantic_to_field_instructions(RolloutDescription)
-
-    # Build instructions string, will go into prompt jinja2 template
-    instructions = f"""
-    Look at the images provided and consider the following task description:
-    TASK: {PI_DEMO_TASKS[task]}
-
-    Create a response to the task by answering the following questions:
-    {chr(10).join(field_instructions)}
-    """.strip()
-
-    # Build example response dict dynamically from model fields
-    response_format = f"""
-    For the response, first respond with about 500 words that describe the entire video, focusing on the robot's actions and the task.
-    Then, respond with a python dict, e.g. {pydantic_to_example_dict(RolloutDescription)} that fulfills the above specifications.
-    """.strip()
-
-    info_dict = {
-        "instructions": instructions,
-        "response_format": response_format,
-    }
-    # breakpoint()
-
-    messages, res = llm.ask(
-        "test_prompt.jinja2",
-        info_dict,
-        images=frames,
-        double_prompt=True,
-    )
-
-    breakpoint()
-    print(res.choices[0].message.content, completion_cost(res))
