@@ -91,7 +91,7 @@ class LLM:
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-    ) -> t.Tuple[t.Any, ModelResponse]:
+    ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
         if video_path:
             raise NotImplementedError("Video path not implemented for this LLM")
         messages = self._construct_messages(
@@ -122,7 +122,7 @@ class GeminiVideoLLM(LLM):
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-    ) -> t.Tuple[t.Any, ModelResponse]:
+    ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
         prompt = self._get_prompt(prompt_filename, info)
         if video_path:
             if "https://" in video_path:

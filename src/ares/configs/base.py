@@ -67,7 +67,7 @@ class Rollout(BaseConfig):
 
 
 def pydantic_to_field_instructions(
-    model_cls: type[BaseModel], exclude_fields: t.Dict, prefix: str = ""
+    model_cls: type[BaseModel], exclude_fields: t.Dict = {}, prefix: str = ""
 ) -> list[str]:
     field_instructions = []
     for field_name, field in model_cls.model_fields.items():
@@ -96,7 +96,7 @@ def pydantic_to_field_instructions(
 
 
 def pydantic_to_example_dict(
-    model_cls: type[BaseModel], exclude_fields: t.Dict
+    model_cls: type[BaseModel], exclude_fields: t.Dict = {}
 ) -> dict:
     example_dict = {}
     for field_name, field in model_cls.model_fields.items():
