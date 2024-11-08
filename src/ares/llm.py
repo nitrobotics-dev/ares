@@ -32,10 +32,9 @@ def structure_image_messages(
 
 
 class LLM:
-    def __init__(self, provider: str, llm_name: str, llm_kwargs: dict = {}):
+    def __init__(self, provider: str, llm_name: str):
         self.provider = provider
         self.llm_name = llm_name
-        self.llm_kwargs = llm_kwargs
         # self.check_valid_key()
 
     def check_valid_key(self) -> bool:
@@ -69,10 +68,17 @@ class LLM:
         prompt = self._get_prompt(prompt_filename, info)
         content.append({"type": "text", "text": prompt})
         if images:
-            image_contents = [
-                structure_image_messages(images[i], provider=self.provider)
-                for i in range(len(images))
-            ]
+            image_contents = []
+            for i in range(len(images)):
+                text_content = {"type": "text", "text": f"Image {i}:"}
+                image_content = structure_image_messages(
+                    images[i], provider=self.provider
+                )
+                image_contents.extend([text_content, image_content])
+            # image_contents = [
+            #     structure_image_messages(images[i], provider=self.provider)
+            #     for i in range(len(images))
+            # ]
             content.extend(image_contents)
         if double_prompt:
             content.append({"type": "text", "text": prompt})
@@ -85,6 +91,7 @@ class LLM:
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
+        llm_kwargs: t.Dict = dict(),
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
         if video_path:
             raise NotImplementedError("Video path not implemented for this LLM")
@@ -92,13 +99,13 @@ class LLM:
             prompt_filename, info, images, double_prompt
         )
         return messages, completion(
-            model=self.llm_name, messages=messages, **self.llm_kwargs
+            model=self.llm_name, messages=messages, **llm_kwargs
         )
 
 
 class GeminiVideoLLM(LLM):
-    def __init__(self, provider: str, llm_name: str, llm_kwargs: dict = {}):
-        super().__init__(provider, llm_name, llm_kwargs)
+    def __init__(self, provider: str, llm_name: str):
+        super().__init__(provider, llm_name)
         vertexai.init(
             project=os.environ["VERTEX_PROJECT"], location=os.environ["VERTEX_LOCATION"]
         )
@@ -116,6 +123,7 @@ class GeminiVideoLLM(LLM):
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
+        llm_kwargs: t.Dict = dict(),
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
         prompt = self._get_prompt(prompt_filename, info)
         if video_path:
