@@ -1,8 +1,9 @@
 import typing as t
 import uuid
 
+import pandas as pd
 from pydantic import BaseModel
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 from sqlmodel import Field, Session, SQLModel, create_engine
 
@@ -69,6 +70,22 @@ def add_rollouts(engine: Engine, rollouts: t.List[Rollout]) -> None:
     with Session(engine) as session:
         session.add_all([RolloutSQLModel(**t.flatten_fields("")) for t in rollouts])
         session.commit()
+
+
+# query helpers
+# Database queries
+def get_rollouts(engine: Engine) -> pd.DataFrame:
+    """Get all rollouts from the database as a pandas DataFrame."""
+    with Session(engine) as session:
+        query = text(
+            """
+            SELECT *
+            FROM rollout
+            ORDER BY id
+        """
+        )
+        df = pd.read_sql(query, session.connection())
+    return df
 
 
 if __name__ == "__main__":
