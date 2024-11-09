@@ -20,3 +20,7 @@ tensorflow-datasets==4.9.3
 
 # llm providers
 vertexai
+
+# data viz
+streamlit
+pandas
