@@ -1,3 +1,6 @@
+import os
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -7,79 +10,124 @@ from sqlalchemy import create_engine, text
 title = "Video Analytics Dashboard"
 
 
+def initialize_mock_data() -> None:
+    """Initialize mock data if it doesn't exist in session state"""
+    if "MOCK_METRICS" not in st.session_state:
+        st.session_state.MOCK_METRICS = pd.DataFrame(
+            {
+                "date": pd.date_range(
+                    start=pd.Timestamp.now() - pd.Timedelta(days=365),
+                    periods=365,
+                    freq="D",
+                ),
+                "views": np.random.randint(100, 1000, size=365),
+                "likes": np.random.randint(10, 100, size=365),
+                "comments": np.random.randint(1, 20, size=365),
+            }
+        )
+
+    if "MOCK_VIDEOS" not in st.session_state:
+        st.session_state.MOCK_VIDEOS = pd.DataFrame(
+            {
+                "video_id": [f"vid_{i}" for i in range(5)],
+                "title": [
+                    "Robot Task 1",
+                    "Robot Task 2",
+                    "Robot Task 3",
+                    "Robot Task 4",
+                    "Robot Task 5",
+                ],
+                "upload_date": pd.date_range(end=pd.Timestamp.now(), periods=5),
+                "views": np.random.randint(100, 1000, size=5),
+                "video_path": [
+                    "/workspaces/ares/data/pi_demos/processed_toast_fail.mp4",
+                    "/workspaces/ares/data/pi_demos/processed_stack_success.mp4",
+                    "/workspaces/ares/data/pi_demos/processed_togo_fail.mp4",
+                    "/workspaces/ares/data/pi_demos/.DS_Store",
+                    "/workspaces/ares/data/pi_demos/processed_towel_success.mp4",
+                ],
+            }
+        )
+
+
+def filter_metrics(date_range: tuple[datetime.date, datetime.date]) -> pd.DataFrame:
+    metrics_df = st.session_state.MOCK_METRICS[
+        (st.session_state.MOCK_METRICS["date"] >= pd.Timestamp(date_range[0]))
+        & (st.session_state.MOCK_METRICS["date"] <= pd.Timestamp(date_range[1]))
+    ].copy()
+
+    if metrics_df.empty:
+        st.warning("No data available for the selected date range")
+        return pd.DataFrame()
+
+    return metrics_df
+
+
+def filter_videos(date_range: tuple[datetime.date, datetime.date]) -> pd.DataFrame:
+    videos_df = st.session_state.MOCK_VIDEOS.copy()
+
+    videos_df = videos_df[
+        (videos_df["upload_date"] >= pd.Timestamp(date_range[0]))
+        & (videos_df["upload_date"] <= pd.Timestamp(date_range[1]))
+    ]
+
+    return videos_df
+
+
 # Streamlit app
 def main() -> None:
     st.set_page_config(page_title=title, page_icon="📊", layout="wide")
     st.title(title)
 
-    # Sidebar filters
-    st.sidebar.header("Filters")
-    date_range = st.sidebar.date_input(
-        "Select Date Range",
-        value=(pd.Timestamp.now() - pd.Timedelta(days=30), pd.Timestamp.now()),
-    )
+    # Initialize mock data at the start of the app
+    initialize_mock_data()
+
+    # Filters
+    st.header("Filters")
+    col1, _ = st.columns([1, 3])  # Create columns with 1:3 ratio, only use first column
+    with col1:
+        date_range = st.date_input(
+            "Select Date Range",
+            value=(pd.Timestamp.now() - pd.Timedelta(days=30), pd.Timestamp.now()),
+        )
 
     if not date_range or len(date_range) != 2:
         st.error("Please select a valid date range")
         return
 
-    # Create mock data
-    try:
-        metrics_df = pd.DataFrame(
-            {
-                "date": pd.date_range(start=date_range[0], end=date_range[1], freq="D"),
-                "views": np.random.randint(
-                    100, 1000, size=(date_range[1] - date_range[0]).days + 1
-                ),
-                "likes": np.random.randint(
-                    10, 100, size=(date_range[1] - date_range[0]).days + 1
-                ),
-                "comments": np.random.randint(
-                    1, 20, size=(date_range[1] - date_range[0]).days + 1
-                ),
-            }
-        )
-    except Exception as e:
-        st.error(f"Error creating metrics data: {str(e)}")
-        return
-
+    metrics_df = filter_metrics(date_range)
     if metrics_df.empty:
-        st.warning("No data available for the selected date range")
         return
 
-    videos_df = pd.DataFrame(
-        {
-            "video_id": [f"vid_{i}" for i in range(5)],
-            "title": [
-                "Robot Task 1",
-                "Robot Task 2",
-                "Robot Task 3",
-                "Robot Task 4",
-                "Robot Task 5",
-            ],
-            "upload_date": pd.date_range(end=pd.Timestamp.now(), periods=5),
-            "views": np.random.randint(100, 1000, size=5),
-            "video_path": [
-                "/workspaces/ares/data/pi_demos/processed_toast_fail.mp4",
-                "/workspaces/ares/data/pi_demos/processed_stack_success.mp4",
-                "/workspaces/ares/data/pi_demos/processed_togo_fail.mp4",
-                "/workspaces/ares/data/pi_demos/.DS_Store",
-                "/workspaces/ares/data/pi_demos/processed_towel_success.mp4",
-            ],
-        }
-    )
-
-    # Filter videos based on date range
-    videos_df = videos_df[
-        (videos_df["upload_date"] >= pd.Timestamp(date_range[0]))
-        & (videos_df["upload_date"] <= pd.Timestamp(date_range[1]))
-    ]
+    videos_df = filter_videos(date_range)
 
     if videos_df.empty:
         st.warning("No videos found for the selected date range")
         return
 
     try:
+        # Add export controls
+        export_col1, export_col2, _ = st.columns([1, 1, 2])
+        with export_col1:
+            export_path = st.text_input(
+                "Export Directory",
+                value="/tmp",
+                help="Directory where exported files will be saved",
+            )
+        with export_col2:
+            if st.button("Export Data"):
+                try:
+                    metrics_path, videos_path = export_dataframes(
+                        metrics_df, videos_df, export_path
+                    )
+                    st.success(
+                        f"""Data exported successfully:
+                    - Metrics: {metrics_path}
+                    - Videos: {videos_path}"""
+                    )
+                except Exception as e:
+                    st.error(f"Failed to export data: {str(e)}")
+
         # Display key metrics in columns
         col1, col2, col3 = st.columns(3)
 
@@ -124,7 +172,9 @@ def main() -> None:
                         f"Upload Date: {video['upload_date'].strftime('%Y-%m-%d')}"
                     )
                 else:
-                    st.warning(f"Invalid video path for {video['title']}")
+                    st.warning(
+                        f"Invalid video path for {video['title'], video['video_path']}"
+                    )
 
         # Show full table
         st.subheader("Video Details")
@@ -141,6 +191,75 @@ def main() -> None:
 
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
+
+
+def export_dataframes(
+    metrics_df: pd.DataFrame, videos_df: pd.DataFrame, base_path: str
+) -> tuple[str, str]:
+    """Export dataframes to CSV files with timestamps.
+
+    Args:
+        metrics_df: DataFrame containing metrics data
+        videos_df: DataFrame containing videos data
+        base_path: Base directory path where files should be saved
+
+    Returns:
+        Tuple of (metrics_path, videos_path) where files were saved
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    export_dir = os.path.join(base_path, "exports")
+
+    # Create exports directory if it doesn't exist
+    os.makedirs(export_dir, exist_ok=True)
+
+    # Save dataframes
+    metrics_path = os.path.join(export_dir, f"metrics_{timestamp}.csv")
+    videos_path = os.path.join(export_dir, f"videos_{timestamp}.csv")
+
+    metrics_df.to_csv(metrics_path, index=False)
+    videos_df.to_csv(videos_path, index=False)
+
+    return metrics_path, videos_path
+
+
+def initialize_mock_data():
+    """Initialize mock data if it doesn't exist in session state"""
+    if "MOCK_METRICS" not in st.session_state:
+        st.session_state.MOCK_METRICS = pd.DataFrame(
+            {
+                "date": pd.date_range(
+                    start=pd.Timestamp.now() - pd.Timedelta(days=365),
+                    periods=365,
+                    freq="D",
+                ),
+                "views": np.random.randint(100, 1000, size=365),
+                "likes": np.random.randint(10, 100, size=365),
+                "comments": np.random.randint(1, 20, size=365),
+            }
+        )
+
+    if "MOCK_VIDEOS" not in st.session_state:
+        st.session_state.MOCK_VIDEOS = pd.DataFrame(
+            {
+                "video_id": [f"vid_{i}" for i in range(5)],
+                "title": [
+                    "Robot Task 1",
+                    "Robot Task 2",
+                    "Robot Task 3",
+                    "Robot Task 4",
+                    "Robot Task 5",
+                ],
+                "upload_date": pd.date_range(end=pd.Timestamp.now(), periods=5),
+                "views": np.random.randint(100, 1000, size=5),
+                "video_path": [
+                    "/workspaces/ares/data/pi_demos/processed_toast_fail.mp4",
+                    "/workspaces/ares/data/pi_demos/processed_stack_success.mp4",
+                    "/workspaces/ares/data/pi_demos/processed_togo_fail.mp4",
+                    "/workspaces/ares/data/pi_demos/processed_towel_success.mp4",
+                    "/workspaces/ares/data/pi_demos/processed_towel_fail.mp4",
+                ],
+            }
+        )
 
 
 if __name__ == "__main__":
