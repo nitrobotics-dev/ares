@@ -29,19 +29,35 @@ def create_flattened_model(
 
     # recursively extract fields
     def flatten_fields(prefix: str, model: t.Type[BaseModel]) -> None:
-        for field_name, field_type in model.__annotations__.items():
+        for field_name, field in model.model_fields.items():
             if field_name == "id":  # Skip id field as we've handled it above
                 continue
-            if issubclass(field_type, BaseModel):
-                flatten_fields(f"{prefix}{field_name}_", field_type)
-            else:
-                field_key = f"{prefix}{field_name}"
-                fields["__annotations__"][field_key] = field_type
-                # Make fields nullable unless they're in non_nullable_fields
-                if field_key not in non_nullable_fields:
-                    fields[field_key] = Field(nullable=True)
+
+            field_type = field.annotation
+            if field_type is None:
+                continue
+
+            # Handle list types by converting them to JSON strings
+            origin_type = t.get_origin(field_type)
+            if origin_type is not None and origin_type in (list, t.List):
+                fields["__annotations__"][f"{prefix}{field_name}"] = str
+                if f"{prefix}{field_name}" not in non_nullable_fields:
+                    fields[f"{prefix}{field_name}"] = Field(default=None, nullable=True)
                 else:
-                    fields[field_key] = Field()
+                    fields[f"{prefix}{field_name}"] = Field()
+                continue
+            elif isinstance(field_type, type) and issubclass(field_type, BaseModel):
+                # Handle nested BaseModel
+                flatten_fields(f"{prefix}{field_name}_", field_type)
+                continue
+
+            # Handle the field
+            field_key = f"{prefix}{field_name}"
+            fields["__annotations__"][field_key] = field_type
+            if field_key not in non_nullable_fields:
+                fields[field_key] = Field(nullable=True)
+            else:
+                fields[field_key] = Field()
 
     flatten_fields("", data_model)
     return type("RolloutSQLModel", (SQLModel,), fields, table=True)
@@ -58,7 +74,7 @@ def setup_database(path: str = BASE_ROBOT_DB_PATH) -> Engine:
     return engine
 
 
-def add_rollout(engine: Engine, rollout: Rollout) -> None:
+def add_rollout(engine: Engine, rollout: Rollout, RolloutSQLModel: SQLModel) -> None:
     rollout_sql_model = RolloutSQLModel(**rollout.flatten_fields(""))
     with Session(engine) as session:
         session.add(rollout_sql_model)

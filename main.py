@@ -49,10 +49,9 @@ if __name__ == "__main__":
 
     os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
     engine = setup_database(path=TEST_ROBOT_DB_PATH)
+    RolloutSQLModel = create_flattened_model(Rollout)
 
     rollouts: list[Rollout] = []
-    add_and_commit_times: list[float] = []
-
     for i, ep in tqdm(enumerate(ds)):
         episode = OpenXEmbodimentEpisode(**ep)
         steps = episode.steps
@@ -62,32 +61,26 @@ if __name__ == "__main__":
         traj = hardcoded_info["trajectory"]
         print(traj["is_first"], traj["is_last"], traj["is_terminal"])
 
+        rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
         breakpoint()
-        # rollout = random_extractor.extract(
-        #     episode=episode, dataset_info=dataset_info
-        # )
-        # rollouts.append(rollout)
-        # # just track this
-        # start_time = time.time()
-        # add_rollout(engine, rollout)
-        # add_and_commit_times.append(time.time() - start_time)
-        # if i > 50:
-        #     break
-
-    print(
-        f"mean (sum) --> add and commit time: {np.mean(add_and_commit_times), np.sum(add_and_commit_times)}"
-    )
-
-    os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
-    engine = setup_database(path=TEST_ROBOT_DB_PATH)
-
-    tic = time.time()
-    add_rollouts(engine, rollouts)
-    bunch_time = time.time() - tic
-
-    print(f"time to add all rollouts: {np.mean(bunch_time), np.sum(bunch_time)}")
+        rollouts.append(rollout)
+        # just track this
+        start_time = time.time()
+        add_rollout(engine, rollout, RolloutSQLModel)
 
     sess = Session(engine)
+    # get a df.head() basically
+    # Get first few rows from RolloutSQLModel table
+    sample_rows = sess.query(RolloutSQLModel).limit(5).all()
+    breakpoint()
+
+    # Print sample rows
+    for row in sample_rows:
+        print(f"\nRollout {row.id}:")
+        print(f"Path: {row.path}")
+        print(f"Task Success: {row.task_success}")
+        print(f"Language Instruction: {row.task_language_instruction}")
+        breakpoint()
     # RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
 
     # row_count = sess.execute(

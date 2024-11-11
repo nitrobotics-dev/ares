@@ -1,3 +1,4 @@
+import json
 import typing as t
 import uuid
 from datetime import datetime
@@ -15,6 +16,9 @@ class BaseConfig(BaseModel):
                 flattened.update(
                     {f"{prefix}{field_name}_{k}": v for k, v in field_value.items()}
                 )
+            elif isinstance(field_value, list):
+                # Convert lists to JSON strings
+                flattened[f"{prefix}{field_name}"] = json.dumps(field_value)
             else:
                 flattened[f"{prefix}{field_name}"] = field_value
         return flattened
@@ -46,11 +50,19 @@ class Task(BaseConfig):
 
 
 class Trajectory(BaseConfig):
-    actions: list[list[float]]  # what to do? (N, D)
+    actions: str  # JSON string of list[list[float]]
     is_first: int | None  # index of first step
     is_last: int | None  # index of last step
     is_terminal: int | None  # index of terminal step
-    states: list[list[float]] | None  # (N, D)
+    states: str | None  # JSON string of list[list[float]]
+
+    @model_validator(mode="before")
+    def convert_lists_to_json(cls, data: dict) -> dict:
+        if isinstance(data.get("actions"), list):
+            data["actions"] = json.dumps(data["actions"])
+        if isinstance(data.get("states"), list):
+            data["states"] = json.dumps(data["states"])
+        return data
 
 
 class Rollout(BaseConfig):

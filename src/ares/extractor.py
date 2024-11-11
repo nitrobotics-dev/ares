@@ -105,23 +105,25 @@ class RandomInformationExtractor(InformationExtractor):
         task_kwargs: t.Dict[str, t.Any] = {},
         llm_kwargs: t.Dict[str, t.Any] = {},
     ) -> Rollout:
-        robot = Robot(
-            name=robot_kwargs.get("name", self.random_string()),
-            sensor=robot_kwargs.get(
-                "sensor", np.random.choice(["camera", "wrist", "gripper"])
-            ),
-        )
+        robot = Robot(embodiment=self.random_string())
         environment = Environment(
             name=self.random_string(),
             lighting=self.random_string(),
             simulation=np.random.choice([True, False]),
         )
         task = Task(
-            name=self.random_string(),
-            description=self.random_string(),
+            dataset_name=self.random_string(),
+            language_instruction=episode.steps[0].language_instruction,
             success_criteria=self.random_string(),
             success=np.random.uniform(0, 1),
-            language_instruction=episode.steps[0].language_instruction,
+        )
+
+        trajectory = Trajectory(
+            actions=np.random.random(size=[7, 10]).tolist(),
+            is_first=0,
+            is_last=-1,
+            is_terminal=-1,
+            states=np.random.random(size=[9, 10]).tolist(),
         )
 
         return Rollout(
@@ -133,8 +135,15 @@ class RandomInformationExtractor(InformationExtractor):
             task=task,
             length=len(episode.steps),
             dataset_name=dataset_info.name,
-            trajectory=Trajectory(),
+            trajectory=trajectory,
         )
+
+
+# class Task(BaseConfig):
+#     dataset_name: str
+#     language_instruction: str
+#     success_criteria: str
+#     success: float
 
 
 class LLMInformationExtractor(InformationExtractor):
