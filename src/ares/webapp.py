@@ -7,6 +7,14 @@ import plotly.express as px
 import streamlit as st
 from sqlalchemy import create_engine, text
 
+from ares.viz_helpers import (
+    create_bar_plot,
+    create_histogram,
+    create_line_plot,
+    display_video_card,
+    show_dataframe,
+)
+
 title = "Video Analytics Dashboard"
 
 
@@ -26,7 +34,9 @@ def initialize_mock_data() -> None:
             {
                 "date": dates,
                 "length": np.random.randint(1, 100, size=365),
-                "success": np.random.random(size=365),
+                "success": np.array(
+                    [np.random.uniform(i / 365, 1) for i in range(365)]
+                ),
             }
         )
 
@@ -47,7 +57,7 @@ def initialize_mock_data() -> None:
                     "/workspaces/ares/data/pi_demos/processed_toast_fail.mp4",
                     "/workspaces/ares/data/pi_demos/processed_stack_success.mp4",
                     "/workspaces/ares/data/pi_demos/processed_togo_fail.mp4",
-                    "/workspaces/ares/data/pi_demos/.DS_Store",
+                    "/workspaces/ares/data/pi_demos/processed_towel_fail.mp4",
                     "/workspaces/ares/data/pi_demos/processed_towel_success.mp4",
                 ],
             }
@@ -74,7 +84,6 @@ def filter_videos(date_range: tuple[datetime.date, datetime.date]) -> pd.DataFra
         (videos_df["upload_date"] >= pd.Timestamp(date_range[0]))
         & (videos_df["upload_date"] <= pd.Timestamp(date_range[1]))
     ]
-
     return videos_df
 
 
@@ -145,13 +154,96 @@ def main() -> None:
 
         # Trending metrics chart
         st.subheader("Trending Metrics")
-        fig = px.line(
-            metrics_df,
-            x="date",
-            y=["views", "likes", "comments"],
-            title="Metrics Over Time",
+        # Group by date and calculate mean length and success rate
+        # hack to get count
+        metrics_df["count"] = 1
+        daily_metrics = (
+            metrics_df.groupby("date")
+            .agg(
+                {
+                    "length": "mean",
+                    "success": "mean",
+                    "count": "sum",  # Count of records per day
+                }
+            )
+            .reset_index()
         )
-        st.plotly_chart(fig, use_container_width=True)
+
+        # Add rolling averages
+        col1 = st.columns(4)[0]
+        with col1:
+            window_size = st.number_input(
+                "Moving Average Window Size",
+                min_value=1,
+                value=7,
+                help="Number of days to use for the moving average calculation",
+            )
+
+        daily_metrics["length_ma"] = (
+            daily_metrics["length"].rolling(window=window_size).mean()
+        )
+        daily_metrics["success_ma"] = (
+            daily_metrics["success"].rolling(window=window_size).mean()
+        )
+
+        # Create two columns for the plots
+        plot_col1, plot_col2 = st.columns(2)
+
+        # Length plot
+        with plot_col1:
+            fig_length = create_line_plot(
+                daily_metrics,
+                x="date",
+                y=["length", "length_ma"],
+                title="Daily Length",
+                labels={
+                    "length": "Length",
+                    "length_ma": f"{window_size}-day Moving Average",
+                    "date": "Date",
+                    "value": "Length",
+                },
+                colors=["#1f77b4", "#17becf"],
+            )
+            st.plotly_chart(fig_length, use_container_width=True)
+
+        # Success rate plot
+        with plot_col2:
+            fig_success = create_line_plot(
+                daily_metrics,
+                x="date",
+                y=["success", "success_ma"],
+                title="Daily Success Rate",
+                labels={
+                    "success": "Success Rate",
+                    "success_ma": f"{window_size}-day Moving Average",
+                    "date": "Date",
+                    "value": "Success Rate",
+                },
+                colors=["#ff7f0e", "#d62728"],
+                y_format=".0%",
+            )
+            st.plotly_chart(fig_success, use_container_width=True)
+
+        # Length histogram
+        fig_hist = create_histogram(
+            daily_metrics,
+            x="length",
+            title="Distribution of Video Lengths",
+            labels={"length": "Length", "count": "Number of Videos"},
+            color="#2ca02c",
+        )
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+        # bar plot of count of rows per day
+        fig_count = create_bar_plot(
+            daily_metrics,
+            x="date",
+            y="count",
+            title="Daily Video Count",
+            labels={"date": "Date", "count": "Number of Videos"},
+            color="#9467bd",
+        )
+        st.plotly_chart(fig_count, use_container_width=True)
 
         # Recent videos table and display
         st.subheader("Recent Videos")
@@ -160,33 +252,10 @@ def main() -> None:
         video_cols = st.columns(3)
         for idx, (_, video) in enumerate(videos_df.iterrows()):
             with video_cols[idx % 3]:
-                if not pd.isna(video["video_path"]) and video["video_path"].endswith(
-                    (".mp4", ".avi", ".mov")
-                ):
-                    st.video(video["video_path"])
-                    st.write(f"**{video['title']}**")
-                    st.write(f"Views: {video['views']:,}")
-                    st.write(
-                        f"Upload Date: {video['upload_date'].strftime('%Y-%m-%d')}"
-                    )
-                else:
-                    st.warning(
-                        f"Invalid video path for {video['title'], video['video_path']}"
-                    )
+                display_video_card(video)
 
         # Show full table
-        st.subheader("Video Details")
-        st.dataframe(
-            videos_df.drop("video_path", axis=1),
-            column_config={
-                "video_id": st.column_config.TextColumn("Video ID"),
-                "title": st.column_config.TextColumn("Title"),
-                "upload_date": st.column_config.DateColumn("Upload Date"),
-                "views": st.column_config.NumberColumn("Views", format="%d"),
-            },
-            hide_index=True,
-        )
-
+        show_dataframe(videos_df, "Video Details", hide_columns=["video_path"])
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
 
