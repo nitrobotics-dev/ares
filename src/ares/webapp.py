@@ -13,16 +13,20 @@ title = "Video Analytics Dashboard"
 def initialize_mock_data() -> None:
     """Initialize mock data if it doesn't exist in session state"""
     if "MOCK_METRICS" not in st.session_state:
+        # Create date range first
+        base_dates = pd.date_range(end=pd.Timestamp.now(), periods=365)
+        # Apply random offsets one at a time
+        random_offsets = np.random.randint(0, 365, size=365)
+        dates = [
+            date - pd.Timedelta(days=int(offset))
+            for date, offset in zip(base_dates, random_offsets)
+        ]
+
         st.session_state.MOCK_METRICS = pd.DataFrame(
             {
-                "date": pd.date_range(
-                    start=pd.Timestamp.now() - pd.Timedelta(days=365),
-                    periods=365,
-                    freq="D",
-                ),
-                "views": np.random.randint(100, 1000, size=365),
-                "likes": np.random.randint(10, 100, size=365),
-                "comments": np.random.randint(1, 20, size=365),
+                "date": dates,
+                "length": np.random.randint(1, 100, size=365),
+                "success": np.random.random(size=365),
             }
         )
 
@@ -84,11 +88,11 @@ def main() -> None:
 
     # Filters
     st.header("Filters")
-    col1, _ = st.columns([1, 3])  # Create columns with 1:3 ratio, only use first column
+    col1, _ = st.columns([2, 2])
     with col1:
         date_range = st.date_input(
             "Select Date Range",
-            value=(pd.Timestamp.now() - pd.Timedelta(days=30), pd.Timestamp.now()),
+            value=(pd.Timestamp("2000-01-01"), pd.Timestamp.now()),
         )
 
     if not date_range or len(date_range) != 2:
@@ -132,18 +136,12 @@ def main() -> None:
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            total_views = metrics_df["views"].sum()
-            st.metric("Total Views", f"{total_views:,}")
+            avg_len = metrics_df["length"].mean()
+            st.metric("Avg Len", f"{avg_len:.4f}")
 
         with col2:
-            total_likes = metrics_df["likes"].sum()
-            st.metric("Total Likes", f"{total_likes:,}")
-
-        with col3:
-            engagement_rate = (
-                (total_likes / total_views * 100) if total_views > 0 else 0
-            )
-            st.metric("Engagement Rate", f"{engagement_rate:.2f}%")
+            success_rate = metrics_df["success"].mean()
+            st.metric("Avg Success", f"{100*success_rate:.4f}%")
 
         # Trending metrics chart
         st.subheader("Trending Metrics")
@@ -220,46 +218,6 @@ def export_dataframes(
     videos_df.to_csv(videos_path, index=False)
 
     return metrics_path, videos_path
-
-
-def initialize_mock_data():
-    """Initialize mock data if it doesn't exist in session state"""
-    if "MOCK_METRICS" not in st.session_state:
-        st.session_state.MOCK_METRICS = pd.DataFrame(
-            {
-                "date": pd.date_range(
-                    start=pd.Timestamp.now() - pd.Timedelta(days=365),
-                    periods=365,
-                    freq="D",
-                ),
-                "views": np.random.randint(100, 1000, size=365),
-                "likes": np.random.randint(10, 100, size=365),
-                "comments": np.random.randint(1, 20, size=365),
-            }
-        )
-
-    if "MOCK_VIDEOS" not in st.session_state:
-        st.session_state.MOCK_VIDEOS = pd.DataFrame(
-            {
-                "video_id": [f"vid_{i}" for i in range(5)],
-                "title": [
-                    "Robot Task 1",
-                    "Robot Task 2",
-                    "Robot Task 3",
-                    "Robot Task 4",
-                    "Robot Task 5",
-                ],
-                "upload_date": pd.date_range(end=pd.Timestamp.now(), periods=5),
-                "views": np.random.randint(100, 1000, size=5),
-                "video_path": [
-                    "/workspaces/ares/data/pi_demos/processed_toast_fail.mp4",
-                    "/workspaces/ares/data/pi_demos/processed_stack_success.mp4",
-                    "/workspaces/ares/data/pi_demos/processed_togo_fail.mp4",
-                    "/workspaces/ares/data/pi_demos/processed_towel_success.mp4",
-                    "/workspaces/ares/data/pi_demos/processed_towel_fail.mp4",
-                ],
-            }
-        )
 
 
 if __name__ == "__main__":

@@ -68,9 +68,9 @@ def create_flattened_model(
 # RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
 
 
-def setup_database(path: str = BASE_ROBOT_DB_PATH) -> Engine:
+def setup_database(RolloutSQLModel: SQLModel, path: str = BASE_ROBOT_DB_PATH) -> Engine:
     engine = create_engine(path)
-    SQLModel.metadata.create_all(engine)
+    RolloutSQLModel.metadata.create_all(engine)
     return engine
 
 
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     RolloutSQLModel = create_flattened_model(
         Rollout, non_nullable_fields=["id", "path"]
     )
-    engine = setup_database(path=TEST_ROBOT_DB_PATH)
+    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     add_rollout(engine, ROLL1)
     add_rollout(engine, ROLL2)
 

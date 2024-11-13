@@ -48,8 +48,8 @@ if __name__ == "__main__":
     random_extractor = RandomInformationExtractor()
 
     os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
-    engine = setup_database(path=TEST_ROBOT_DB_PATH)
     RolloutSQLModel = create_flattened_model(Rollout)
+    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
     rollouts: list[Rollout] = []
     for i, ep in tqdm(enumerate(ds)):
@@ -62,7 +62,6 @@ if __name__ == "__main__":
         print(traj["is_first"], traj["is_last"], traj["is_terminal"])
 
         rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
-        breakpoint()
         rollouts.append(rollout)
         # just track this
         start_time = time.time()
