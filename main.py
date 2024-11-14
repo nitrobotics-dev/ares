@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from ares.configs.base import Environment, Robot, Rollout, Task
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
-from ares.database import (  # RolloutSQLModel,
+from ares.databases.structured_database import (
     SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
     add_rollout,
