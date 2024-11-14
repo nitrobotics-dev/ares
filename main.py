@@ -15,6 +15,7 @@ from ares.database import (  # RolloutSQLModel,
     add_rollout,
     add_rollouts,
     create_flattened_model,
+    recreate_model,
     setup_database,
 )
 from ares.extractor import (
@@ -47,34 +48,36 @@ if __name__ == "__main__":
 
     random_extractor = RandomInformationExtractor()
 
-    os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
+    # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
     RolloutSQLModel = create_flattened_model(Rollout)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
-    rollouts: list[Rollout] = []
-    for i, ep in tqdm(enumerate(ds)):
-        episode = OpenXEmbodimentEpisode(**ep)
-        steps = episode.steps
-        dataset_info_dict = hard_coded_dataset_info_extraction(dataset_info)
-        episode_info_dict = hard_coded_episode_info_extraction(episode)
-        hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
-        traj = hardcoded_info["trajectory"]
-        print(traj["is_first"], traj["is_last"], traj["is_terminal"])
+    # rollouts: list[Rollout] = []
+    # for i, ep in tqdm(enumerate(ds)):
+    #     episode = OpenXEmbodimentEpisode(**ep)
+    #     steps = episode.steps
+    #     dataset_info_dict = hard_coded_dataset_info_extraction(dataset_info)
+    #     episode_info_dict = hard_coded_episode_info_extraction(episode)
+    #     hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
+    #     traj = hardcoded_info["trajectory"]
+    #     print(traj["is_first"], traj["is_last"], traj["is_terminal"])
 
-        rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
-        rollouts.append(rollout)
-        # just track this
-        start_time = time.time()
-        add_rollout(engine, rollout, RolloutSQLModel)
+    #     rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
+    #     rollouts.append(rollout)
+    #     # just track this
+    #     start_time = time.time()
+    #     add_rollout(engine, rollout, RolloutSQLModel)
 
     sess = Session(engine)
     # get a df.head() basically
     # Get first few rows from RolloutSQLModel table
-    sample_rows = sess.query(RolloutSQLModel).limit(5).all()
+    rows = sess.query(RolloutSQLModel).limit(5).all()
+    # breakpoint()
+    row = rows[0]
+    rollout = recreate_model(rows[0], Rollout)
     breakpoint()
-
     # Print sample rows
-    for row in sample_rows:
+    for row in rows:
         print(f"\nRollout {row.id}:")
         print(f"Path: {row.path}")
         print(f"Task Success: {row.task_success}")

@@ -57,15 +57,32 @@ class Trajectory(BaseConfig):
     states: str | None  # JSON string of list[list[float]]
 
     @model_validator(mode="before")
-    def convert_lists_to_json(cls, data: dict) -> dict:
-        if isinstance(data.get("actions"), list):
-            data["actions"] = json.dumps(data["actions"])
-        if isinstance(data.get("states"), list):
-            data["states"] = json.dumps(data["states"])
+    def convert_sequences_to_json(cls, data: dict) -> dict:
+        # Convert any list fields to JSON strings
+        for field in ["actions", "states"]:
+            if isinstance(data.get(field), (list, np.ndarray)):
+                # Convert numpy arrays to lists first if needed
+                value = data[field]
+                if isinstance(value, np.ndarray):
+                    value = value.tolist()
+                data[field] = json.dumps(value)
         return data
+
+    @property
+    def actions_array(self) -> np.ndarray:
+        """Get actions as a numpy array instead of JSON string."""
+        return np.array(json.loads(self.actions))
+
+    @property
+    def states_array(self) -> np.ndarray | None:
+        """Get states as a numpy array instead of JSON string."""
+        if self.states is None:
+            return None
+        return np.array(json.loads(self.states))
 
 
 class Rollout(BaseConfig):
+    # all fields are default None since database/schemas may change
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     creation_time: datetime
     ingestion_time: datetime
