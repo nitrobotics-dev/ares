@@ -92,38 +92,18 @@ def display_video_card(video: pd.Series) -> None:
             - video_path: Path to video file
             - title: Video title
             - views: View count
-            - upload_date: Upload datetime
+            - date: Upload datetime
     """
     if not pd.isna(video["video_path"]) and video["video_path"].endswith(
         (".mp4", ".avi", ".mov")
     ):
         st.video(video["video_path"])
-        st.write(f"**{video['title']}**")
+        st.write(f"**{video['video_id']}**")
+        st.write(f"Task: {video['task']}")
         st.write(f"Views: {video['views']:,}")
-        st.write(f"Upload Date: {video['upload_date'].strftime('%Y-%m-%d')}")
+        st.write(f"Upload Date: {video['date'].strftime('%Y-%m-%d')}")
     else:
-        st.warning(f"Invalid video path for {video['title'], video['video_path']}")
-
-
-def display_video_card(video: pd.Series) -> None:
-    """Display a single video card with metadata.
-
-    Args:
-        video: Pandas Series containing video data with keys:
-            - video_path: Path to video file
-            - title: Video title
-            - views: View count
-            - upload_date: Upload datetime
-    """
-    if not pd.isna(video["video_path"]) and video["video_path"].endswith(
-        (".mp4", ".avi", ".mov")
-    ):
-        st.video(video["video_path"])
-        st.write(f"**{video['title']}**")
-        st.write(f"Views: {video['views']:,}")
-        st.write(f"Upload Date: {video['upload_date'].strftime('%Y-%m-%d')}")
-    else:
-        st.warning(f"Invalid video path for {video['title'], video['video_path']}")
+        st.warning(f"Invalid video path for {video['video_id'], video['video_path']}")
 
 
 def show_dataframe(
