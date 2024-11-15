@@ -1,46 +1,31 @@
-import ast
-import base64
 import json
 import os
-import re
 import traceback
 import typing as t
-from collections import defaultdict
 
 import numpy as np
-import vertexai
-from jinja2 import Environment, FileSystemLoader
-from litellm import completion, completion_cost
-from litellm.utils import ModelResponse
-from PIL import Image
+from litellm import completion_cost
 from pydantic import BaseModel, Field
-from vertexai.generative_models import GenerativeModel, Part
 
-from ares.configs.base import pydantic_to_example_dict, pydantic_to_field_instructions
-from ares.image_utils import (
-    choose_and_preprocess_frames,
-    encode_image,
-    split_video_to_frames,
-)
+from ares.configs.base import pydantic_to_field_instructions
+from ares.image_utils import choose_and_preprocess_frames, split_video_to_frames
 from ares.llm import LLM
 from ares.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 
 
 class RolloutDescription(BaseModel):
-    # description: str = Field(description="what happens in this episode? answer based on the provided images.")
-    # number_of_images: int
     task_success_constraints: str = Field(
         description="""
-    Generate a list of constraints that must be met for the TASK to be successful based on the first image.
+    Generate a list of constraints that must be met for the TASKto be successful based on the first image. 
     Be very specific -- you should be able to judge the success of the following frames based on these constraints.
     """.strip()
     )
     description: str = Field(
         # max_length=1000,
         description="""
-        A detailed description of the robot's actions over the course of the provided images. 
-        Don't include fluff like 'Let's describe...'. Just describe the episode. Make this very detailed and extensive. 
-        Roughly 1000 tokens.""".strip(),
+        A detailed description of the robot's actions over the course of the provided images.
+        Don't include fluff like 'Let's describe...'. Just describe the episode. Make this very detailed and extensive. Roughly 1000 tokens.
+        """.strip(),
     )
     robot_setup: t.Literal["one arm", "two arms"]
     environment: t.Literal["floor", "table", "other"]
@@ -49,16 +34,16 @@ class RolloutDescription(BaseModel):
     success_str: str = Field(
         # max_length=1000,
         description="""
-    A detailed description of whether or not the robot successfully completes the task. 
-    Be very specific and critical about whether or not the robot has met the intended goal state of the task and include lots of details pertaining to partial success.
-    In order to be successful, the robot must have completed the task in a way that is consistent with the task description. Any error or deviation from the task description is a failure.
-    Roughly 100 tokens.
+    A detailed description of whether or not the robot successfully completes the task. Be very specific and critical about whether or not the robot has met the intended
+    goal state of the task and include lots of details pertaining to partial success. In order to be successful, the robot must have completed the task in a way that is
+    consistent with the task description. Any error or deviation from the task description is a failure. Roughly 100 tokens.
     """.strip(),
     )
     success_score: float = Field(
         description="""
-    A float score between 0 and 1, representing the success of the task. 
-    A score of 0 means the task was not completed at all, and a score of 1 means the task was absolutely completed.
+    A float score between 0 and 1, representing the success of the task.
+    A score of 0 means the task was not completed at all, and a score of
+    1 means the task was absolutely completed.
     """.strip()
     )
 
@@ -74,14 +59,15 @@ TASK: {task}
 Create a response to the task by answering the following questions:
 {field_instructions}
 
-Make sure to ground any descriptions in the images they came from by specifying image 0, 1, 2, etc.
+Make sure to ground any descriptions in the images they came from!
+You can do this by specifying image 0, 1, 2, etc.
 Do not hallucinate any details that cannot be grounded in a certain image!
 """.strip()
 
 # Build example response dict dynamically from model fields
-response_format_instructions = f"""
+response_format_instructions = """
 Respond with a python dict that fulfills the above specifications.
-The python dict should be able to be loaded with JSON and then instantiated into the RolloutDescription object, e.g. RolloutDescription(**json.loads(output_dict)).
+The python dict should be able to be loaded with JSON, and then instantiated into the RolloutDescription object, e.g. RolloutDescription(**json.loads(output_dict)).
 """.strip()
 
 

@@ -1,30 +1,14 @@
-import os
-import time
-
-import datasets
-import numpy as np
 import tensorflow_datasets as tfds
 from sqlalchemy.orm import Session
-from tqdm import tqdm
 
-from ares.configs.base import Environment, Robot, Rollout, Task
-from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
+from ares.configs.base import Rollout
 from ares.configs.pydantic_sql_helpers import recreate_model
 from ares.databases.structured_database import (
-    SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
-    add_rollout,
-    add_rollouts,
     create_flattened_model,
     setup_database,
 )
-from ares.extractor import (
-    LLMInformationExtractor,
-    RandomInformationExtractor,
-    hard_coded_dataset_info_extraction,
-    hard_coded_episode_info_extraction,
-    merge_dicts,
-)
+from ares.extractor import RandomInformationExtractor
 
 
 def build_dataset(
@@ -32,8 +16,8 @@ def build_dataset(
 ) -> tuple[tfds.builder, tfds.datasets]:
     builder = tfds.builder(dataset_name, data_dir=data_dir)
     builder.download_and_prepare()
-    datasets = builder.as_dataset()
-    return builder, datasets
+    dataset_dict = builder.as_dataset()
+    return builder, dataset_dict
 
 
 if __name__ == "__main__":
@@ -42,9 +26,9 @@ if __name__ == "__main__":
     # dataset_name = "cmu_play_fusion"
     data_dir = "/workspaces/ares/data"
 
-    builder, datasets = build_dataset(dataset_name, data_dir)
+    builder, dataset_dict = build_dataset(dataset_name, data_dir)
     dataset_info = builder.info
-    ds = datasets["train"]
+    ds = dataset_dict["train"]
 
     random_extractor = RandomInformationExtractor()
 
@@ -83,7 +67,9 @@ if __name__ == "__main__":
         print(f"Task Success: {row.task_success}")
         print(f"Language Instruction: {row.task_language_instruction}")
         breakpoint()
-    # RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
+    # RolloutSQLModel = create_flattened_model(
+    #     Rollout, non_nullable_fields=["id", "path"]
+    # )
 
     # row_count = sess.execute(
     #     select(func.count()).select_from(RolloutSQLModel)

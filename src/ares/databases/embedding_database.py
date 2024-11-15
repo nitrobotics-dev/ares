@@ -1,9 +1,10 @@
 """
-We want a different embedding index for each robot and for each robot's state and action spaces. It would be great to have a unified embedding space
-of 3D positions, but that relies on finding the forward kinematics model for each robot. We leave that for future work. 
+We want a different embedding index for each robot,and for each robot's state and action spaces.
+It would be great to have a unified embedding space of 3D positions, but that relies on finding the forward kinematics model for each robot.
+We leave that for future work.
 
-Right now, for each robot, for each episode, we get (N, S) arrays for states and actions. The embedding indexes only work on flat vectors, so our goal
-is to normalize and flatten the matrices into vectors. 
+Right now, for each robot, for each episode, we get (N, S) arrays for states and actions.
+The embedding indexes only work on flat vectors, so our goal is to normalize and flatten the matrices into vectors.
     - TODO: normalize each sensor range independently
     - TODO: better time dilation? right now just scale all to T timesteps
     - TODO: how to handle over time?
@@ -12,11 +13,10 @@ is to normalize and flatten the matrices into vectors.
 """
 
 import json
-import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import faiss
 import numpy as np
@@ -64,12 +64,10 @@ class BaseIndexManager(ABC):
     @abstractmethod
     def init_index(self, name: str, dimension: int) -> None:
         """Initialize a new index for a robot's state or action"""
-        pass
 
     @abstractmethod
     def add_matrix(self, name: str, matrix: np.ndarray) -> None:
         """Add a new matrix to robot's index"""
-        pass
 
     def _matrix_to_vector(
         self, matrix: np.ndarray, normalize: bool = True, **kwargs: Any
@@ -89,17 +87,14 @@ class BaseIndexManager(ABC):
         self, name: str, query_matrix: np.ndarray, k: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Search for similar matrices"""
-        pass
 
     @abstractmethod
     def backup_index(self, name: str, force: bool = False) -> None:
         """Backup the index for a robot"""
-        pass
 
     @abstractmethod
     def load_latest_index(self, name: str) -> bool:
         """Load the most recent index for a robot"""
-        pass
 
     def update_metadata(self, name: str, **kwargs: Any) -> None:
         """Update metadata for a robot"""
@@ -152,7 +147,6 @@ class BaseIndexManager(ABC):
         Returns:
             np.ndarray: Array of shape (n_entries, dimension) containing all vectors
         """
-        pass
 
 
 class FaissIndexManager(BaseIndexManager):
@@ -309,6 +303,7 @@ if __name__ == "__main__":
     breakpoint()
 
     # Demonstrate search
+    name = "panda_state"
     query = np.random.randn(50, 32).astype(np.float32)
     distances, indices = manager.search(name, query, k=5)
 

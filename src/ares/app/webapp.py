@@ -4,9 +4,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import streamlit as st
-from sqlalchemy import create_engine, text
 
 from ares.app.viz_helpers import (
     create_bar_plot,

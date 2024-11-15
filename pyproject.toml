@@ -22,6 +22,15 @@ extend-exclude = '''
   | dist
 )/
 '''
+force-exclude = '''
+# Exclude long strings, comments, and docstrings
+(?x)
+  (
+    \"\"\".*?\"\"\"|
+    \'\'\'.*?\'\'\'|
+    \#.*
+  )
+'''
 
 [tool.isort]
 profile = "black"
@@ -44,3 +53,12 @@ disallow_incomplete_defs = true
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-ra -q"
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E501"]
+extend-select = ["E501"]
+per-file-ignores = '''
+    # Ignore E501 only for lines containing strings/comments
+    *: E501 # type: ignore
+'''

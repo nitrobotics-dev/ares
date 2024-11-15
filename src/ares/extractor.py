@@ -1,4 +1,3 @@
-import os
 import re
 import string
 import typing as t
@@ -77,7 +76,14 @@ class InformationExtractor:
         pass
 
     def extract(
-        self, episode: OpenXEmbodimentEpisode, dataset_info: DatasetInfo
+        self,
+        episode: OpenXEmbodimentEpisode,
+        dataset_info: DatasetInfo,
+        *,  # Force keyword arguments
+        robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        llm_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
         raise NotImplementedError
 
@@ -100,11 +106,15 @@ class RandomInformationExtractor(InformationExtractor):
         self,
         episode: OpenXEmbodimentEpisode,
         dataset_info: DatasetInfo,
-        robot_kwargs: t.Dict[str, t.Any] = {},
-        environment_kwargs: t.Dict[str, t.Any] = {},
-        task_kwargs: t.Dict[str, t.Any] = {},
-        llm_kwargs: t.Dict[str, t.Any] = {},
+        *,  # Force keyword arguments
+        robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        llm_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
+        robot_kwargs = robot_kwargs or {}
+        environment_kwargs = environment_kwargs or {}
+        task_kwargs = task_kwargs or {}
         robot = Robot(embodiment=self.random_string())
         environment = Environment(
             name=self.random_string(),
@@ -154,16 +164,22 @@ class LLMInformationExtractor(InformationExtractor):
         self,
         episode: OpenXEmbodimentEpisode,
         dataset_info: DatasetInfo,
-        robot_kwargs: t.Dict[str, t.Any] = {},
-        environment_kwargs: t.Dict[str, t.Any] = {},
-        task_kwargs: t.Dict[str, t.Any] = {},
-        llm_kwargs: t.Dict[str, t.Any] = {},
+        *,  # Force keyword arguments
+        robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        llm_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
+        robot_kwargs = robot_kwargs or {}
+        environment_kwargs = environment_kwargs or {}
+        task_kwargs = task_kwargs or {}
+        llm_kwargs = llm_kwargs or {}
         dataset_info_dict = hard_coded_dataset_info_extraction(dataset_info)
         episode_info_dict = hard_coded_episode_info_extraction(episode)
         hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
 
-        # with our hardcoded extraction, we need to tell the LLM which fields NOT to extract
+        # with our hardcoded extraction
+        # we need to tell the LLM which fields NOT to extract
         images = [step.observation.image for step in episode.steps]
         info = {
             "task": episode.steps[0].language_instruction,

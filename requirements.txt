@@ -24,3 +24,6 @@ vertexai
 # data viz
 streamlit
 pandas
+
+# database
+faiss-cpu #TODO: try faiss-gpu
