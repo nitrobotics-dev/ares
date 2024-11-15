@@ -7,6 +7,8 @@ is to normalize and flatten the matrices into vectors.
     - TODO: normalize each sensor range independently
     - TODO: better time dilation? right now just scale all to T timesteps
     - TODO: how to handle over time?
+
+# total 2 indices per robot plus 2 for video, text description (plus one for 3D pos!)
 """
 
 import json
@@ -21,14 +23,46 @@ import numpy as np
 
 
 class BaseIndexManager(ABC):
-    def __init__(self, base_dir: str, max_backups: int = 2):
+    def __init__(self, base_dir: str, max_backups: int = 1, load_existing: bool = True):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(exist_ok=True)
         self.metadata: Dict[str, dict] = {}
         self.max_backups = max_backups
+        self.indices: Dict[str, Any] = {}
+
+        # Load existing manager state if it exists
+        if load_existing:
+            self.load_manager()
+
+    def save_manager(self) -> None:
+        """Save the entire state of the index manager"""
+        # Save metadata
+        metadata_path = self.base_dir / "metadata.json"
+        with metadata_path.open("w") as f:
+            json.dump(self.metadata, f, indent=2)
+
+        # Save each index
+        for name in self.indices:
+            self.backup_index(name)
+
+    def load_manager(self) -> None:
+        """Load the entire state of the index manager"""
+        # Load metadata if it exists
+        metadata_path = self.base_dir / "metadata.json"
+        if metadata_path.exists():
+            with metadata_path.open("r") as f:
+                self.metadata = json.load(f)
+
+        # Load indices from directories
+        if self.base_dir.exists():
+            for robot_dir in self.base_dir.iterdir():
+                if robot_dir.is_dir():
+                    name = robot_dir.name
+                    if self.load_latest_index(name):
+                        print(f"Loaded existing index for {name}")
 
     @abstractmethod
-    def init_index(self, name: str) -> None:
+    def init_index(self, name: str, dimension: int) -> None:
         """Initialize a new index for a robot's state or action"""
         pass
 
@@ -108,11 +142,22 @@ class BaseIndexManager(ABC):
             if meta_file.exists():
                 meta_file.unlink()
 
+    @abstractmethod
+    def get_all_vectors(self, name: str) -> np.ndarray:
+        """Get all vectors stored in the index.
+
+        Args:
+            name: Name of the index to query
+
+        Returns:
+            np.ndarray: Array of shape (n_entries, dimension) containing all vectors
+        """
+        pass
+
 
 class FaissIndexManager(BaseIndexManager):
-    def __init__(self, base_dir: str, max_backups: int = 5):
+    def __init__(self, base_dir: str, max_backups: int = 1):
         super().__init__(base_dir, max_backups)
-        self.indices: Dict[str, faiss.IndexFlatL2] = {}
 
     def init_index(self, name: str, dimension: int) -> None:
         """Initialize a new index with specified dimension"""
@@ -125,9 +170,9 @@ class FaissIndexManager(BaseIndexManager):
     def add_matrix(self, name: str, matrix: np.ndarray) -> None:
         """Add a matrix to the index, initializing if needed"""
         if name not in self.indices:
-            self.init_index(name, dimension=np.prod(matrix.shape))
+            self.init_index(name, dimension=int(np.prod(matrix.shape)))
 
-        vector = self._matrix_to_vector(matrix, normalize=True)
+        vector = self._matrix_to_vector(matrix)  # , normalize=True)
         self.indices[name].add(vector)
         self.metadata[name]["n_entries"] += 1
 
@@ -185,6 +230,22 @@ class FaissIndexManager(BaseIndexManager):
 
         return True
 
+    def get_all_vectors(self, name: str) -> np.ndarray:
+        """Get all vectors stored in the index.
+
+        Args:
+            name: Name of the index to query
+
+        Returns:
+            np.ndarray: Array of shape (n_entries, dimension) containing all vectors
+        """
+        if name not in self.indices:
+            raise KeyError(f"No index exists for {name}")
+
+        index = self.indices[name]
+        n_vectors = index.ntotal
+        return np.vstack([index.reconstruct(i) for i in range(n_vectors)])
+
 
 # class QdrantIndexManager(BaseIndexManager):
 #     def __init__(self, base_dir: str = "robot_indices"):
@@ -212,35 +273,57 @@ class FaissIndexManager(BaseIndexManager):
 #         # Load collection from backup
 #         pass
 
-if __name__ == "__main__":
-    # Create a test index manager
-    manager = FaissIndexManager("/tmp/robot_indices")
+
+def setup_test_index_manager(
+    base_dir: str, n_dim: int, n_time: int, n_entries: int
+) -> FaissIndexManager:
+    manager = FaissIndexManager(base_dir)
 
     # Initialize indices for different robots and their state/action spaces
     for robot in ["panda", "ur5"]:
         for content in ["state", "action"]:
             name = f"{robot}_{content}"
-            manager.init_index(name, dimension=32)
+            manager.init_index(name, dimension=n_dim)
 
             # Generate some random test data
-            for _ in range(10):
+            for _ in range(n_entries):
                 # Simulate episode data: (timesteps, features)
-                fake_data = np.random.randn(50, 32).astype(np.float32)
+                fake_data = np.random.randn(n_time, n_dim).astype(np.float32)
                 manager.add_matrix(name, fake_data)
 
             # Backup the index
             manager.backup_index(name)
+    return manager
 
-            # Demonstrate search
-            query = np.random.randn(50, 32).astype(np.float32)
-            distances, indices = manager.search(name, query, k=5)
 
-            print(f"\nResults for {name}:")
-            print(f"Found {len(indices[0])} nearest neighbors")
-            print(f"Distances: {distances[0]}")
-            print(f"Indices: {indices[0]}")
+if __name__ == "__main__":
+    # Create a test index manager
+    index_path = "/tmp/robot_indices"
+    n_dim = 32
+    n_time = 100
+    n_entries = 50
 
-            # Print stats
-            stats = manager.get_stats(name)
-            print(f"\nIndex stats for {name}:")
-            print(json.dumps(stats, indent=2))
+    manager = setup_test_index_manager(index_path, n_dim, n_time, n_entries)
+    # test loading from disk
+    new_manager = FaissIndexManager(index_path)
+    breakpoint()
+
+    # Demonstrate search
+    query = np.random.randn(50, 32).astype(np.float32)
+    distances, indices = manager.search(name, query, k=5)
+
+    print(f"\nResults for {name}:")
+    print(f"Found {len(indices[0])} nearest neighbors")
+    print(f"Distances: {distances[0]}")
+    print(f"Indices: {indices[0]}")
+
+    # Print stats
+    stats = manager.get_stats(name)
+    print(f"\nIndex stats for {name}:")
+    print(json.dumps(stats, indent=2))
+
+    # Save everything
+    manager.save_manager()
+
+    # Create new manager that auto-loads everything
+    new_manager = FaissIndexManager("/tmp/robot_indices")

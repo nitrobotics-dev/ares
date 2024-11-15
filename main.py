@@ -9,13 +9,13 @@ from tqdm import tqdm
 
 from ares.configs.base import Environment, Robot, Rollout, Task
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
+from ares.configs.pydantic_sql_helpers import recreate_model
 from ares.databases.structured_database import (
     SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
     add_rollout,
     add_rollouts,
     create_flattened_model,
-    recreate_model,
     setup_database,
 )
 from ares.extractor import (

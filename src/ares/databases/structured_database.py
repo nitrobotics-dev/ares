@@ -6,8 +6,8 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 from sqlmodel import Session, SQLModel, create_engine
 
-from ares.config_sql_helpers import create_flattened_model
 from ares.configs.base import Rollout
+from ares.configs.pydantic_sql_helpers import create_flattened_model
 
 SQLITE_PREFIX = "sqlite:///"
 BASE_ROBOT_DB_PATH = SQLITE_PREFIX + "robot_data.db"
