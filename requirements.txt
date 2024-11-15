@@ -24,6 +24,9 @@ vertexai
 # data viz
 streamlit
 pandas
+plotly
+umap-learn
+hdbscan
 
 # database
 faiss-cpu #TODO: try faiss-gpu
