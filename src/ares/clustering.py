@@ -159,44 +159,71 @@ def visualize_clusters(
     return fig, df
 
 
+def handle_select(*args):
+    """Handle selection events from the plotly chart."""
+    # The plot data is passed as the first argument
+    plot_data = args[0] if args else None
+
+    if plot_data is not None and "points" in plot_data:
+        # Update selected indices in session state
+        st.session_state.selected_indices = [
+            p.get("pointIndex") for p in plot_data["points"]
+        ]
+        # Force a rerun to update the selection info
+        st.rerun()
+    else:
+        print(f"No points data found in plot_data: {plot_data}")
+
+
 if __name__ == "__main__":
     import json
     import os
 
     import streamlit as st
 
-    # Initialize session state for selections
+    # Initialize session state for selections and data
     if "selected_indices" not in st.session_state:
         st.session_state.selected_indices = []
 
-    embeddings = np.random.rand(1000, 2)
-    for i in range(3):
-        embeddings[i * 200 : (i + 1) * 200] += i
-    reduced, labels, probs = cluster_embeddings(embeddings)
+    # Initialize embeddings and clustering results in session state
+    if "embeddings" not in st.session_state:
+        embeddings = np.random.rand(1000, 2)
+        for i in range(3):
+            embeddings[i * 200 : (i + 1) * 200] += i
+        st.session_state.embeddings = embeddings
+        st.session_state.reduced, st.session_state.labels, st.session_state.probs = (
+            cluster_embeddings(embeddings)
+        )
 
-    # Create the visualization
-    fig, df = visualize_clusters(reduced, labels, probs)
+    # Create the visualization using state data
+    fig, df = visualize_clusters(
+        st.session_state.reduced, st.session_state.labels, st.session_state.probs
+    )
 
     # Create columns for controls and info
     col1, col2 = st.columns([3, 1])
 
     with col1:
-        # Display the plot
+        # Display the plot and capture selected points from the event data
         selected_points = st.plotly_chart(
-            fig, use_container_width=True, key="cluster_plot"
+            fig,
+            use_container_width=True,
+            key="cluster_plot",
+            selection_mode="box",
+            on_select=handle_select,  # Pass the function reference
         )
 
     with col2:
         st.write("### Selection Controls")
 
         if st.button("Save Selection"):
-            # Get the currently selected points from the figure's selectedpoints
-            selected = fig.data[0].selectedpoints
-            if selected:
+            # Use the selection from session state instead of fig.data
+            if st.session_state.selected_indices:
                 with open(SELECTION_FILE, "w") as f:
-                    json.dump({"selected": selected}, f)
-                st.session_state.selected_indices = selected
+                    json.dump({"selected": st.session_state.selected_indices}, f)
                 st.success("Selection saved!")
+            else:
+                st.warning("No points selected")
 
         if st.button("Load Selection"):
             if os.path.exists(SELECTION_FILE):
@@ -215,9 +242,12 @@ if __name__ == "__main__":
 
         # Display selection information
         if st.session_state.selected_indices:
+            print(st.session_state.selected_indices)
             selected_df = df.iloc[st.session_state.selected_indices]
             st.write("### Selection Info")
             st.write(f"Points selected: {len(st.session_state.selected_indices)}")
             st.write("Cluster distribution:")
             st.write(selected_df["cluster"].value_counts())
             st.write(f"Avg probability: {selected_df['probability'].mean():.3f}")
+        else:
+            st.write("No selection")
