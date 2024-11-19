@@ -151,13 +151,18 @@ def export_controls(filtered_df: pd.DataFrame) -> None:
 
 
 def infer_visualization_type(
-    column_name: str, data: pd.DataFrame, skip_columns: list | None = None
+    column_name: str,
+    data: pd.DataFrame,
+    skip_columns: list | None = None,
+    max_str_length: int = 500,
 ) -> str | None:
     """Infer the appropriate visualization type based on column characteristics.
 
     Args:
         column_name: Name of the column to analyze
         data: DataFrame containing the data
+        skip_columns: List of column names to skip
+        max_str_length: Maximum string length allowed for categorical plots. Longer strings will be skipped.
 
     Returns:
         str | None: Type of visualization ('line', 'bar', 'histogram', etc.) or None if the column should be skipped
@@ -170,6 +175,11 @@ def infer_visualization_type(
     # Get column data type
     dtype = data[column_name].dtype
     nunique = data[column_name].nunique()
+
+    # Skip columns with long string values
+    if pd.api.types.is_string_dtype(dtype):
+        if data[column_name].str.len().max() > max_str_length:
+            return None
 
     # Time series data (look for time/date columns)
     if pd.api.types.is_datetime64_any_dtype(dtype):
@@ -194,18 +204,11 @@ def infer_visualization_type(
 
 
 def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
-    """Generate success rate visualizations for categorical columns.
-
-    Args:
-        df: DataFrame to visualize
-
-    Returns:
-        list[dict]: List of success rate visualization configurations
-    """
+    """Generate success rate visualizations for categorical columns."""
     visualizations = []
-    categorical_cols = [
-        col for col in df.columns if infer_visualization_type(col, df) == "bar"
-    ]
+    categorical_cols = sorted(
+        [col for col in df.columns if infer_visualization_type(col, df) == "bar"]
+    )
 
     for col in categorical_cols:
         # Aggregate success rates by category
@@ -232,24 +235,62 @@ def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
 def generate_automatic_visualizations(
     df: pd.DataFrame, time_column: str = "creation_time"
 ) -> list[dict]:
-    """Generate visualizations automatically based on data types.
-
-    Args:
-        df: DataFrame to visualize
-        time_column: Name of the column to use for time series plots
-
-    Returns:
-        list[dict]: List of visualization configurations
-    """
+    """Generate visualizations automatically based on data types."""
     visualizations = []
 
-    # First, handle time series for numeric columns
-    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    # Sort all column names
+    columns = sorted(df.columns)
+
+    for col in columns:
+        if col == time_column or infer_visualization_type(col, df) is None:
+            continue
+
+        col_title = col.replace("_", " ").replace("-", " ").title()
+        viz_type = infer_visualization_type(col, df)
+
+        if viz_type == "histogram":
+            visualizations.append(
+                {
+                    "figure": create_histogram(
+                        df,
+                        x=col,
+                        color="#1f77b4",
+                        title=f"Distribution of {col_title}",
+                        labels={col: col_title, "count": "Count"},
+                    ),
+                    "title": f"{col_title} Distribution",
+                }
+            )
+        elif viz_type == "bar":
+            agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
+            visualizations.append(
+                {
+                    "figure": create_bar_plot(
+                        agg_data,
+                        x=col,
+                        y=time_column,
+                        color="#1f77b4",
+                        title=f"Count by {col_title}",
+                        labels={col: col_title, time_column: "Count"},
+                    ),
+                    "title": f"{col_title} Distribution",
+                }
+            )
+
+    return visualizations
+
+
+def generate_time_series_visualizations(
+    df: pd.DataFrame, time_column: str = "creation_time"
+) -> list[dict]:
+    """Generate time series visualizations for numeric columns."""
+    visualizations = []
+    numeric_cols = sorted(df.select_dtypes(include=["int64", "float64"]).columns)
 
     for col in numeric_cols:
         if col == time_column or infer_visualization_type(col, df) is None:
             continue
-        # Time series plot
+
         col_title = col.replace("_", " ").replace("-", " ").title()
         visualizations.append(
             {
@@ -267,45 +308,6 @@ def generate_automatic_visualizations(
                     y_format=".0%" if "task_success" in col.lower() else None,
                 ),
                 "title": f"{col_title} Trends",
-            }
-        )
-
-        # Distribution plot
-        if infer_visualization_type(col, df) == "histogram":
-            visualizations.append(
-                {
-                    "figure": create_histogram(
-                        df,
-                        x=col,
-                        color="#1f77b4",
-                        title=f"Distribution of {col_title}",
-                        labels={col: col_title, "count": "Count"},
-                    ),
-                    "title": f"{col_title} Distribution",
-                }
-            )
-
-    # Handle categorical columns (removed success rate visualizations)
-    categorical_cols = [
-        col for col in df.columns if infer_visualization_type(col, df) == "bar"
-    ]
-
-    for col in categorical_cols:
-        # Only create count distribution plots here
-        agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
-        col_title = col.replace("_", " ").replace("-", " ").title()
-
-        visualizations.append(
-            {
-                "figure": create_bar_plot(
-                    agg_data,
-                    x=col,
-                    y=time_column,
-                    color="#1f77b4",
-                    title=f"Count by {col_title}",
-                    labels={col: col_title, time_column: "Count"},
-                ),
-                "title": f"{col_title} Distribution",
             }
         )
 
@@ -342,23 +344,50 @@ def main() -> None:
     print(f"found columns: {filtered_df.columns}")
 
     try:
+        pass
+        # show first 5 rows of dataframe
+        # show_dataframe(filtered_df.sample(5), title="Sampled 5 Rows")
+
+        # Create overview of all data
+        # st.header("General Analytics")
+        # general_visualizations = generate_automatic_visualizations(
+        #     filtered_df, time_column="ingestion_time"
+        # )
+        # create_tabbed_visualizations(
+        #     general_visualizations, [viz["title"] for viz in general_visualizations]
+        # )
+
+        # st.header("Success Rate Analytics")
+        # success_visualizations = generate_success_rate_visualizations(filtered_df)
+        # create_tabbed_visualizations(
+        #     success_visualizations, [viz["title"] for viz in success_visualizations]
+        # )
+
+        # st.header("Time Series Analytics")
+        # time_series_visualizations = generate_time_series_visualizations(
+        #     filtered_df, time_column="ingestion_time"
+        # )
+        # create_tabbed_visualizations(
+        #     time_series_visualizations,
+        #     [viz["title"] for viz in time_series_visualizations],
+        # )
+
+        # show video cards of first 5 rows in a horizontal layout
+        # st.header("Video Analytics")
+        # video_cols = st.columns(5)
+        # video_paths = [
+        #     os.path.join(PI_DEMO_PATH, path)
+        #     for path in os.listdir(PI_DEMO_PATH)
+        #     if "ds_store" not in path.lower()
+        # ]
+        # for i, row in filtered_df.head().iterrows():
+        #     with video_cols[i]:
+        #         inp = {**row.to_dict(), "video_path": video_paths[i]}
+        #         display_video_card(inp)
+
         # Export controls
-        export_controls(filtered_df)
+        # export_controls(filtered_df)
 
-        # Create two sections of visualizations
-        st.header("General Analytics")
-        general_visualizations = generate_automatic_visualizations(
-            filtered_df, time_column="ingestion_time"
-        )
-        create_tabbed_visualizations(
-            general_visualizations, [viz["title"] for viz in general_visualizations]
-        )
-
-        st.header("Success Rate Analytics")
-        success_visualizations = generate_success_rate_visualizations(filtered_df)
-        create_tabbed_visualizations(
-            success_visualizations, [viz["title"] for viz in success_visualizations]
-        )
     except Exception as e:
         st.error(f"Error loading data: {str(e)}\n{traceback.format_exc()}")
 
