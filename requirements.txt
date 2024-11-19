@@ -27,6 +27,8 @@ pandas
 plotly
 umap-learn
 hdbscan
+kaleido
+pdfkit
 
 # database
 faiss-cpu #TODO: try faiss-gpu
