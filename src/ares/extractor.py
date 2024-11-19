@@ -89,7 +89,10 @@ def hard_coded_episode_info_extraction(episode: OpenXEmbodimentEpisode) -> dict:
     is_terminal = np.where(terminals)[0][-1] if np.any(terminals) else None
     states = np.stack([step.observation.state for step in steps]).tolist()
     return {
-        "rollout": {"path": episode.episode_metadata.file_path},
+        "rollout": {
+            "path": episode.episode_metadata.file_path,
+            "length": len(steps),
+        },
         "trajectory": {
             "actions": actions,
             "is_first": is_first,

@@ -61,10 +61,10 @@ def initialize_mock_data() -> None:
             {
                 "creation_time": dates,
                 "length": np.random.randint(1, 100, size=365),
-                "success": np.array(
+                "task_success": np.array(
                     [np.random.uniform(i / 365, 1) for i in range(365)]
                 ),
-                "video_id": [f"vid_{i}" for i in range(365)],
+                "id": [f"vid_{i}" for i in range(365)],
                 "task": [f"Robot Task {i}" for i in np.random.randint(0, 10, 365)],
                 "views": np.random.randint(100, 1000, size=365),
                 "video_path": [
@@ -163,7 +163,7 @@ def infer_visualization_type(
         str | None: Type of visualization ('line', 'bar', 'histogram', etc.) or None if the column should be skipped
     """
     # Skip certain columns that shouldn't be plotted
-    skip_columns = skip_columns or ["video_path", "video_id", "id"]
+    skip_columns = skip_columns or ["path", "id"]
     if column_name.lower() in skip_columns:
         return None
 
@@ -193,6 +193,42 @@ def infer_visualization_type(
     return None
 
 
+def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
+    """Generate success rate visualizations for categorical columns.
+
+    Args:
+        df: DataFrame to visualize
+
+    Returns:
+        list[dict]: List of success rate visualization configurations
+    """
+    visualizations = []
+    categorical_cols = [
+        col for col in df.columns if infer_visualization_type(col, df) == "bar"
+    ]
+
+    for col in categorical_cols:
+        # Aggregate success rates by category
+        agg_data = df.groupby(col).agg({"task_success": "mean"}).reset_index()
+        col_title = col.replace("_", " ").replace("-", " ").title()
+
+        visualizations.append(
+            {
+                "figure": create_bar_plot(
+                    agg_data,
+                    x=col,
+                    y="task_success",
+                    color="#2ecc71",  # Different color for success metrics
+                    title=f"Success Rate by {col_title}",
+                    labels={col: col_title, "task_success": "Success Rate"},
+                ),
+                "title": f"{col_title} Success Rate",
+            }
+        )
+
+    return visualizations
+
+
 def generate_automatic_visualizations(
     df: pd.DataFrame, time_column: str = "creation_time"
 ) -> list[dict]:
@@ -213,8 +249,8 @@ def generate_automatic_visualizations(
     for col in numeric_cols:
         if col == time_column or infer_visualization_type(col, df) is None:
             continue
-
         # Time series plot
+        col_title = col.replace("_", " ").replace("-", " ").title()
         visualizations.append(
             {
                 "figure": create_line_plot(
@@ -222,15 +258,15 @@ def generate_automatic_visualizations(
                     x=time_column,
                     y=[col],
                     colors=["#1f77b4"],
-                    title=f"{col.title()} Over Time",
+                    title=f"{col_title} Over Time",
                     labels={
-                        col: col.title(),
+                        col: col_title,
                         time_column: time_column.title(),
-                        "value": col.title(),
+                        "value": col_title,
                     },
-                    y_format=".0%" if "success" in col.lower() else None,
+                    y_format=".0%" if "task_success" in col.lower() else None,
                 ),
-                "title": f"{col.title()} Trends",
+                "title": f"{col_title} Trends",
             }
         )
 
@@ -242,25 +278,23 @@ def generate_automatic_visualizations(
                         df,
                         x=col,
                         color="#1f77b4",
-                        title=f"Distribution of {col.title()}",
-                        labels={col: col.title(), "count": "Count"},
+                        title=f"Distribution of {col_title}",
+                        labels={col: col_title, "count": "Count"},
                     ),
-                    "title": f"{col.title()} Distribution",
+                    "title": f"{col_title} Distribution",
                 }
             )
 
-    # Handle categorical columns
+    # Handle categorical columns (removed success rate visualizations)
     categorical_cols = [
         col for col in df.columns if infer_visualization_type(col, df) == "bar"
     ]
 
     for col in categorical_cols:
-        # Aggregate by category
-        agg_data = (
-            df.groupby(col).agg({"success": "mean", time_column: "count"}).reset_index()
-        )
+        # Only create count distribution plots here
+        agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
+        col_title = col.replace("_", " ").replace("-", " ").title()
 
-        # Count by category
         visualizations.append(
             {
                 "figure": create_bar_plot(
@@ -268,28 +302,12 @@ def generate_automatic_visualizations(
                     x=col,
                     y=time_column,
                     color="#1f77b4",
-                    title=f"Count by {col.title()}",
-                    labels={col: col.title(), time_column: "Count"},
+                    title=f"Count by {col_title}",
+                    labels={col: col_title, time_column: "Count"},
                 ),
-                "title": f"{col.title()} Distribution",
+                "title": f"{col_title} Distribution",
             }
         )
-
-        # Success rate by category (if applicable)
-        if "success" in df.columns:
-            visualizations.append(
-                {
-                    "figure": create_bar_plot(
-                        agg_data,
-                        x=col,
-                        y="success",
-                        color="#1f77b4",
-                        title=f"Success Rate by {col.title()}",
-                        labels={col: col.title(), "success": "Success Rate"},
-                    ),
-                    "title": f"{col.title()} Success Rate",
-                }
-            )
 
     return visualizations
 
@@ -319,19 +337,28 @@ def main() -> None:
     #     return
 
     # just get df from sess, engine in state, drop "unnamed" columns
-    df = st.session_state.SESSION.exec(select(RolloutSQLModel)).all()
+    df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
     filtered_df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
+    print(f"found columns: {filtered_df.columns}")
 
     try:
         # Export controls
         export_controls(filtered_df)
 
-        # Generate automatic visualizations
-        visualizations = generate_automatic_visualizations(filtered_df)
+        # Create two sections of visualizations
+        st.header("General Analytics")
+        general_visualizations = generate_automatic_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            general_visualizations, [viz["title"] for viz in general_visualizations]
+        )
 
-        # Create tabs
-        tab_names = [viz["title"] for viz in visualizations]
-        create_tabbed_visualizations(visualizations, tab_names)
+        st.header("Success Rate Analytics")
+        success_visualizations = generate_success_rate_visualizations(filtered_df)
+        create_tabbed_visualizations(
+            success_visualizations, [viz["title"] for viz in success_visualizations]
+        )
     except Exception as e:
         st.error(f"Error loading data: {str(e)}\n{traceback.format_exc()}")
 

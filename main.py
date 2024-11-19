@@ -78,15 +78,15 @@ if __name__ == "__main__":
     rollouts: list[Rollout] = []
     all_times = []
     tic = time.time()
-    for i, ep in tqdm(enumerate(ds)):
-        episode = OpenXEmbodimentEpisode(**ep)
-        rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
-        rollouts.append(rollout)
+    # for i, ep in tqdm(enumerate(ds)):
+    #     episode = OpenXEmbodimentEpisode(**ep)
+    #     rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
+    #     rollouts.append(rollout)
 
-        # just track this
-        start_time = time.time()
-        add_rollout(engine, rollout, RolloutSQLModel)
-        all_times.append(time.time() - start_time)
+    #     # just track this
+    #     start_time = time.time()
+    #     add_rollout(engine, rollout, RolloutSQLModel)
+    #     all_times.append(time.time() - start_time)
 
     print(f"Total rollouts: {len(rollouts)}")
     print(f"Total time: {time.time() - tic}")
