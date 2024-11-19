@@ -1,4 +1,7 @@
+from typing import Any
+
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from pydantic import BaseModel, model_validator
 
@@ -13,8 +16,8 @@ class TensorConverterMixin(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def convert_tensors_to_python(cls, data):
-        def convert_value(value):
+    def convert_tensors_to_python(cls, data: dict) -> dict:
+        def convert_value(value: Any) -> Any:
             if isinstance(value, tf.Tensor):
                 # Convert to numpy first
                 value = value.numpy()
@@ -41,7 +44,7 @@ class OpenXEmbodimentEpisodeMetadata(TensorConverterMixin, BaseModel):
 
 class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
     image: np.ndarray
-    state: np.ndarray = None
+    state: np.ndarray | None = None
     depth: np.ndarray | None = None
     highres_image: np.ndarray | None = None
 
@@ -61,3 +64,16 @@ class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
 class OpenXEmbodimentEpisode(TensorConverterMixin, BaseModel):
     episode_metadata: OpenXEmbodimentEpisodeMetadata
     steps: list[OpenXEmbodimentStep]
+
+
+PATH_TO_SPREADSHEET = "/workspaces/ares/data/oxe.csv"
+HEADER_ROW = 16
+
+
+def get_oxe_dataframe() -> pd.DataFrame:
+    return pd.read_csv(PATH_TO_SPREADSHEET, header=HEADER_ROW)
+
+
+def get_dataset_information(dataset_name: str) -> pd.DataFrame:
+    df = get_oxe_dataframe()
+    return dict(df[df["Registered Dataset Name"] == dataset_name].iloc[0])

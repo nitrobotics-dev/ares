@@ -11,6 +11,8 @@ SQLITE_PREFIX = "sqlite:///"
 BASE_ROBOT_DB_PATH = SQLITE_PREFIX + "robot_data.db"
 TEST_ROBOT_DB_PATH = SQLITE_PREFIX + "test_robot_data.db"
 
+RolloutSQLModel = create_flattened_model(Rollout)
+
 
 def setup_database(RolloutSQLModel: SQLModel, path: str = BASE_ROBOT_DB_PATH) -> Engine:
     engine = create_engine(path)
@@ -51,12 +53,9 @@ def get_rollouts(engine: Engine) -> pd.DataFrame:
 if __name__ == "__main__":
     from ares.configs.test_configs import ROLL1, ROLL2
 
-    RolloutSQLModel = create_flattened_model(
-        Rollout, non_nullable_fields=["id", "path"]
-    )
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    add_rollout(engine, ROLL1)
-    add_rollout(engine, ROLL2)
+    add_rollout(engine, ROLL1, RolloutSQLModel)
+    add_rollout(engine, ROLL2, RolloutSQLModel)
 
     sess = Session(engine)
     res = sess.query(RolloutSQLModel).filter(RolloutSQLModel.task_success > 0.5)

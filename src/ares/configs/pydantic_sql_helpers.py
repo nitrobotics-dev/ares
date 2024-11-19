@@ -54,11 +54,6 @@ def create_flattened_model(
     return type("RolloutSQLModel", (SQLModel,), fields, table=True)
 
 
-# creates the flattened SQLModel class dynamically from the Rollout config
-# note that all fields are nullable by default, except for id and path
-# RolloutSQLModel = create_flattened_model(Rollout, non_nullable_fields=["id", "path"])
-
-
 def recreate_model(
     sql_model_instance: SQLModel, model_cls: type[BaseModel]
 ) -> BaseModel:

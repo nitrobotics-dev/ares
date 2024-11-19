@@ -28,6 +28,13 @@ class Robot(BaseConfig):
     # name: str --> "generic"
     # sensor: str --> just single camera for now
     embodiment: str
+    gripper: str
+    morphology: str
+    action_space: str
+    # TODO: make sure everything is recursive then add Sensor class
+    rgb_cams: int
+    depth_cams: int
+    wrist_cams: int
 
 
 class Environment(BaseConfig):
@@ -37,8 +44,8 @@ class Environment(BaseConfig):
 
 
 class Task(BaseConfig):
-    dataset_name: str
     language_instruction: str
+    language_instruction_type: str
     success_criteria: str
     success: float
 
@@ -82,9 +89,8 @@ class Trajectory(BaseConfig):
 
 
 class Rollout(BaseConfig):
-    # all fields are default None since database/schemas may change
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    creation_time: datetime
+    creation_time: datetime | None
     ingestion_time: datetime
     path: str
     dataset_name: str
