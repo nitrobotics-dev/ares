@@ -14,9 +14,14 @@ from ares.app.export_data import export_options
 from ares.app.init_data import initialize_data
 from ares.app.viz_helpers import (
     create_bar_plot,
+    create_data_filters,
     create_histogram,
     create_line_plot,
+    create_tabbed_visualizations,
     display_video_card,
+    generate_automatic_visualizations,
+    generate_success_rate_visualizations,
+    generate_time_series_visualizations,
     show_dataframe,
 )
 from ares.clustering import visualize_clusters
@@ -29,242 +34,35 @@ video_paths = list(os.listdir(PI_DEMO_PATH))
 tmp_dump_dir = "/tmp/ares_dump"
 
 
-def filter_data_controls() -> pd.DataFrame:
-    """Display filter controls and return filtered data.
+# def filter_data_controls() -> pd.DataFrame:
+#     """Display filter controls and return filtered data.
 
-    Returns:
-        pd.DataFrame: Filtered dataframe based on selected date range
-    """
-    st.header("Filters")
-    col1, _ = st.columns([2, 2])
-    with col1:
-        date_range = st.date_input(
-            "Select Date Range",
-            value=(pd.Timestamp("2000-01-01"), pd.Timestamp.now()),
-        )
+#     Returns:
+#         pd.DataFrame: Filtered dataframe based on selected date range
+#     """
+#     st.header("Filters")
+#     col1, _ = st.columns([2, 2])
+#     with col1:
+#         date_range = st.date_input(
+#             "Select Date Range",
+#             value=(pd.Timestamp("2000-01-01"), pd.Timestamp.now()),
+#         )
 
-    if not date_range or len(date_range) != 2:
-        st.error("Please select a valid date range")
-        return pd.DataFrame()
+#     if not date_range or len(date_range) != 2:
+#         st.error("Please select a valid date range")
+#         return pd.DataFrame()
 
-    # Filter the data based on date range
-    filtered_df = st.session_state.MOCK_DATA[
-        (st.session_state.MOCK_DATA["creation_time"] >= pd.Timestamp(date_range[0]))
-        & (st.session_state.MOCK_DATA["creation_time"] <= pd.Timestamp(date_range[1]))
-    ].copy()
+#     # Filter the data based on date range
+#     filtered_df = st.session_state.MOCK_DATA[
+#         (st.session_state.MOCK_DATA["creation_time"] >= pd.Timestamp(date_range[0]))
+#         & (st.session_state.MOCK_DATA["creation_time"] <= pd.Timestamp(date_range[1]))
+#     ].copy()
 
-    if filtered_df.empty:
-        st.warning("No data available for the selected date range")
-        return pd.DataFrame()
+#     if filtered_df.empty:
+#         st.warning("No data available for the selected date range")
+#         return pd.DataFrame()
 
-    return filtered_df
-
-
-def infer_visualization_type(
-    column_name: str,
-    data: pd.DataFrame,
-    skip_columns: list | None = None,
-    max_str_length: int = 500,
-) -> str | None:
-    """Infer the appropriate visualization type based on column characteristics.
-
-    Args:
-        column_name: Name of the column to analyze
-        data: DataFrame containing the data
-        skip_columns: List of column names to skip
-        max_str_length: Maximum string length allowed for categorical plots. Longer strings will be skipped.
-
-    Returns:
-        str | None: Type of visualization ('line', 'bar', 'histogram', etc.) or None if the column should be skipped
-    """
-    # Skip certain columns that shouldn't be plotted
-    skip_columns = skip_columns or ["path", "id"]
-    if column_name.lower() in skip_columns:
-        return None
-
-    # Get column data type
-    dtype = data[column_name].dtype
-    nunique = data[column_name].nunique()
-
-    # Skip columns with long string values
-    if pd.api.types.is_string_dtype(dtype):
-        if data[column_name].str.len().max() > max_str_length:
-            return None
-
-    # Time series data (look for time/date columns)
-    if pd.api.types.is_datetime64_any_dtype(dtype):
-        return None  # We'll use this as an x-axis instead
-
-    # Numeric continuous data
-    if pd.api.types.is_numeric_dtype(dtype):
-        if nunique > 20:  # Arbitrary threshold for continuous vs discrete
-            return "histogram"
-        else:
-            return "bar"
-
-    # Categorical data
-    if pd.api.types.is_string_dtype(dtype) or nunique < 20:
-        return "bar"
-
-    print(
-        f"Skipping column {column_name} with dtype {dtype} and nunique {nunique} -- didn't fit into any graph types"
-    )
-    print(data[column_name].value_counts())
-    return None
-
-
-def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
-    """Generate success rate visualizations for categorical columns."""
-    visualizations = []
-    categorical_cols = sorted(
-        [col for col in df.columns if infer_visualization_type(col, df) == "bar"]
-    )
-
-    for col in categorical_cols:
-        # Create new DataFrame with success rates by category
-        success_rates = pd.DataFrame(
-            {
-                col: df[col].unique(),
-                "success_rate": [
-                    df[df[col] == val]["task_success"].mean()
-                    for val in df[col].unique()
-                ],
-            }
-        )
-
-        col_title = col.replace("_", " ").replace("-", " ").title()
-
-        visualizations.append(
-            {
-                "figure": create_bar_plot(
-                    success_rates,
-                    x=col,
-                    y="success_rate",
-                    color="#2ecc71",
-                    title=f"Success Rate by {col_title}",
-                    labels={col: col_title, "success_rate": "Success Rate"},
-                ),
-                "title": f"{col_title} Success Rate",
-            }
-        )
-
-    return visualizations
-
-
-def generate_automatic_visualizations(
-    df: pd.DataFrame, time_column: str = "creation_time"
-) -> list[dict]:
-    """Generate visualizations automatically based on data types."""
-    visualizations = []
-
-    # Sort all column names
-    columns = sorted(df.columns)
-
-    for col in columns:
-        if col == time_column or infer_visualization_type(col, df) is None:
-            continue
-
-        col_title = col.replace("_", " ").replace("-", " ").title()
-        viz_type = infer_visualization_type(col, df)
-
-        if viz_type == "histogram":
-            visualizations.append(
-                {
-                    "figure": create_histogram(
-                        df,
-                        x=col,
-                        color="#1f77b4",
-                        title=f"Distribution of {col_title}",
-                        labels={col: col_title, "count": "Count"},
-                    ),
-                    "title": f"{col_title} Distribution",
-                }
-            )
-        elif viz_type == "bar":
-            agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
-            visualizations.append(
-                {
-                    "figure": create_bar_plot(
-                        agg_data,
-                        x=col,
-                        y=time_column,
-                        color="#1f77b4",
-                        title=f"Count by {col_title}",
-                        labels={col: col_title, time_column: "Count"},
-                    ),
-                    "title": f"{col_title} Distribution",
-                }
-            )
-
-    return visualizations
-
-
-def generate_time_series_visualizations(
-    df: pd.DataFrame, time_column: str = "creation_time"
-) -> list[dict]:
-    """Generate time series visualizations for numeric columns."""
-    visualizations = []
-    numeric_cols = sorted(df.select_dtypes(include=["int64", "float64"]).columns)
-
-    for col in numeric_cols:
-        if col == time_column or infer_visualization_type(col, df) is None:
-            continue
-
-        col_title = col.replace("_", " ").replace("-", " ").title()
-        visualizations.append(
-            {
-                "figure": create_line_plot(
-                    df,
-                    x=time_column,
-                    y=[col],
-                    colors=["#1f77b4"],
-                    title=f"{col_title} Over Time",
-                    labels={
-                        col: col_title,
-                        time_column: time_column.title(),
-                        "value": col_title,
-                    },
-                    y_format=".0%" if "task_success" in col.lower() else None,
-                ),
-                "title": f"{col_title} Trends",
-            }
-        )
-
-    return visualizations
-
-
-def create_tabbed_visualizations(
-    visualizations: list[dict], tab_names: list[str]
-) -> None:
-    """Create tabs for each visualization."""
-    tabs = st.tabs(tab_names)
-    for tab, viz in zip(tabs, visualizations):
-        with tab:
-            st.plotly_chart(viz["figure"], use_container_width=True)
-
-
-def display_video_grid(filtered_df: pd.DataFrame, max_videos: int = 5) -> None:
-    """Display a grid of video cards for the first N rows of the dataframe.
-
-    Args:
-        filtered_df: DataFrame containing rollout data
-        max_videos: Maximum number of videos to display in the grid
-    """
-    st.header("Rollout Examples")
-    n_videos = min(max_videos, len(filtered_df))
-    video_cols = st.columns(n_videos)
-
-    video_paths = [
-        os.path.join(PI_DEMO_PATH, path)
-        for path in os.listdir(PI_DEMO_PATH)
-        if "ds_store" not in path.lower()
-    ]
-
-    for i, (_, row) in enumerate(filtered_df.head(n_videos).iterrows()):
-        with video_cols[i]:
-            video_path = video_paths[i % len(video_paths)]
-            inp = {**row.to_dict(), "video_path": video_path}
-            display_video_card(inp)
+#     return filtered_df
 
 
 # Streamlit app
@@ -277,14 +75,13 @@ def main() -> None:
     # initialize_mock_data(tmp_dump_dir)
     initialize_data(tmp_dump_dir)
 
-    # Get filtered dataframe
-    # filtered_df = filter_data_controls()
-    # if filtered_df.empty:
-    #     return
-
-    # just get df from sess, engine in state, drop "unnamed" columns
+    # Initial dataframe
     df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
     df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
+
+    # Add filters section
+    st.header("Filters")
+    value_filtered_df = create_data_filters(df)  # First stage of filtering (by values)
 
     try:
         # Create the visualization using state data
@@ -341,7 +138,9 @@ def main() -> None:
         st.write(
             f"Selected {n_pts} point{'' if n_pts == 1 else 's'} from {n_clusters} cluster{'' if n_clusters == 1 else 's'}"
         )
-        filtered_df = df.iloc[indices]
+        filtered_df = value_filtered_df.iloc[
+            indices
+        ]  # Second stage of filtering (by cluster selection)
         ######### end hack #########
 
         if filtered_df.empty:

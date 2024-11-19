@@ -54,7 +54,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
             st.session_state.probs = probs
 
 
-def initialize_mock_data(tmp_dump_dir: str, video_paths: List[str]) -> None:
+def initialize_mock_data(tmp_dump_dir: str, video_paths: list[str]) -> None:
     """Initialize or load mock data"""
     mock_data_path = os.path.join(tmp_dump_dir, "mock_data.pkl")
 

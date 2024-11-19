@@ -15,7 +15,5 @@ COPY . .
 RUN pip install -e .
 
 
-
-
 # start in bash for interactive containers
 CMD ["/bin/bash"]
