@@ -123,27 +123,44 @@ def visualize_clusters(
     )
 
     # Add centroids
+    centroid_x = []
+    centroid_y = []
+    centroid_colors = []
+    centroid_names = []
+
     for cluster in np.unique(cluster_labels):
         if cluster != -1:  # Skip noise points
             mask = cluster_labels == cluster
             if mask.any():  # Only add centroid if cluster has points
                 centroid = reduced_embeddings[mask].mean(axis=0)
-                fig.add_trace(
-                    go.Scatter(
-                        x=[centroid[0]],
-                        y=[centroid[1]],
-                        mode="markers",
-                        marker=dict(
-                            symbol="triangle-up",
-                            color=colors[cluster],
-                            size=25,
-                            line=dict(color="white", width=2),
-                        ),
-                        name=f"Centroid {cluster}",
-                        legendgroup="centroids",
-                        legendgrouptitle_text="Centroids",
-                    )
-                )
+                centroid_x.append(centroid[0])
+                centroid_y.append(centroid[1])
+                centroid_colors.append(colors[cluster])
+                centroid_names.append(f"Centroid {cluster}")
+
+    # Add all centroids as a single trace with individual legend entries
+    if centroid_x:  # Only add if there are centroids
+        fig.add_trace(
+            go.Scatter(
+                x=centroid_x,
+                y=centroid_y,
+                mode="markers",
+                marker=dict(
+                    symbol="triangle-up",
+                    color=centroid_colors,
+                    size=25,
+                    line=dict(color="white", width=2),
+                ),
+                name="Centroids",
+                legendgroup="centroids",
+                legendgrouptitle_text="Centroids",
+                showlegend=True,
+                legendgrouptitle=dict(text="Centroids"),
+                text=centroid_names,  # Add names for hover text
+                hoverinfo="text",
+                customdata=[[name] for name in centroid_names],  # For legend entries
+            )
+        )
 
     # Add this after all traces are added
     fig.update_layout(
@@ -157,22 +174,6 @@ def visualize_clusters(
     )
 
     return fig, df
-
-
-def handle_select(*args):
-    """Handle selection events from the plotly chart."""
-    # The plot data is passed as the first argument
-    plot_data = args[0] if args else None
-
-    if plot_data is not None and "points" in plot_data:
-        # Update selected indices in session state
-        st.session_state.selected_indices = [
-            p.get("pointIndex") for p in plot_data["points"]
-        ]
-        # Force a rerun to update the selection info
-        st.rerun()
-    else:
-        print(f"No points data found in plot_data: {plot_data}")
 
 
 if __name__ == "__main__":

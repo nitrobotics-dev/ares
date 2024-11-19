@@ -1,6 +1,7 @@
 import os
 import time
 import traceback
+from collections import defaultdict
 from datetime import datetime
 
 import numpy as np
@@ -19,6 +20,7 @@ from ares.app.viz_helpers import (
     display_video_card,
     show_dataframe,
 )
+from ares.clustering import cluster_embeddings, visualize_clusters
 from ares.configs.base import Rollout
 from ares.databases.structured_database import (
     SQLITE_PREFIX,
@@ -32,46 +34,92 @@ from ares.task_utils import PI_DEMO_PATH
 title = "Video Analytics Dashboard"
 video_paths = list(os.listdir(PI_DEMO_PATH))
 
+tmp_dump_dir = "/tmp/ares_dump"
+
 
 def initialize_data() -> None:
-    """Initialize database connection if it doesn't exist in session state"""
+    """Initialize database connection and load/create embeddings"""
     if "ENGINE" not in st.session_state or "SESSION" not in st.session_state:
         engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
         sess = Session(engine)
         st.session_state.ENGINE = engine
         st.session_state.SESSION = sess
 
+    # Create tmp directory if it doesn't exist
+    os.makedirs(tmp_dump_dir, exist_ok=True)
+    embeddings_path = os.path.join(tmp_dump_dir, "embeddings.npy")
+    clusters_path = os.path.join(tmp_dump_dir, "clusters.npz")
+
+    # Initialize or load embeddings
+    if "embeddings" not in st.session_state:
+        if os.path.exists(embeddings_path):
+            # Load from disk
+            st.session_state.embeddings = np.load(embeddings_path)
+            clusters_data = np.load(clusters_path)
+            st.session_state.reduced = clusters_data["reduced"]
+            st.session_state.labels = clusters_data["labels"]
+            st.session_state.probs = clusters_data["probs"]
+        else:
+            # Create new random data and save to disk
+            embeddings = np.random.rand(1000, 2)
+            for i in range(3):
+                embeddings[i * 200 : (i + 1) * 200] += i
+
+            reduced, labels, probs = cluster_embeddings(embeddings)
+
+            # Save to disk
+            np.save(embeddings_path, embeddings)
+            np.savez(clusters_path, reduced=reduced, labels=labels, probs=probs)
+
+            # Store in session state
+            st.session_state.embeddings = embeddings
+            st.session_state.reduced = reduced
+            st.session_state.labels = labels
+            st.session_state.probs = probs
+
 
 def initialize_mock_data() -> None:
-    """Initialize mock data if it doesn't exist in session state"""
+    """Initialize or load mock data"""
+    mock_data_path = os.path.join(tmp_dump_dir, "mock_data.pkl")
+
     if "MOCK_DATA" not in st.session_state:
-        # Create date range first
-        base_dates = pd.date_range(end=pd.Timestamp.now(), periods=365)
-        # Apply random offsets one at a time
-        random_offsets = np.random.randint(0, 365, size=365)
-        dates = [
-            date - pd.Timedelta(days=int(offset))
-            for date, offset in zip(base_dates, random_offsets)
-        ]
+        if os.path.exists(mock_data_path):
+            # Load from disk
+            st.session_state.MOCK_DATA = pd.read_pickle(mock_data_path)
+        else:
+            # Create new random data
+            base_dates = pd.date_range(end=pd.Timestamp.now(), periods=365)
+            np.random.seed(42)  # Set seed for reproducibility
+            random_offsets = np.random.randint(0, 365, size=365)
+            dates = [
+                date - pd.Timedelta(days=int(offset))
+                for date, offset in zip(base_dates, random_offsets)
+            ]
 
-        # Sample video paths randomly
-        sampled_paths = np.random.choice(video_paths, size=365)
+            sampled_paths = np.random.choice(video_paths, size=365)
 
-        st.session_state.MOCK_DATA = pd.DataFrame(
-            {
-                "creation_time": dates,
-                "length": np.random.randint(1, 100, size=365),
-                "task_success": np.array(
-                    [np.random.uniform(i / 365, 1) for i in range(365)]
-                ),
-                "id": [f"vid_{i}" for i in range(365)],
-                "task": [f"Robot Task {i}" for i in np.random.randint(0, 10, 365)],
-                "views": np.random.randint(100, 1000, size=365),
-                "video_path": [
-                    f"/workspaces/ares/data/pi_demos/{path}" for path in sampled_paths
-                ],
-            }
-        )
+            mock_data = pd.DataFrame(
+                {
+                    "creation_time": dates,
+                    "length": np.random.randint(1, 100, size=365),
+                    "task_success": np.array(
+                        [np.random.uniform(i / 365, 1) for i in range(365)]
+                    ),
+                    "id": [f"vid_{i}" for i in range(365)],
+                    "task": [f"Robot Task {i}" for i in np.random.randint(0, 10, 365)],
+                    "views": np.random.randint(100, 1000, size=365),
+                    "video_path": [
+                        f"/workspaces/ares/data/pi_demos/{path}"
+                        for path in sampled_paths
+                    ],
+                }
+            )
+
+            # Save to disk
+            mock_data.to_pickle(mock_data_path)
+
+            # Store in session state
+            st.session_state.MOCK_DATA = mock_data
 
 
 def filter_data_controls() -> pd.DataFrame:
@@ -128,26 +176,162 @@ def export_dataframe(df: pd.DataFrame, base_path: str) -> str:
     return export_path
 
 
-def export_controls(filtered_df: pd.DataFrame) -> None:
-    """Display and handle export controls for the dataframe.
+def export_dashboard(
+    df: pd.DataFrame, visualizations: list[dict], base_path: str, format: str = "html"
+) -> str:
+    """Export dashboard including data, visualizations, and analytics.
+
+    Args:
+        df: DataFrame containing all data
+        visualizations: List of visualization dictionaries with figures and titles
+        base_path: Base directory path where file should be saved
+        format: Export format ("html", "pdf", "csv", "xlsx")
+
+    Returns:
+        Path where file was saved
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    export_dir = os.path.join(base_path, "exports")
+    os.makedirs(export_dir, exist_ok=True)
+
+    base_filename = f"dashboard_export_{timestamp}"
+    export_path = os.path.join(export_dir, base_filename)
+
+    if format in ["csv", "xlsx"]:
+        # Simple data-only export
+        full_path = f"{export_path}.{format}"
+        if format == "csv":
+            df.to_csv(full_path, index=False)
+        else:
+            df.to_excel(full_path, index=False)
+    else:
+        # Full dashboard export
+        full_path = f"{export_path}.{format}"
+        img_dir = f"{export_path}_files"
+        os.makedirs(img_dir, exist_ok=True)
+
+        # Generate HTML content
+        html_content = [
+            "<html><head>",
+            "<style>",
+            "body { font-family: Arial, sans-serif; margin: 40px; }",
+            ".plot-container { margin: 20px 0; }",
+            ".stats-container { margin: 20px 0; }",
+            "table { border-collapse: collapse; width: 100%; }",
+            "th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }",
+            "</style>",
+            "</head><body>",
+            f"<h1>{title}</h1>",
+            f"<p>Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>",
+        ]
+
+        # Add cluster visualization if available
+        if "reduced" in st.session_state:
+            cluster_fig, _ = visualize_clusters(
+                st.session_state.reduced,
+                st.session_state.labels,
+                st.session_state.probs,
+            )
+            cluster_path = os.path.join(img_dir, "clusters.png")
+            cluster_fig.write_image(cluster_path)
+            html_content.extend(
+                [
+                    "<h2>Cluster Analysis</h2>",
+                    f'<img src="{os.path.basename(img_dir)}/clusters.png" style="max-width:100%">',
+                ]
+            )
+
+        # Add all visualizations
+        html_content.append("<h2>Analytics Visualizations</h2>")
+        for i, viz in enumerate(visualizations):
+            img_path = os.path.join(img_dir, f"plot_{i}.png")
+            viz["figure"].write_image(img_path)
+            html_content.extend(
+                [
+                    f"<div class='plot-container'>",
+                    f"<h3>{viz['title']}</h3>",
+                    f'<img src="{os.path.basename(img_dir)}/plot_{i}.png" style="max-width:100%">',
+                    "</div>",
+                ]
+            )
+
+        # Add summary statistics
+        html_content.extend(
+            [
+                "<h2>Summary Statistics</h2>",
+                "<div class='stats-container'>",
+                df.describe().to_html(),
+                "</div>",
+            ]
+        )
+
+        # Add data table
+        html_content.extend(
+            [
+                "<h2>Data Sample</h2>",
+                "<div class='data-container'>",
+                df.head(100).to_html(),  # First 100 rows
+                "</div>",
+                "</body></html>",
+            ]
+        )
+
+        html_content = "\n".join(html_content)
+
+        if format == "html":
+            with open(full_path, "w") as f:
+                f.write(html_content)
+        else:  # PDF
+            try:
+                import pdfkit
+
+                html_path = f"{export_path}_temp.html"
+                with open(html_path, "w") as f:
+                    f.write(html_content)
+                pdfkit.from_file(html_path, full_path)
+                os.remove(html_path)  # Clean up temp file
+            except ImportError:
+                raise ImportError("Please install pdfkit: pip install pdfkit")
+
+    return full_path
+
+
+def export_options(filtered_df: pd.DataFrame, visualizations: list[dict]) -> None:
+    """Display and handle export controls for the dashboard.
 
     Args:
         filtered_df: DataFrame to be exported
+        visualizations: List of visualization dictionaries
     """
-    export_col1, export_col2, _ = st.columns([1, 1, 2])
+    st.header("Export Options")
+    export_col1, export_col2, export_col3, _ = st.columns([1, 1, 1, 1])
+
     with export_col1:
         export_path = st.text_input(
             "Export Directory",
             value="/tmp",
             help="Directory where exported files will be saved",
         )
+
     with export_col2:
-        if st.button("Export Data"):
+        export_format = st.selectbox(
+            "Export Format",
+            options=["html", "pdf", "csv", "xlsx"],
+            help="Choose the format for your export. HTML/PDF include visualizations.",
+        )
+
+    with export_col3:
+        if st.button("Export Dashboard"):
             try:
-                export_path = export_dataframe(filtered_df, export_path)
-                st.success(f"Data exported successfully to: {export_path}")
+                with st.spinner(f"Exporting dashboard as {export_format}..."):
+                    export_path = export_dashboard(
+                        filtered_df, visualizations, export_path, export_format
+                    )
+                    st.success(f"Dashboard exported successfully to: {export_path}")
             except Exception as e:
-                st.error(f"Failed to export data: {str(e)}\n{traceback.format_exc()}")
+                st.error(
+                    f"Failed to export dashboard: {str(e)}\n{traceback.format_exc()}"
+                )
 
 
 def infer_visualization_type(
@@ -211,19 +395,28 @@ def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
     )
 
     for col in categorical_cols:
-        # Aggregate success rates by category
-        agg_data = df.groupby(col).agg({"task_success": "mean"}).reset_index()
+        # Create new DataFrame with success rates by category
+        success_rates = pd.DataFrame(
+            {
+                col: df[col].unique(),
+                "success_rate": [
+                    df[df[col] == val]["task_success"].mean()
+                    for val in df[col].unique()
+                ],
+            }
+        )
+
         col_title = col.replace("_", " ").replace("-", " ").title()
 
         visualizations.append(
             {
                 "figure": create_bar_plot(
-                    agg_data,
+                    success_rates,
                     x=col,
-                    y="task_success",
-                    color="#2ecc71",  # Different color for success metrics
+                    y="success_rate",
+                    color="#2ecc71",
                     title=f"Success Rate by {col_title}",
-                    labels={col: col_title, "task_success": "Success Rate"},
+                    labels={col: col_title, "success_rate": "Success Rate"},
                 ),
                 "title": f"{col_title} Success Rate",
             }
@@ -326,6 +519,7 @@ def create_tabbed_visualizations(
 
 # Streamlit app
 def main() -> None:
+    print("\n" + "=" * 100 + "\n")
     st.set_page_config(page_title=title, page_icon="📊", layout="wide")
     st.title(title)
 
@@ -340,53 +534,130 @@ def main() -> None:
 
     # just get df from sess, engine in state, drop "unnamed" columns
     df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
-    filtered_df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
-    print(f"found columns: {filtered_df.columns}")
+    df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
 
     try:
-        pass
+        # Create the visualization using state data
+        fig, cluster_df = visualize_clusters(
+            st.session_state.reduced, st.session_state.labels, st.session_state.probs
+        )
+
+        # Create columns for controls and info
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            # Display the plot and capture selected points from the event data
+            event = st.plotly_chart(
+                fig,
+                use_container_width=True,
+                key="cluster_plot",
+                selection_mode=["points", "box", "lasso"],
+                # on_select=handle_select,  # Pass the function reference
+                on_select="rerun",
+            )
+            selection = event.selection
+
+        with col2:
+            st.write("Selection Controls")
+            st.write("Double click to clear selection")
+            if st.button("Summarize Selection"):
+                st.write(f"selected {len(selection['points'])} points")
+                st.write(f"ex: {selection['points'][:5]}")
+
+        ##### start hack #####
+        # # HACK - fit selected points to df, only for this data
+        available_dataset_pts = len(df)
+        st.write(f"hack: available_dataset_pts: {available_dataset_pts}")
+        # determine if selection was made OR if just no points selected
+        selection_flag = any(len(selection[k]) > 0 for k in ["box", "lasso", "points"])
+        if selection_flag:
+            # selection made!
+            indices = []
+            for i in range(len(selection["points"])):
+                if selection["points"][i]["curve_number"] == 0:
+                    indices.append(selection["point_indices"][i])
+        else:
+            # no selection made, use all points
+            indices = np.arange(len(st.session_state.reduced))
+        indices = np.unique(np.array(indices) % available_dataset_pts)
+        n_pts = len(indices)
+        clusters = st.session_state.labels[indices] if n_pts > 0 else []
+        st.write(
+            f"Selection found! Using {'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'} as bounds"
+            if selection_flag
+            else "No selection found, using all points"
+        )
+        n_clusters = len(np.unique(clusters))
+        st.write(
+            f"Selected {n_pts} point{'' if n_pts == 1 else 's'} from {n_clusters} cluster{'' if n_clusters == 1 else 's'}"
+        )
+        filtered_df = df.iloc[indices]
+        ######### end hack #########
+
+        if filtered_df.empty:
+            st.warning(
+                "No data available for the selected points! Try adjusting your selection to receive analytics."
+            )
+            return
+
         # show first 5 rows of dataframe
-        # show_dataframe(filtered_df.sample(5), title="Sampled 5 Rows")
+        show_dataframe(filtered_df.sample(5), title="Sampled 5 Rows")
+
+        st.divider()  # Add horizontal line
 
         # Create overview of all data
-        # st.header("General Analytics")
-        # general_visualizations = generate_automatic_visualizations(
-        #     filtered_df, time_column="ingestion_time"
-        # )
-        # create_tabbed_visualizations(
-        #     general_visualizations, [viz["title"] for viz in general_visualizations]
-        # )
+        st.header("General Analytics")
+        general_visualizations = generate_automatic_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            general_visualizations, [viz["title"] for viz in general_visualizations]
+        )
 
-        # st.header("Success Rate Analytics")
-        # success_visualizations = generate_success_rate_visualizations(filtered_df)
-        # create_tabbed_visualizations(
-        #     success_visualizations, [viz["title"] for viz in success_visualizations]
-        # )
+        st.header("Success Rate Analytics")
+        success_visualizations = generate_success_rate_visualizations(filtered_df)
+        create_tabbed_visualizations(
+            success_visualizations, [viz["title"] for viz in success_visualizations]
+        )
 
-        # st.header("Time Series Analytics")
-        # time_series_visualizations = generate_time_series_visualizations(
-        #     filtered_df, time_column="ingestion_time"
-        # )
-        # create_tabbed_visualizations(
-        #     time_series_visualizations,
-        #     [viz["title"] for viz in time_series_visualizations],
-        # )
+        st.header("Time Series Analytics")
+        time_series_visualizations = generate_time_series_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            time_series_visualizations,
+            [viz["title"] for viz in time_series_visualizations],
+        )
 
         # show video cards of first 5 rows in a horizontal layout
-        # st.header("Video Analytics")
-        # video_cols = st.columns(5)
-        # video_paths = [
-        #     os.path.join(PI_DEMO_PATH, path)
-        #     for path in os.listdir(PI_DEMO_PATH)
-        #     if "ds_store" not in path.lower()
-        # ]
-        # for i, row in filtered_df.head().iterrows():
-        #     with video_cols[i]:
-        #         inp = {**row.to_dict(), "video_path": video_paths[i]}
-        #         display_video_card(inp)
+        st.header("Video Analytics")
+        n_videos = min(5, len(filtered_df))  # Take minimum of 5 or available rows
+        video_cols = st.columns(n_videos)
+        video_paths = [
+            os.path.join(PI_DEMO_PATH, path)
+            for path in os.listdir(PI_DEMO_PATH)
+            if "ds_store" not in path.lower()
+        ]
 
+        # Use enumerate to safely iterate through both columns and rows
+        for i, (_, row) in enumerate(filtered_df.head(n_videos).iterrows()):
+            with video_cols[i]:
+                # Safely index into video_paths
+                video_path = video_paths[
+                    i % len(video_paths)
+                ]  # Use modulo to avoid index errors
+                inp = {**row.to_dict(), "video_path": video_path}
+                display_video_card(inp)
+
+        st.divider()  # Add horizontal line
         # Export controls
-        # export_controls(filtered_df)
+        # Collect all visualizations
+        all_visualizations = []
+        all_visualizations.extend(general_visualizations)
+        all_visualizations.extend(success_visualizations)
+        all_visualizations.extend(time_series_visualizations)
+
+        export_options(filtered_df, all_visualizations)
 
     except Exception as e:
         st.error(f"Error loading data: {str(e)}\n{traceback.format_exc()}")
