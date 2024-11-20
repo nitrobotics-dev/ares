@@ -68,15 +68,14 @@ def main() -> None:
         )
 
     st.write(f"Selected {len(value_filtered_df)} rows out of {len(df)} total")
-    st.write(f"Selected indices: {value_filtered_df.index.tolist()}")
-    st.write(f"Keep Mask: {value_filtered_df.index.tolist()}")
+    # st.write(f"Selected indices: {value_filtered_df.index.tolist()}")
+    # st.write(f"Keep Mask: {value_filtered_df.index.tolist()}")
 
     try:
         # Create the visualization using state data
-        fig, cluster_df = visualize_clusters(
+        fig, cluster_df, cluster_to_trace = visualize_clusters(
             st.session_state.reduced,
             st.session_state.labels,
-            st.session_state.probs,
             keep_mask=value_filtered_df.index.tolist(),
         )
 
@@ -111,14 +110,40 @@ def main() -> None:
         if selection_flag:
             # selection made!
             indices = []
-            for i in range(len(selection["points"])):
-                if selection["points"][i]["curve_number"] == 0:
-                    indices.append(selection["point_indices"][i])
+            try:
+                valid_traces = [
+                    v for k, v in cluster_to_trace.items() if "cluster" in k
+                ]
+                # Create a mapping of filtered indices to original indices
+                filtered_to_original = value_filtered_df.index.tolist()
+
+                for point in selection["points"]:
+                    if point["curve_number"] in valid_traces:
+                        # Get the point's position within its trace
+                        point_number = point["point_number"]
+                        # Get the trace data
+                        trace_data = fig.data[point["curve_number"]]
+                        # Get the original index from custom_data
+                        original_idx = trace_data.customdata[point_number][0]
+                        indices.append(original_idx)
+
+                st.write(f"Debug info:")
+                st.write(f"- Valid traces: {valid_traces}")
+                st.write(f"- Number of selected points: {len(selection['points'])}")
+                st.write(f"- First few points: {selection['points'][:2]}")
+                st.write(f"- Resulting indices: {indices[:5]}")
+            except Exception as e:
+                st.error(
+                    f"Error processing selection: {str(e)}\n{traceback.format_exc()}"
+                )
+                indices = []
         else:
-            # no selection made, use all points
-            indices = np.arange(len(st.session_state.reduced))
-        indices = np.unique(np.array(indices) % available_dataset_pts)
+            # no selection made, use all filtered points
+            indices = value_filtered_df.index.tolist()
+        # breakpoint()
+
         n_pts = len(indices)
+        # breakpoint()
         clusters = st.session_state.labels[indices] if n_pts > 0 else []
         st.write(
             f"Selection found! Using {'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'} as bounds"

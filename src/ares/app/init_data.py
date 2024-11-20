@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ares.clustering import cluster_embeddings
@@ -21,6 +22,9 @@ def initialize_data(tmp_dump_dir: str) -> None:
         st.session_state.ENGINE = engine
         st.session_state.SESSION = sess
 
+    # get len of available dataset
+    available_len = len(pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE))
+
     # Create tmp directory if it doesn't exist
     os.makedirs(tmp_dump_dir, exist_ok=True)
     embeddings_path = os.path.join(tmp_dump_dir, "embeddings.npy")
@@ -37,7 +41,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
             st.session_state.probs = clusters_data["probs"]
         else:
             # Create new random data and save to disk
-            embeddings = np.random.rand(1000, 2)
+            embeddings = np.random.rand(available_len, 2)
             for i in range(3):
                 embeddings[i * 200 : (i + 1) * 200] += i
 

@@ -57,24 +57,23 @@ def cluster_embeddings(
 def visualize_clusters(
     reduced_embeddings: np.ndarray,
     cluster_labels: np.ndarray,
-    probabilities: Optional[np.ndarray] = None,
     title: str = "Embedding Clusters",
     keep_mask: Optional[list] = None,
-) -> Tuple[go.Figure, pd.DataFrame]:
+) -> Tuple[go.Figure, pd.DataFrame, dict[str, int]]:
     """
     Create an interactive 2D visualization of the clustered embeddings.
     Returns figure and dataframe for selection tracking.
     """
+    # Create a color map
+    n_clusters = len(np.unique(cluster_labels))
+    # Use Set1 palette but ensure discrete colors
+    colors = px.colors.qualitative.Set1[:n_clusters]
+
     df = pd.DataFrame(
         {
             "x": reduced_embeddings[:, 0],
             "y": reduced_embeddings[:, 1],
-            "cluster": cluster_labels,
-            "probability": (
-                probabilities
-                if probabilities is not None
-                else np.ones(len(cluster_labels))
-            ),
+            "cluster": [str(x) if x != -1 else "Noise" for x in cluster_labels],
             "point_index": range(len(cluster_labels)),
         }
     )
@@ -85,9 +84,9 @@ def visualize_clusters(
         mask_array[keep_mask] = True
         df["masked"] = ~mask_array
 
-    # Create a color map
-    n_clusters = len(np.unique(cluster_labels))
-    colors = px.colors.qualitative.Dark24[:n_clusters]
+    # Initialize trace mapping at the start of visualization
+    trace_mapping = {}
+    current_trace = 0
 
     # Create figure with masked points first (if mask exists)
     if keep_mask is not None:
@@ -104,20 +103,27 @@ def visualize_clusters(
             marker=dict(color="lightgray", size=3, opacity=0.3),
             showlegend=False,
             hoverinfo="skip",
-            selectedpoints=None,  # Prevent selection of masked points
+            selectedpoints=None,
         )
+        trace_mapping["masked_points"] = current_trace
+        current_trace += 1
 
-        # Plot unmasked points on top
-        unmasked_df = df[~df["masked"]]
-        fig.add_traces(
-            px.scatter(
-                unmasked_df,
-                x="x",
-                y="y",
-                color="cluster",
-                color_discrete_sequence=colors,
-            ).data
-        )
+        # Plot unmasked points on top, but track original indices
+        unmasked_df = df[~df["masked"]].copy()
+        unmasked_df["original_index"] = unmasked_df.index  # Store original indices
+        cluster_traces = px.scatter(
+            unmasked_df,
+            x="x",
+            y="y",
+            color="cluster",
+            color_discrete_sequence=colors,
+            custom_data=["original_index"],  # Include original indices in hover data
+        ).data
+        fig.add_traces(cluster_traces)
+        # Map each cluster trace
+        for cluster in sorted(unmasked_df["cluster"].unique()):
+            trace_mapping[f"cluster_{cluster}"] = current_trace
+            current_trace += 1
     else:
         # Original plotting logic for no mask
         fig = px.scatter(
@@ -129,6 +135,10 @@ def visualize_clusters(
             color_discrete_sequence=colors,
             template="plotly_white",
         )
+        # Map each cluster trace
+        for cluster in sorted(df["cluster"].unique()):
+            trace_mapping[f"cluster_{cluster}"] = current_trace
+            current_trace += 1
 
     # Update traces and layout
     fig.update_traces(
@@ -164,48 +174,29 @@ def visualize_clusters(
     centroid_names = []
 
     for cluster in np.unique(cluster_labels):
-        if cluster != -1:  # Skip noise points
-            mask = cluster_labels == cluster
-            if mask.any():  # Only add centroid if cluster has points
-                centroid = reduced_embeddings[mask].mean(axis=0)
-                centroid_x.append(centroid[0])
-                centroid_y.append(centroid[1])
-                centroid_colors.append(colors[cluster])
-                centroid_names.append(f"Centroid {cluster}")
+        # if cluster != -1:  # Skip noise points
+        mask = cluster_labels == cluster
+        if mask.any():  # Only add centroid if cluster has points
+            centroid = reduced_embeddings[mask].mean(axis=0)
+            centroid_x.append(centroid[0])
+            centroid_y.append(centroid[1])
+            centroid_colors.append(colors[cluster])
+            centroid_names.append(f"Centroid {cluster}")
 
-    # Add all centroids as a single trace with individual legend entries
-    if centroid_x:  # Only add if there are centroids
-        fig.add_trace(
-            go.Scatter(
-                x=centroid_x,
-                y=centroid_y,
-                mode="markers",
-                marker=dict(
-                    symbol="triangle-up",
-                    color=centroid_colors,
-                    size=25,
-                    line=dict(color="white", width=2),
-                ),
-                name="Centroids",
-                legendgroup="centroids",
-                legendgrouptitle_text="Centroids",
-                showlegend=True,
-                legendgrouptitle=dict(text="Centroids"),
-                text=centroid_names,  # Add names for hover text
-                hoverinfo="text",
-                customdata=[[name] for name in centroid_names],  # For legend entries
-            )
+    if centroid_x:
+        centroid_df = pd.DataFrame(
+            {"x": centroid_x, "y": centroid_y, "cluster": centroid_names}
         )
-
-    # Add this after all traces are added
-    fig.update_layout(
-        legend=dict(
-            yanchor="top",
-            y=-0.1,  # Moves legend below the plot
-            xanchor="left",
-            x=0,
-            orientation="h",  # Makes legend horizontal
+        fig.add_traces(
+            px.scatter(
+                centroid_df,
+                x="x",
+                y="y",
+                color_discrete_sequence=["black"],
+                symbol_sequence=["triangle-up"],
+                size=[5] * len(centroid_df),
+            ).data
         )
-    )
+        trace_mapping["centroids"] = current_trace
 
-    return fig, df
+    return fig, df, trace_mapping
