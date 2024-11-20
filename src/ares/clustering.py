@@ -59,6 +59,7 @@ def visualize_clusters(
     cluster_labels: np.ndarray,
     probabilities: Optional[np.ndarray] = None,
     title: str = "Embedding Clusters",
+    keep_mask: Optional[list] = None,
 ) -> Tuple[go.Figure, pd.DataFrame]:
     """
     Create an interactive 2D visualization of the clustered embeddings.
@@ -74,26 +75,60 @@ def visualize_clusters(
                 if probabilities is not None
                 else np.ones(len(cluster_labels))
             ),
-            "point_index": range(
-                len(cluster_labels)
-            ),  # Add index for selection tracking
+            "point_index": range(len(cluster_labels)),
         }
     )
+
+    # If mask is provided, create two separate dataframes
+    if keep_mask is not None:
+        mask_array = np.zeros(len(df), dtype=bool)
+        mask_array[keep_mask] = True
+        df["masked"] = ~mask_array
 
     # Create a color map
     n_clusters = len(np.unique(cluster_labels))
     colors = px.colors.qualitative.Dark24[:n_clusters]
 
-    fig = px.scatter(
-        df,
-        x="x",
-        y="y",
-        color="cluster",
-        title=title,
-        labels={"cluster": "Cluster"},
-        color_discrete_sequence={i: colors[i] for i in (np.unique(cluster_labels))},
-        template="plotly_white",
-    )
+    # Create figure with masked points first (if mask exists)
+    if keep_mask is not None:
+        # Plot masked (grayed out) points first
+        masked_df = df[df["masked"]]
+        fig = px.scatter(
+            masked_df,
+            x="x",
+            y="y",
+            title=title,
+            template="plotly_white",
+        )
+        fig.update_traces(
+            marker=dict(color="lightgray", size=3, opacity=0.3),
+            showlegend=False,
+            hoverinfo="skip",
+            selectedpoints=None,  # Prevent selection of masked points
+        )
+
+        # Plot unmasked points on top
+        unmasked_df = df[~df["masked"]]
+        fig.add_traces(
+            px.scatter(
+                unmasked_df,
+                x="x",
+                y="y",
+                color="cluster",
+                color_discrete_sequence=colors,
+            ).data
+        )
+    else:
+        # Original plotting logic for no mask
+        fig = px.scatter(
+            df,
+            x="x",
+            y="y",
+            color="cluster",
+            title=title,
+            color_discrete_sequence=colors,
+            template="plotly_white",
+        )
 
     # Update traces and layout
     fig.update_traces(
@@ -174,81 +209,3 @@ def visualize_clusters(
     )
 
     return fig, df
-
-
-if __name__ == "__main__":
-    import json
-    import os
-
-    import streamlit as st
-
-    # Initialize session state for selections and data
-    if "selected_indices" not in st.session_state:
-        st.session_state.selected_indices = []
-
-    # Initialize embeddings and clustering results in session state
-    if "embeddings" not in st.session_state:
-        embeddings = np.random.rand(1000, 2)
-        for i in range(3):
-            embeddings[i * 200 : (i + 1) * 200] += i
-        st.session_state.embeddings = embeddings
-        st.session_state.reduced, st.session_state.labels, st.session_state.probs = (
-            cluster_embeddings(embeddings)
-        )
-
-    # Create the visualization using state data
-    fig, df = visualize_clusters(
-        st.session_state.reduced, st.session_state.labels, st.session_state.probs
-    )
-
-    # Create columns for controls and info
-    col1, col2 = st.columns([3, 1])
-
-    with col1:
-        # Display the plot and capture selected points from the event data
-        selected_points = st.plotly_chart(
-            fig,
-            use_container_width=True,
-            key="cluster_plot",
-            selection_mode="box",
-            on_select=handle_select,  # Pass the function reference
-        )
-
-    with col2:
-        st.write("### Selection Controls")
-
-        if st.button("Save Selection"):
-            # Use the selection from session state instead of fig.data
-            if st.session_state.selected_indices:
-                with open(SELECTION_FILE, "w") as f:
-                    json.dump({"selected": st.session_state.selected_indices}, f)
-                st.success("Selection saved!")
-            else:
-                st.warning("No points selected")
-
-        if st.button("Load Selection"):
-            if os.path.exists(SELECTION_FILE):
-                with open(SELECTION_FILE, "r") as f:
-                    data = json.load(f)
-                    st.session_state.selected_indices = data["selected"]
-                    # Update figure with loaded selection
-                    fig.update_traces(selectedpoints=st.session_state.selected_indices)
-                st.success("Selection loaded!")
-
-        if st.button("Clear Selection"):
-            if os.path.exists(SELECTION_FILE):
-                os.remove(SELECTION_FILE)
-            st.session_state.selected_indices = []
-            st.rerun()
-
-        # Display selection information
-        if st.session_state.selected_indices:
-            print(st.session_state.selected_indices)
-            selected_df = df.iloc[st.session_state.selected_indices]
-            st.write("### Selection Info")
-            st.write(f"Points selected: {len(st.session_state.selected_indices)}")
-            st.write("Cluster distribution:")
-            st.write(selected_df["cluster"].value_counts())
-            st.write(f"Avg probability: {selected_df['probability'].mean():.3f}")
-        else:
-            st.write("No selection")

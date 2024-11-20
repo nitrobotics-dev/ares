@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import pandas as pd
 import plotly
@@ -159,7 +160,7 @@ def infer_visualization_type(
     data: pd.DataFrame,
     skip_columns: list | None = None,
     max_str_length: int = 500,
-) -> str | None:
+) -> dict[str, Any]:
     """Infer the appropriate visualization type based on column characteristics.
 
     Args:
@@ -169,49 +170,60 @@ def infer_visualization_type(
         max_str_length: Maximum string length allowed for categorical plots. Longer strings will be skipped.
 
     Returns:
-        str | None: Type of visualization ('line', 'bar', 'histogram', etc.) or None if the column should be skipped
+        dict containing:
+            - viz_type: Type of visualization ('line', 'bar', 'histogram', etc.) or None if should be skipped
+            - dtype: Data type as string
+            - nunique: Number of unique values
     """
+    # Get column data type and unique count
+    dtype = str(data[column_name].dtype)
+    nunique = data[column_name].nunique()
+
+    result = {"viz_type": None, "dtype": dtype, "nunique": nunique}
+
     # Skip certain columns that shouldn't be plotted
     skip_columns = skip_columns or ["path", "id"]
     if column_name.lower() in skip_columns:
-        return None
-
-    # Get column data type
-    dtype = data[column_name].dtype
-    nunique = data[column_name].nunique()
+        return result
 
     # Skip columns with long string values
-    if pd.api.types.is_string_dtype(dtype):
+    if pd.api.types.is_string_dtype(data[column_name]):
         if data[column_name].str.len().max() > max_str_length:
-            return None
+            return result
 
     # Time series data (look for time/date columns)
-    if pd.api.types.is_datetime64_any_dtype(dtype):
-        return None  # We'll use this as an x-axis instead
+    if pd.api.types.is_datetime64_any_dtype(data[column_name]):
+        return result  # We'll use this as an x-axis instead
 
     # Numeric continuous data
-    if pd.api.types.is_numeric_dtype(dtype):
+    if pd.api.types.is_numeric_dtype(data[column_name]):
         if nunique > 20:  # Arbitrary threshold for continuous vs discrete
-            return "histogram"
+            result["viz_type"] = "histogram"
         else:
-            return "bar"
+            result["viz_type"] = "bar"
+        return result
 
     # Categorical data
-    if pd.api.types.is_string_dtype(dtype) or nunique < 20:
-        return "bar"
+    if pd.api.types.is_string_dtype(data[column_name]) or nunique < 20:
+        result["viz_type"] = "bar"
+        return result
 
     print(
         f"Skipping column {column_name} with dtype {dtype} and nunique {nunique} -- didn't fit into any graph types"
     )
     print(data[column_name].value_counts())
-    return None
+    return result
 
 
 def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
     """Generate success rate visualizations for categorical columns."""
     visualizations = []
     categorical_cols = sorted(
-        [col for col in df.columns if infer_visualization_type(col, df) == "bar"]
+        [
+            col
+            for col in df.columns
+            if infer_visualization_type(col, df)["viz_type"] == "bar"
+        ]
     )
 
     for col in categorical_cols:
@@ -250,16 +262,15 @@ def generate_automatic_visualizations(
 ) -> list[dict]:
     """Generate visualizations automatically based on data types."""
     visualizations = []
-
-    # Sort all column names
     columns = sorted(df.columns)
 
     for col in columns:
-        if col == time_column or infer_visualization_type(col, df) is None:
+        viz_info = infer_visualization_type(col, df)
+        if col == time_column or viz_info["viz_type"] is None:
             continue
 
         col_title = col.replace("_", " ").replace("-", " ").title()
-        viz_type = infer_visualization_type(col, df)
+        viz_type = viz_info["viz_type"]
 
         if viz_type == "histogram":
             visualizations.append(
@@ -297,11 +308,12 @@ def generate_time_series_visualizations(
     df: pd.DataFrame, time_column: str = "creation_time"
 ) -> list[dict]:
     """Generate time series visualizations for numeric columns."""
-    visualizations = []
+    visualizations: list[dict] = []
     numeric_cols = sorted(df.select_dtypes(include=["int64", "float64"]).columns)
 
     for col in numeric_cols:
-        if col == time_column or infer_visualization_type(col, df) is None:
+        viz_info = infer_visualization_type(col, df)
+        if col == time_column or viz_info["viz_type"] is None:
             continue
 
         col_title = col.replace("_", " ").replace("-", " ").title()
@@ -361,48 +373,67 @@ def display_video_grid(filtered_df: pd.DataFrame, max_videos: int = 5) -> None:
             display_video_card(inp)
 
 
-def create_data_filters(df: pd.DataFrame) -> pd.DataFrame:
-    """Create filter controls for dataframe columns based on their types.
-
-    Args:
-        df: Input DataFrame to filter
-
-    Returns:
-        pd.DataFrame: Filtered dataframe based on user selections
-    """
+def create_data_filters(
+    df: pd.DataFrame, max_options: int = 9
+) -> tuple[pd.DataFrame, list]:
+    """Create filter controls for dataframe columns based on their types."""
     filtered_df = df.copy()
+    skipped_cols = []
 
     with st.expander("Filter Data", expanded=True):
         filter_cols = st.columns(3)
 
         for idx, col in enumerate(df.columns):
-            viz_type = infer_visualization_type(col, df)
-            if viz_type is None:
+            viz_info = infer_visualization_type(col, df)
+            if viz_info["viz_type"] is None:
+                skipped_cols.append(col)
                 continue
-
             with filter_cols[idx % 3]:
-                if viz_type == "histogram":
-                    # Numeric column - use slider
-                    min_val, max_val = float(df[col].min()), float(df[col].max())
-                    selected_range = st.slider(
+                if (
+                    pd.api.types.is_numeric_dtype(df[col])
+                    and viz_info["nunique"] > max_options
+                ):
+                    min_val = float(df[col].min())
+                    max_val = float(df[col].max())
+                    if min_val == max_val:
+                        skipped_cols.append(col)
+                        continue
+
+                    # Initialize session state for this filter
+                    if f"filter_{col}_range" not in st.session_state:
+                        st.session_state[f"filter_{col}_range"] = (min_val, max_val)
+
+                    # Create the slider
+                    values = st.slider(
                         f"Filter {col}",
                         min_value=min_val,
                         max_value=max_val,
-                        value=(min_val, max_val),
+                        value=st.session_state[f"filter_{col}_range"],
                     )
+                    st.session_state[f"filter_{col}_range"] = values
                     filtered_df = filtered_df[
-                        (filtered_df[col] >= selected_range[0])
-                        & (filtered_df[col] <= selected_range[1])
+                        (filtered_df[col] >= values[0])
+                        & (filtered_df[col] <= values[1])
                     ]
-                elif viz_type == "bar":
-                    # Categorical column - use multiselect
-                    options = sorted(df[col].unique().tolist())
-                    selected_values = st.multiselect(
-                        f"Filter {col}", options=options, default=options
-                    )
-                    if selected_values:
-                        filtered_df = filtered_df[
-                            filtered_df[col].isin(selected_values)
-                        ]
 
-    return filtered_df
+                elif viz_info["viz_type"] == "bar":
+                    options = df[col].unique()
+                    if len(options) > max_options:
+                        skipped_cols.append(col)
+                        continue
+
+                    # Initialize session state for this filter
+                    if f"filter_{col}_select" not in st.session_state:
+                        st.session_state[f"filter_{col}_select"] = list(options)
+
+                    # Create the multiselect
+                    selected = st.multiselect(
+                        f"Filter {col}",
+                        options=options,
+                        default=st.session_state[f"filter_{col}_select"],
+                    )
+                    st.session_state[f"filter_{col}_select"] = selected
+                    if selected:
+                        filtered_df = filtered_df[filtered_df[col].isin(selected)]
+
+    return filtered_df, skipped_cols

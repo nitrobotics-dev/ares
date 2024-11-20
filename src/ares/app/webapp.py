@@ -18,7 +18,7 @@ from ares.app.viz_helpers import (
     create_histogram,
     create_line_plot,
     create_tabbed_visualizations,
-    display_video_card,
+    display_video_grid,
     generate_automatic_visualizations,
     generate_success_rate_visualizations,
     generate_time_series_visualizations,
@@ -32,37 +32,6 @@ title = "ARES Dashboard"
 video_paths = list(os.listdir(PI_DEMO_PATH))
 
 tmp_dump_dir = "/tmp/ares_dump"
-
-
-# def filter_data_controls() -> pd.DataFrame:
-#     """Display filter controls and return filtered data.
-
-#     Returns:
-#         pd.DataFrame: Filtered dataframe based on selected date range
-#     """
-#     st.header("Filters")
-#     col1, _ = st.columns([2, 2])
-#     with col1:
-#         date_range = st.date_input(
-#             "Select Date Range",
-#             value=(pd.Timestamp("2000-01-01"), pd.Timestamp.now()),
-#         )
-
-#     if not date_range or len(date_range) != 2:
-#         st.error("Please select a valid date range")
-#         return pd.DataFrame()
-
-#     # Filter the data based on date range
-#     filtered_df = st.session_state.MOCK_DATA[
-#         (st.session_state.MOCK_DATA["creation_time"] >= pd.Timestamp(date_range[0]))
-#         & (st.session_state.MOCK_DATA["creation_time"] <= pd.Timestamp(date_range[1]))
-#     ].copy()
-
-#     if filtered_df.empty:
-#         st.warning("No data available for the selected date range")
-#         return pd.DataFrame()
-
-#     return filtered_df
 
 
 # Streamlit app
@@ -81,12 +50,34 @@ def main() -> None:
 
     # Add filters section
     st.header("Filters")
-    value_filtered_df = create_data_filters(df)  # First stage of filtering (by values)
+    col1, col2 = st.columns([6, 1])  # Create columns for layout
+    with col1:
+        st.subheader("Data Filters")
+    with col2:
+        if st.button("Reset Filters", type="primary"):
+            # Clear all filter-related session state variables
+            for key in list(st.session_state.keys()):
+                if key.startswith("filter_"):
+                    del st.session_state[key]
+            st.rerun()  # Rerun the app to reset the filters
+
+    value_filtered_df, skipped_cols = create_data_filters(df)
+    if skipped_cols:
+        st.warning(
+            f"Skipped columns: {skipped_cols} due to high cardinality or lack of unique values"
+        )
+
+    st.write(f"Selected {len(value_filtered_df)} rows out of {len(df)} total")
+    st.write(f"Selected indices: {value_filtered_df.index.tolist()}")
+    st.write(f"Keep Mask: {value_filtered_df.index.tolist()}")
 
     try:
         # Create the visualization using state data
         fig, cluster_df = visualize_clusters(
-            st.session_state.reduced, st.session_state.labels, st.session_state.probs
+            st.session_state.reduced,
+            st.session_state.labels,
+            st.session_state.probs,
+            keep_mask=value_filtered_df.index.tolist(),
         )
 
         # Create columns for controls and info
