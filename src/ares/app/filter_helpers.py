@@ -1,0 +1,143 @@
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+
+from ares.app.viz_helpers import infer_visualization_type
+from ares.clustering import visualize_clusters
+
+
+def create_data_filters(
+    df: pd.DataFrame, max_options: int = 9
+) -> tuple[pd.DataFrame, list]:
+    """Create filter controls for dataframe columns based on their types."""
+    filtered_df = df.copy()
+    skipped_cols = []
+
+    with st.expander("Filter Data", expanded=True):
+        filter_cols = st.columns(3)
+
+        for idx, col in enumerate(df.columns):
+            viz_info = infer_visualization_type(col, df)
+            if viz_info["viz_type"] is None:
+                skipped_cols.append(col)
+                continue
+            with filter_cols[idx % 3]:
+                if (
+                    pd.api.types.is_numeric_dtype(df[col])
+                    and viz_info["nunique"] > max_options
+                ):
+                    min_val = float(df[col].min())
+                    max_val = float(df[col].max())
+                    if min_val == max_val:
+                        skipped_cols.append(col)
+                        continue
+
+                    # Initialize session state for this filter
+                    if f"filter_{col}_range" not in st.session_state:
+                        st.session_state[f"filter_{col}_range"] = (min_val, max_val)
+
+                    # Create the slider
+                    values = st.slider(
+                        f"Filter {col}",
+                        min_value=min_val,
+                        max_value=max_val,
+                        value=st.session_state[f"filter_{col}_range"],
+                    )
+                    st.session_state[f"filter_{col}_range"] = values
+                    filtered_df = filtered_df[
+                        (filtered_df[col] >= values[0])
+                        & (filtered_df[col] <= values[1])
+                    ]
+
+                elif viz_info["viz_type"] == "bar":
+                    options = df[col].unique()
+                    if len(options) > max_options:
+                        skipped_cols.append(col)
+                        continue
+
+                    # Initialize session state for this filter
+                    if f"filter_{col}_select" not in st.session_state:
+                        st.session_state[f"filter_{col}_select"] = list(options)
+
+                    # Create the multiselect
+                    selected: list[str] = st.multiselect(
+                        f"Filter {col}",
+                        options=options,
+                        default=st.session_state[f"filter_{col}_select"],
+                    )
+                    st.session_state[f"filter_{col}_select"] = selected
+                    if selected:
+                        filtered_df = filtered_df[filtered_df[col].isin(selected)]
+
+    return filtered_df, skipped_cols
+
+
+def structured_data_filters(df: pd.DataFrame) -> pd.DataFrame:
+    # Add filters section
+    st.header("Structured Data Filters")
+    col1, col2 = st.columns([6, 1])  # Create columns for layout
+    with col1:
+        st.subheader("Data Filters")
+    with col2:
+        if st.button("Reset Filters", type="primary"):
+            # Clear all filter-related session state variables
+            for key in list(st.session_state.keys()):
+                if key.startswith("filter_"):
+                    del st.session_state[key]
+            st.rerun()  # Rerun the app to reset the filters
+
+    value_filtered_df, skipped_cols = create_data_filters(df)
+    if skipped_cols:
+        st.warning(
+            f"Skipped columns: {skipped_cols} due to high cardinality or lack of unique values"
+        )
+    return value_filtered_df
+
+
+def handle_selection(
+    value_filtered_df: pd.DataFrame,
+    selection: dict,
+    cluster_to_trace: dict,
+    fig: go.Figure,
+) -> tuple[bool, list[int], dict]:
+    # determine if selection was made OR if just no points selected
+    selection_flag = any(
+        len(selection.get(k, [])) > 0 for k in ["box", "lasso", "points"]
+    )
+    if selection_flag:
+        # selection made!
+        indices = []
+        valid_traces = [v for k, v in cluster_to_trace.items() if "cluster" in k]
+        for point in selection["points"]:
+            if point["curve_number"] in valid_traces:
+                # Get the point's position within its trace
+                point_number = point["point_number"]
+                # Get the trace data
+                trace_data = fig.data[point["curve_number"]]
+                # Get the original index from custom_data
+                original_idx = trace_data.customdata[point_number][0]
+                indices.append(original_idx)
+
+    else:
+        # no selection made, use all filtered points
+        indices = value_filtered_df.index.tolist()
+    return selection_flag, indices, selection
+
+
+def embedding_data_filters(
+    value_filtered_df: pd.DataFrame, fig: go.Figure, cluster_to_trace: dict
+) -> tuple[bool, list[int], dict]:
+    # Display the plot and capture selected points from the event data
+    event = st.plotly_chart(
+        fig,
+        use_container_width=True,
+        key="cluster_plot",
+        selection_mode=["points", "box", "lasso"],
+        on_select="rerun",
+    )
+    selection = getattr(event, "selection", dict())
+    # handle finding the indices of the selected points
+    selection_flag, indices, selection = handle_selection(
+        value_filtered_df, selection, cluster_to_trace, fig
+    )
+    return selection_flag, indices, selection

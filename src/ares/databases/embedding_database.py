@@ -15,365 +15,377 @@ import json
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import faiss
 import numpy as np
+from scipy.interpolate import interp1d
 
 
-class BaseIndexManager(ABC):
-    def __init__(self, base_dir: str, max_backups: int = 1, load_existing: bool = True):
-        self.base_dir = Path(base_dir)
-        self.base_dir.mkdir(exist_ok=True)
-        self.metadata: Dict[str, dict] = {}
-        self.max_backups = max_backups
-        self.indices: Dict[str, Any] = {}
-
-        # Load existing manager state if it exists
-        if load_existing:
-            self.load_manager()
-
-    def save_manager(self) -> None:
-        """Save the entire state of the index manager"""
-        # Save metadata
-        metadata_path = self.base_dir / "metadata.json"
-        with metadata_path.open("w") as f:
-            json.dump(self.metadata, f, indent=2)
-
-        # Save each index
-        for name in self.indices:
-            self.backup_index(name)
-
-    def load_manager(self) -> None:
-        """Load the entire state of the index manager"""
-        # Load metadata if it exists
-        metadata_path = self.base_dir / "metadata.json"
-        if metadata_path.exists():
-            with metadata_path.open("r") as f:
-                self.metadata = json.load(f)
-
-        # Load indices from directories
-        if self.base_dir.exists():
-            for robot_dir in self.base_dir.iterdir():
-                if robot_dir.is_dir():
-                    name = robot_dir.name
-                    if self.load_latest_index(name):
-                        print(f"Loaded existing index for {name}")
+class Index(ABC):
+    """Base class for vector indices"""
 
     @abstractmethod
-    def init_index(self, name: str, dimension: int) -> None:
-        """Initialize a new index for a robot's state or action"""
+    def __init__(self, feature_dim: int, time_steps: int):
+        self.feature_dim = feature_dim
+        self.time_steps = time_steps
+        self.total_dim = feature_dim * time_steps
+        self.n_entries = 0
+
+        # Initialize normalization constants to None
+        self.norm_means: Optional[np.ndarray] = None
+        self.norm_stds: Optional[np.ndarray] = None
 
     @abstractmethod
-    def add_matrix(self, name: str, matrix: np.ndarray) -> None:
-        """Add a new matrix to robot's index"""
-
-    def _matrix_to_vector(
-        self, matrix: np.ndarray, normalize: bool = True, **kwargs: Any
-    ) -> np.ndarray:
-        """Convert a matrix to (1, N) and optionally normalize
-
-        Args:
-            matrix: Input matrix to vectorize
-            normalize: Whether to normalize the vector
-        """
-        vector = matrix.reshape(1, -1).astype(np.float32)
-        # TODO: normalize?
-        return vector
+    def add_vector(self, vector: np.ndarray, entry_id: str) -> None:
+        """Add a single vector to the index"""
+        pass
 
     @abstractmethod
     def search(
-        self, name: str, query_matrix: np.ndarray, k: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """Search for similar matrices"""
-
-    @abstractmethod
-    def backup_index(self, name: str, force: bool = False) -> None:
-        """Backup the index for a robot"""
-
-    @abstractmethod
-    def load_latest_index(self, name: str) -> bool:
-        """Load the most recent index for a robot"""
-
-    def update_metadata(self, name: str, **kwargs: Any) -> None:
-        """Update metadata for a robot"""
-        if name not in self.metadata:
-            self.metadata[name] = {
-                "created_at": datetime.now().isoformat(),
-                "n_entries": 0,
-                "last_backup": None,
-            }
-        self.metadata[name].update(kwargs)
-
-    def get_stats(self, name: str) -> Dict[str, Any]:
-        """Get statistics about the index"""
-        if name not in self.metadata:
-            raise KeyError(f"No index exists for {name}")
-        return {
-            "n_entries": self.metadata[name]["n_entries"],
-            "created_at": self.metadata[name]["created_at"],
-            "last_backup": self.metadata[name]["last_backup"],
-        }
-
-    def cleanup_old_backups(self, name: str) -> None:
-        """Remove old backups keeping only max_backups most recent"""
-        robot_dir = self.base_dir / name
-        if not robot_dir.exists():
-            return
-
-        # Get all backup files sorted by modification time
-        index_files = sorted(
-            robot_dir.glob("index_*.faiss"),
-            key=lambda x: x.stat().st_mtime,
-            reverse=True,
-        )
-
-        # Keep only max_backups most recent
-        for idx_file in index_files[self.max_backups :]:
-            timestamp = idx_file.stem[6:]
-            idx_file.unlink()
-            meta_file = robot_dir / f"meta_{timestamp}.json"
-            if meta_file.exists():
-                meta_file.unlink()
-
-    @abstractmethod
-    def get_all_vectors(self, name: str) -> np.ndarray:
-        """Get all vectors stored in the index.
-
-        Args:
-            name: Name of the index to query
-
+        self, query_vector: np.ndarray, k: int
+    ) -> Tuple[np.ndarray, List[str], np.ndarray]:
+        """Search for similar vectors
         Returns:
-            np.ndarray: Array of shape (n_entries, dimension) containing all vectors
+            - distances: (n_queries, k) array of distances
+            - ids: list of string IDs corresponding to the matches
+            - vectors: (k, dimension) array of the matched vectors
         """
+        pass
+
+    @abstractmethod
+    def save(self, path: Path) -> None:
+        """Save index to disk"""
+        pass
+
+    @abstractmethod
+    def load(self, path: Path) -> None:
+        """Load index from disk"""
+        pass
+
+    @abstractmethod
+    def get_all_vectors(self) -> np.ndarray:
+        """Get all vectors in the index"""
+        pass
+
+    def set_normalization(self, means: np.ndarray, stds: np.ndarray) -> None:
+        """Set normalization constants for each channel"""
+        if means.shape[0] != self.feature_dim or stds.shape[0] != self.feature_dim:
+            raise ValueError(
+                f"Normalization constants must have shape ({self.feature_dim},)"
+            )
+        self.norm_means = means
+        self.norm_stds = stds
+
+    def normalize_matrix(self, matrix: np.ndarray) -> np.ndarray:
+        """Apply channel-wise normalization if constants are set"""
+        if self.norm_means is None or self.norm_stds is None:
+            return matrix
+
+        normalized = matrix.copy()
+        for i in range(self.feature_dim):
+            normalized[:, i] = (matrix[:, i] - self.norm_means[i]) / self.norm_stds[i]
+        return normalized
+
+    def denormalize_matrix(self, matrix: np.ndarray) -> np.ndarray:
+        """Reverse normalization if constants are set"""
+        if self.norm_means is None or self.norm_stds is None:
+            return matrix
+
+        denormalized = matrix.copy()
+        for i in range(self.feature_dim):
+            denormalized[:, i] = (matrix[:, i] * self.norm_stds[i]) + self.norm_means[i]
+        return denormalized
 
 
-class FaissIndexManager(BaseIndexManager):
-    def __init__(self, base_dir: str, max_backups: int = 1):
-        super().__init__(base_dir, max_backups)
-        # Track ID mappings for each index
-        self.id_maps: Dict[str, Dict[int, str]] = {}
-        self.next_ids: Dict[str, int] = {}
+class FaissIndex(Index):
+    def __init__(self, feature_dim: int, time_steps: int):
+        super().__init__(feature_dim, time_steps)
+        base_index = faiss.IndexFlatL2(self.total_dim)
+        self.index = faiss.IndexIDMap2(base_index)
+        self.id_map: Dict[int, str] = {}
+        self.next_id: int = 0
 
-    def init_index(self, name: str, dimension: int) -> None:
-        """Initialize a new index with specified dimension"""
-        if name in self.indices:
-            raise ValueError(f"Index for {name} already exists")
-
-        base_index = faiss.IndexFlatL2(dimension)
-        self.indices[name] = faiss.IndexIDMap2(base_index)
-        self.next_ids[name] = 0
-        self.id_maps[name] = {}
-        self.update_metadata(name, dimension=dimension)
-
-    def add_matrix(self, name: str, matrix: np.ndarray, entry_id: str) -> None:
-        """Add a matrix to the index with a string ID
-
-        Args:
-            name: Name of the index
-            matrix: Matrix to add
-            entry_id: String ID to associate with this vector
-        """
-        if name not in self.indices:
-            self.init_index(name, dimension=int(np.prod(matrix.shape)))
-
-        vector = self._matrix_to_vector(matrix)
-
-        # Use internal integer ID for FAISS
-        internal_id = self.next_ids[name]
-        self.next_ids[name] += 1
-
-        # Store the mapping between internal ID and string ID
-        self.id_maps[name][internal_id] = entry_id
-
-        self.indices[name].add_with_ids(vector, np.array([internal_id]))
-        self.metadata[name]["n_entries"] += 1
+    def add_vector(self, vector: np.ndarray, entry_id: str) -> None:
+        internal_id = self.next_id
+        self.next_id += 1
+        self.id_map[internal_id] = entry_id
+        self.index.add_with_ids(vector.reshape(1, -1), np.array([internal_id]))
+        self.n_entries += 1
 
     def search(
-        self, name: str, query_matrix: np.ndarray, k: int
-    ) -> Tuple[np.ndarray, np.ndarray, List[str], np.ndarray]:
-        """Search for similar matrices
-
-        Returns:
-            Tuple containing:
-                - distances: (n_queries, k) array of distances
-                - indices: (n_queries, k) array of internal indices
-                - ids: list of string IDs corresponding to the matches
-                - vectors: (k, dimension) array of the matched vectors
-        """
-        if name not in self.indices:
-            raise KeyError(f"No index exists for robot {name}")
-
-        query_vector = self._matrix_to_vector(query_matrix)
-        distances, internal_indices = self.indices[name].search(query_vector, k)
-
-        # Convert internal indices to string IDs
-        string_ids = [
-            self.id_maps[name][int(idx)] for idx in internal_indices[0] if idx != -1
-        ]
-
-        # Get the actual vectors
+        self, query_vector: np.ndarray, k: int
+    ) -> Tuple[np.ndarray, List[str], np.ndarray]:
+        distances, internal_indices = self.index.search(query_vector.reshape(1, -1), k)
+        string_ids = [self.id_map[int(idx)] for idx in internal_indices[0] if idx != -1]
         vectors = np.vstack(
             [
-                self.indices[name].reconstruct(int(idx))
+                self.index.reconstruct(int(idx))
                 for idx in internal_indices[0]
                 if idx != -1
             ]
         )
+        return distances, string_ids, vectors
 
-        return distances, internal_indices, string_ids, vectors
+    def save(self, path: Path) -> None:
+        faiss.write_index(self.index, str(path))
+        meta = {
+            "feature_dim": self.feature_dim,
+            "time_steps": self.time_steps,
+            "n_entries": self.n_entries,
+            "id_map": self.id_map,
+            "next_id": self.next_id,
+            "norm_means": (
+                self.norm_means.tolist() if self.norm_means is not None else None
+            ),
+            "norm_stds": (
+                self.norm_stds.tolist() if self.norm_stds is not None else None
+            ),
+        }
+        with (path.parent / f"{path.stem}_meta.json").open("w") as f:
+            json.dump(meta, f, indent=2)
 
-    def backup_index(self, name: str, force: bool = False) -> None:
-        """Backup the index and ID mappings"""
+    def load(self, path: Path) -> None:
+        self.index = faiss.read_index(str(path))
+        meta_path = path.parent / f"{path.stem}_meta.json"
+        if meta_path.exists():
+            with meta_path.open() as f:
+                meta = json.load(f)
+                self.feature_dim = meta["feature_dim"]
+                self.time_steps = meta["time_steps"]
+                self.total_dim = self.feature_dim * self.time_steps
+                self.n_entries = meta["n_entries"]
+                self.id_map = {int(k): v for k, v in meta["id_map"].items()}
+                self.next_id = meta["next_id"]
+
+                if meta["norm_means"] is not None:
+                    self.norm_means = np.array(meta["norm_means"])
+                    self.norm_stds = np.array(meta["norm_stds"])
+
+    def get_all_vectors(self) -> np.ndarray:
+        return np.vstack([self.index.reconstruct(i) for i in range(self.index.ntotal)])
+
+
+class IndexManager:
+    def __init__(self, base_dir: str, index_class: Type[Index], max_backups: int = 1):
+        self.base_dir = Path(base_dir)
+        self.base_dir.mkdir(exist_ok=True)
+        self.index_class = index_class
+        self.max_backups = max_backups
+        self.indices: Dict[str, Index] = {}
+        self.metadata: Dict[str, dict] = {}
+
+        # Load existing indices if they exist
+        self.load_manager()
+
+    def init_index(
+        self,
+        name: str,
+        feature_dim: int,
+        time_steps: int,
+        norm_means: Optional[np.ndarray] = None,
+        norm_stds: Optional[np.ndarray] = None,
+    ) -> None:
+        """Initialize a new index with specified dimensions and optional normalization"""
+        if name in self.indices:
+            raise ValueError(f"Index {name} already exists")
+
+        index = self.index_class(feature_dim, time_steps)
+        if norm_means is not None and norm_stds is not None:
+            index.set_normalization(norm_means, norm_stds)
+
+        self.indices[name] = index
+        self.update_metadata(
+            name,
+            feature_dim=feature_dim,
+            time_steps=time_steps,
+            has_normalization=norm_means is not None,
+        )
+
+    def _interpolate_matrix(
+        self, matrix: np.ndarray, target_time_steps: int
+    ) -> np.ndarray:
+        """Interpolate matrix to target number of time steps"""
+        current_steps = matrix.shape[0]
+        if current_steps == target_time_steps:
+            return matrix
+
+        # Create evenly spaced points for interpolation
+        current_times = np.linspace(0, 1, current_steps)
+        target_times = np.linspace(0, 1, target_time_steps)
+
+        # Interpolate each feature dimension
+        interpolated = np.zeros((target_time_steps, matrix.shape[1]))
+        for feature in range(matrix.shape[1]):
+            interpolator = interp1d(current_times, matrix[:, feature], kind="linear")
+            interpolated[:, feature] = interpolator(target_times)
+
+        return interpolated
+
+    def add_matrix(self, name: str, matrix: np.ndarray, entry_id: str) -> None:
+        """Add a matrix to the index, applying interpolation and normalization"""
         if name not in self.indices:
-            return
-
-        robot_dir = self.base_dir / name
-        robot_dir.mkdir(exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        index_path = robot_dir / f"index_{timestamp}.faiss"
-        meta_path = robot_dir / f"meta_{timestamp}.json"
-
-        # Save the index
-        faiss.write_index(self.indices[name], str(index_path))
-
-        # Save metadata including ID mappings
-        self.metadata[name]["last_backup"] = timestamp
-        self.metadata[name]["id_map"] = self.id_maps[name]
-        self.metadata[name]["next_id"] = self.next_ids[name]
-
-        with meta_path.open("w") as f:
-            json.dump(self.metadata[name], f, indent=2)
-        print(f"Backed up index for {name} to {index_path}")
-
-    def load_latest_index(self, name: str) -> bool:
-        """Load the index and ID mappings"""
-        robot_dir = self.base_dir / name
-        if not robot_dir.exists():
-            return False
-
-        index_files = list(robot_dir.glob("index_*.faiss"))
-        if not index_files:
-            return False
-
-        latest_index = max(index_files, key=lambda x: x.stat().st_mtime)
-        latest_meta = robot_dir / f"meta_{latest_index.stem[6:]}.json"
-
-        self.indices[name] = faiss.read_index(str(latest_index))
-        if latest_meta.exists():
-            with latest_meta.open() as f:
-                metadata = json.load(f)
-                self.metadata[name] = metadata
-                # Convert ID map keys back to integers
-                self.id_maps[name] = {int(k): v for k, v in metadata["id_map"].items()}
-                self.next_ids[name] = metadata["next_id"]
-
-        return True
-
-    def get_all_vectors(self, name: str) -> np.ndarray:
-        """Get all vectors stored in the index.
-
-        Args:
-            name: Name of the index to query
-
-        Returns:
-            np.ndarray: Array of shape (n_entries, dimension) containing all vectors
-        """
-        if name not in self.indices:
-            raise KeyError(f"No index exists for {name}")
+            feature_dim = matrix.shape[1]
+            default_time_steps = matrix.shape[0]
+            self.init_index(
+                name, feature_dim=feature_dim, time_steps=default_time_steps
+            )
 
         index = self.indices[name]
-        n_vectors = index.ntotal
-        return np.vstack([index.reconstruct(i) for i in range(n_vectors)])
+        interpolated = self._interpolate_matrix(matrix, index.time_steps)
+        normalized = index.normalize_matrix(interpolated)
+        vector = normalized.flatten()
 
+        index.add_vector(vector, entry_id)
+        self.metadata[name]["n_entries"] += 1
 
-# class QdrantIndexManager(BaseIndexManager):
-#     def __init__(self, base_dir: str = "robot_indices"):
-#         super().__init__(base_dir)
-#         # Initialize Qdrant client here
+    def load_manager(self) -> None:
+        """Load indices and metadata from disk"""
+        for path in self.base_dir.iterdir():
+            if path.is_file():
+                continue
+            name = path.stem
+            feature_dim = int(np.prod(self.indices[name].get_all_vectors().shape))
+            self.init_index(
+                name, feature_dim=feature_dim, time_steps=self.indices[name].time_steps
+            )
+            self.load_index(name)
 
-#     def init_robot(self, name: str) -> None:
-#         # Create collection for robot
-#         pass
+    def load_index(self, name: str) -> None:
+        """Load an index from disk"""
+        path = self.base_dir / f"{name}.index"
+        if path.exists():
+            self.indices[name].load(path)
 
-#     def add_matrix(self, name: str, matrix: np.ndarray) -> None:
-#         # Add points to Qdrant collection
-#         pass
+    def save_manager(self) -> None:
+        """Save indices and metadata to disk"""
+        for name, index in self.indices.items():
+            self.save_index(name)
 
-#     def search(
-#         self, name: str, query_matrix: np.ndarray, k: int
-#     ) -> Tuple[np.ndarray, np.ndarray]:
-#         pass
+    def save_index(self, name: str) -> None:
+        """Save an index to disk"""
+        path = self.base_dir / f"{name}.index"
+        self.indices[name].save(path)
 
-#     def backup_index(self, name: str, force: bool = False) -> None:
-#         # Snapshot collection or backup as needed
-#         pass
+    def update_metadata(self, name: str, **kwargs: Any) -> None:
+        """Update metadata for an index"""
+        self.metadata[name] = kwargs
 
-#     def load_latest_index(self, name: str) -> bool:
-#         # Load collection from backup
-#         pass
+    def get_stats(self, name: str) -> dict:
+        """Get statistics for an index"""
+        return self.metadata[name]
 
+    def search_matrix(
+        self, name: str, query_matrix: np.ndarray, k: int
+    ) -> Tuple[np.ndarray, List[str], List[np.ndarray]]:
+        """Search for similar matrices, handling normalization"""
+        index = self.indices[name]
+        interpolated = self._interpolate_matrix(query_matrix, index.time_steps)
+        normalized = index.normalize_matrix(interpolated)
+        query_vector = normalized.flatten()
 
-def make_fake_data(n_time: int, n_dim: int) -> np.ndarray:
-    return np.random.randn(n_time, n_dim).astype(np.float32)
+        distances, ids, vectors = index.search(query_vector, k)
 
+        # Reshape and denormalize the results
+        matrices = []
+        for v in vectors:
+            matrix = index.reshape_vector(v)
+            denormalized = index.denormalize_matrix(matrix)
+            matrices.append(denormalized)
 
-def setup_test_index_manager(
-    base_dir: str, n_dim: int, n_time: int, n_entries: int
-) -> FaissIndexManager:
-    manager = FaissIndexManager(base_dir)
+        return distances, ids, matrices
 
-    # Initialize indices for different robots and their state/action spaces
-    for robot in ["panda", "ur5"]:
-        for content in ["state", "action"]:
-            name = f"{robot}_{content}"
-            manager.init_index(name, dimension=n_dim * n_time)
+    def set_normalization(self, name: str, means: np.ndarray, stds: np.ndarray) -> None:
+        """Set normalization constants for an existing index"""
+        if name not in self.indices:
+            raise ValueError(f"Index {name} does not exist")
 
-            # Generate some random test data
-            for _ in range(n_entries):
-                # Simulate episode data: (timesteps, features)
-                fake_data = make_fake_data(n_time, n_dim)
-                manager.add_matrix(name, fake_data)
-
-            # Backup the index
-            manager.backup_index(name)
-    return manager
+        self.indices[name].set_normalization(means, stds)
+        self.metadata[name]["has_normalization"] = True
 
 
 if __name__ == "__main__":
-    # Create a test index manager
-    index_path = "/tmp/robot_indices"
-    n_dim = 32
-    n_time = 100
-    n_entries = 50
+    # Test the index manager with synthetic data
+    import shutil
 
-    # manager = setup_test_index_manager(index_path, n_dim, n_time, n_entries)
-    # test loading from disk
-    manager = FaissIndexManager(index_path)
-    breakpoint()
+    from scipy.stats import norm
 
-    # Demonstrate search
-    name = "panda_state"
-    query = make_fake_data(n_time, n_dim)
-    distances, indices = manager.search(name, query, k=5)
+    # Create test directory
+    test_dir = Path("test_index_manager")
+    if test_dir.exists():
+        shutil.rmtree(test_dir)
+    test_dir.mkdir()
 
-    breakpoint()
+    # Initialize manager
+    manager = IndexManager(str(test_dir), FaissIndex)
 
-    print(f"\nResults for {name}:")
-    print(f"Found {len(indices[0])} nearest neighbors")
+    # Create synthetic data with varying time lengths
+    feature_dim = 3
+    n_samples = 5
+
+    # Set up normalization constants
+    norm_means = np.array([0.0, 1.0, -0.5])
+    norm_stds = np.array([1.0, 2.0, 0.5])
+
+    # Generate test matrices of different lengths
+    matrices = []
+    for i in range(n_samples):
+        # Random length between 8-12 timesteps
+        time_steps = np.random.randint(8, 13)
+        # Create a matrix with some pattern plus noise
+        t = np.linspace(0, 2 * np.pi, time_steps)
+        matrix = np.zeros((time_steps, feature_dim))
+        matrix[:, 0] = np.sin(t) + norm.rvs(size=time_steps, scale=0.1)
+        matrix[:, 1] = np.cos(t) + norm.rvs(size=time_steps, scale=0.1)
+        matrix[:, 2] = np.sin(2 * t) + norm.rvs(size=time_steps, scale=0.1)
+        matrices.append(matrix)
+
+    # Initialize index with normalization
+    manager.init_index(
+        "test_index",
+        feature_dim=feature_dim,
+        time_steps=10,  # We'll standardize to 10 time steps
+        norm_means=norm_means,
+        norm_stds=norm_stds,
+    )
+
+    # Add matrices
+    for i, matrix in enumerate(matrices):
+        manager.add_matrix("test_index", matrix, f"entry_{i}")
+        print(f"Added matrix {i} with shape {matrix.shape}")
+
+    # Test search
+    query_matrix = matrices[0]  # Use first matrix as query
+    print(f"\nSearching with query matrix of shape {query_matrix.shape}")
+
+    distances, ids, result_matrices = manager.search_matrix(
+        "test_index", query_matrix, k=3
+    )
+
+    print("\nSearch results:")
     print(f"Distances: {distances[0]}")
-    print(f"Indices: {indices[0]}")
-    breakpoint()
+    print(f"IDs: {ids}")
+    print(f"Result matrix shapes: {[m.shape for m in result_matrices]}")
 
-    # Print stats
-    stats = manager.get_stats(name)
-    print(f"\nIndex stats for {name}:")
-    print(json.dumps(stats, indent=2))
-    breakpoint()
+    # Save and reload
+    print("\nSaving and reloading index...")
+    manager.save_all()
 
-    # Save everything
-    manager.save_manager()
+    new_manager = IndexManager(test_dir, FaissIndex)
+    distances, ids, result_matrices = new_manager.search_matrix(
+        "test_index", query_matrix, k=3
+    )
 
-    # Create new manager that auto-loads everything
-    new_manager = FaissIndexManager("/tmp/robot_indices")
+    print("\nSearch results after reload:")
+    print(f"Distances: {distances[0]}")
+    print(f"IDs: {ids}")
+    print(f"Result matrix shapes: {[m.shape for m in result_matrices]}")
+
+    # Verify normalization was preserved
+    index = new_manager.indices["test_index"]
+    print("\nNormalization constants after reload:")
+    print(f"Means: {index.norm_means}")
+    print(f"Stds: {index.norm_stds}")
+
+    # Clean up
+    shutil.rmtree(test_dir)
