@@ -54,9 +54,10 @@ def create_flattened_model(
     return type("RolloutSQLModel", (SQLModel,), fields, table=True)
 
 
-def recreate_model(
-    sql_model_instance: SQLModel, model_cls: type[BaseModel]
-) -> BaseModel:
+ModelCls = t.TypeVar("ModelCls", bound=BaseModel)
+
+
+def recreate_model(sql_model_instance: SQLModel, model_cls: type[ModelCls]) -> ModelCls:
     """Recreate a Pydantic model object from a flattened SQLModel instance.
 
     Args:

@@ -12,6 +12,7 @@ Total 2 indices per robot plus 2 for video, text description (plus one for 3D po
 """
 
 import json
+import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +21,9 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 import faiss
 import numpy as np
 from scipy.interpolate import interp1d
+
+BASE_EMBEDDING_DB_PATH = "/tmp/ares_dump/embedding_data"
+TEST_EMBEDDING_DB_PATH = "/tmp/ares_dump/test_embedding_data"
 
 
 class Index(ABC):
@@ -82,20 +86,16 @@ class Index(ABC):
         if self.norm_means is None or self.norm_stds is None:
             return matrix
 
-        normalized = matrix.copy()
-        for i in range(self.feature_dim):
-            normalized[:, i] = (matrix[:, i] - self.norm_means[i]) / self.norm_stds[i]
-        return normalized
+        # Broadcasting will automatically align the dimensions
+        return (matrix - self.norm_means) / self.norm_stds
 
     def denormalize_matrix(self, matrix: np.ndarray) -> np.ndarray:
         """Reverse normalization if constants are set"""
         if self.norm_means is None or self.norm_stds is None:
             return matrix
 
-        denormalized = matrix.copy()
-        for i in range(self.feature_dim):
-            denormalized[:, i] = (matrix[:, i] * self.norm_stds[i]) + self.norm_means[i]
-        return denormalized
+        # Broadcasting will automatically align the dimensions
+        return (matrix * self.norm_stds) + self.norm_means
 
 
 class FaissIndex(Index):
@@ -176,7 +176,7 @@ class IndexManager:
         self.metadata: Dict[str, dict] = {}
 
         # Load existing indices if they exist
-        self.load_manager()
+        self.load()
 
     def init_index(
         self,
@@ -235,21 +235,33 @@ class IndexManager:
         interpolated = self._interpolate_matrix(matrix, index.time_steps)
         normalized = index.normalize_matrix(interpolated)
         vector = normalized.flatten()
-
-        index.add_vector(vector, entry_id)
+        try:
+            index.add_vector(vector, entry_id)
+        except Exception as e:
+            print(f"Error adding vector to index {name}: {e}; {traceback.format_exc()}")
+            breakpoint()
         self.metadata[name]["n_entries"] += 1
 
-    def load_manager(self) -> None:
+    def load(self) -> None:
         """Load indices and metadata from disk"""
+        # Load manager metadata first
+        metadata_path = self.base_dir / "manager_metadata.json"
+        if metadata_path.exists():
+            with metadata_path.open("r") as f:
+                self.metadata = json.load(f)
+
+        # Load indices
         for path in self.base_dir.iterdir():
-            if path.is_file():
-                continue
-            name = path.stem
-            feature_dim = int(np.prod(self.indices[name].get_all_vectors().shape))
-            self.init_index(
-                name, feature_dim=feature_dim, time_steps=self.indices[name].time_steps
-            )
-            self.load_index(name)
+            if path.suffix == ".index":
+                name = path.stem
+                # Use metadata to get the correct dimensions
+                if name in self.metadata:
+                    self.init_index(
+                        name,
+                        feature_dim=self.metadata[name]["feature_dim"],
+                        time_steps=self.metadata[name]["time_steps"],
+                    )
+                    self.load_index(name)
 
     def load_index(self, name: str) -> None:
         """Load an index from disk"""
@@ -257,10 +269,16 @@ class IndexManager:
         if path.exists():
             self.indices[name].load(path)
 
-    def save_manager(self) -> None:
+    def save(self) -> None:
         """Save indices and metadata to disk"""
+        # Save all indices
         for name, index in self.indices.items():
             self.save_index(name)
+
+        # Save manager metadata
+        metadata_path = self.base_dir / "manager_metadata.json"
+        with metadata_path.open("w") as f:
+            json.dump(self.metadata, f, indent=2)
 
     def save_index(self, name: str) -> None:
         """Save an index to disk"""
@@ -269,7 +287,9 @@ class IndexManager:
 
     def update_metadata(self, name: str, **kwargs: Any) -> None:
         """Update metadata for an index"""
-        self.metadata[name] = kwargs
+        if name not in self.metadata:
+            self.metadata[name] = {"n_entries": 0}  # Initialize with n_entries
+        self.metadata[name].update(kwargs)  # Update with additional metadata
 
     def get_stats(self, name: str) -> dict:
         """Get statistics for an index"""
@@ -289,7 +309,8 @@ class IndexManager:
         # Reshape and denormalize the results
         matrices = []
         for v in vectors:
-            matrix = index.reshape_vector(v)
+            # Direct reshape using the index dimensions
+            matrix = v.reshape(index.time_steps, index.feature_dim)
             denormalized = index.denormalize_matrix(matrix)
             matrices.append(denormalized)
 
@@ -303,89 +324,23 @@ class IndexManager:
         self.indices[name].set_normalization(means, stds)
         self.metadata[name]["has_normalization"] = True
 
+    def get_all_matrices(
+        self, name: str | list[str] | None = None
+    ) -> Dict[str, np.ndarray]:
+        """Get all vectors the manager, reshaping them to matrices. Pass a name or list of names to get a single index's vectors."""
+        if not name:
+            return {
+                name: index.get_all_vectors().reshape(
+                    -1, index.time_steps, index.feature_dim
+                )
+                for name, index in self.indices.items()
+            }
+        if isinstance(name, str):
+            name = [name]
 
-if __name__ == "__main__":
-    # Test the index manager with synthetic data
-    import shutil
-
-    from scipy.stats import norm
-
-    # Create test directory
-    test_dir = Path("test_index_manager")
-    if test_dir.exists():
-        shutil.rmtree(test_dir)
-    test_dir.mkdir()
-
-    # Initialize manager
-    manager = IndexManager(str(test_dir), FaissIndex)
-
-    # Create synthetic data with varying time lengths
-    feature_dim = 3
-    n_samples = 5
-
-    # Set up normalization constants
-    norm_means = np.array([0.0, 1.0, -0.5])
-    norm_stds = np.array([1.0, 2.0, 0.5])
-
-    # Generate test matrices of different lengths
-    matrices = []
-    for i in range(n_samples):
-        # Random length between 8-12 timesteps
-        time_steps = np.random.randint(8, 13)
-        # Create a matrix with some pattern plus noise
-        t = np.linspace(0, 2 * np.pi, time_steps)
-        matrix = np.zeros((time_steps, feature_dim))
-        matrix[:, 0] = np.sin(t) + norm.rvs(size=time_steps, scale=0.1)
-        matrix[:, 1] = np.cos(t) + norm.rvs(size=time_steps, scale=0.1)
-        matrix[:, 2] = np.sin(2 * t) + norm.rvs(size=time_steps, scale=0.1)
-        matrices.append(matrix)
-
-    # Initialize index with normalization
-    manager.init_index(
-        "test_index",
-        feature_dim=feature_dim,
-        time_steps=10,  # We'll standardize to 10 time steps
-        norm_means=norm_means,
-        norm_stds=norm_stds,
-    )
-
-    # Add matrices
-    for i, matrix in enumerate(matrices):
-        manager.add_matrix("test_index", matrix, f"entry_{i}")
-        print(f"Added matrix {i} with shape {matrix.shape}")
-
-    # Test search
-    query_matrix = matrices[0]  # Use first matrix as query
-    print(f"\nSearching with query matrix of shape {query_matrix.shape}")
-
-    distances, ids, result_matrices = manager.search_matrix(
-        "test_index", query_matrix, k=3
-    )
-
-    print("\nSearch results:")
-    print(f"Distances: {distances[0]}")
-    print(f"IDs: {ids}")
-    print(f"Result matrix shapes: {[m.shape for m in result_matrices]}")
-
-    # Save and reload
-    print("\nSaving and reloading index...")
-    manager.save_all()
-
-    new_manager = IndexManager(test_dir, FaissIndex)
-    distances, ids, result_matrices = new_manager.search_matrix(
-        "test_index", query_matrix, k=3
-    )
-
-    print("\nSearch results after reload:")
-    print(f"Distances: {distances[0]}")
-    print(f"IDs: {ids}")
-    print(f"Result matrix shapes: {[m.shape for m in result_matrices]}")
-
-    # Verify normalization was preserved
-    index = new_manager.indices["test_index"]
-    print("\nNormalization constants after reload:")
-    print(f"Means: {index.norm_means}")
-    print(f"Stds: {index.norm_stds}")
-
-    # Clean up
-    shutil.rmtree(test_dir)
+        return {
+            n: self.indices[n]
+            .get_all_vectors()
+            .reshape(-1, self.indices[n].time_steps, self.indices[n].feature_dim)
+            for n in name
+        }
