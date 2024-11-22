@@ -95,7 +95,9 @@ def main() -> None:
 
     with filter_error_context("displaying data"):
         # show first 5 rows of dataframe
-        show_dataframe(filtered_df.sample(5), title="Sampled 5 Rows")
+        show_dataframe(
+            filtered_df.sample(min(5, len(filtered_df))), title="Sampled 5 Rows"
+        )
 
         st.divider()  # Add horizontal line
 

@@ -14,6 +14,12 @@ def create_structured_data_filters(
     filtered_df = df.copy()
     skipped_cols = []
 
+    # Initialize temporary filter values if not exists
+    if "temp_filter_values" not in st.session_state:
+        st.session_state.temp_filter_values = {}
+    if "active_filter_values" not in st.session_state:
+        st.session_state.active_filter_values = {}
+
     filter_cols = st.columns(3)
 
     for idx, col in enumerate(df.columns):
@@ -28,61 +34,84 @@ def create_structured_data_filters(
             ):
                 min_val = float(df[col].min())
                 max_val = float(df[col].max())
-                if min_val == max_val:
-                    skipped_cols.append(col)
-                    continue
 
-                # Initialize session state for this filter
-                if f"filter_{col}_range" not in st.session_state:
-                    st.session_state[f"filter_{col}_range"] = (min_val, max_val)
+                # Initialize with current active values or defaults
+                if f"{col}_range" not in st.session_state.temp_filter_values:
+                    st.session_state.temp_filter_values[f"{col}_range"] = (
+                        st.session_state.active_filter_values.get(
+                            f"{col}_range", (min_val, max_val)
+                        )
+                    )
 
-                # Create the slider
+                # Update temporary values without filtering
                 values = st.slider(
                     f"Filter {col}",
                     min_value=min_val,
                     max_value=max_val,
-                    value=st.session_state[f"filter_{col}_range"],
+                    value=st.session_state.temp_filter_values[f"{col}_range"],
                 )
-                st.session_state[f"filter_{col}_range"] = values
-                filtered_df = filtered_df[
-                    (filtered_df[col] >= values[0]) & (filtered_df[col] <= values[1])
-                ]
+                st.session_state.temp_filter_values[f"{col}_range"] = values
+
+                # Only apply active filters
+                active_values = st.session_state.active_filter_values.get(
+                    f"{col}_range"
+                )
+                if active_values:
+                    filtered_df = filtered_df[
+                        (filtered_df[col] >= active_values[0])
+                        & (filtered_df[col] <= active_values[1])
+                    ]
 
             elif viz_info["viz_type"] == "bar":
-                options = df[col].unique()
+                options = sorted(df[col].unique().tolist())
+                # bad ux for > 9 options
                 if len(options) > max_options:
                     skipped_cols.append(col)
                     continue
 
-                # Initialize session state for this filter
-                if f"filter_{col}_select" not in st.session_state:
-                    st.session_state[f"filter_{col}_select"] = list(options)
+                # Initialize with current active values or defaults
+                if f"{col}_select" not in st.session_state.temp_filter_values:
+                    st.session_state.temp_filter_values[f"{col}_select"] = (
+                        st.session_state.active_filter_values.get(
+                            f"{col}_select", options
+                        )
+                    )
 
-                # Create the multiselect
-                selected: list[str] = st.multiselect(
+                # Update temporary values without filtering
+                selected = st.multiselect(
                     f"Filter {col}",
                     options=options,
-                    default=st.session_state[f"filter_{col}_select"],
+                    default=st.session_state.temp_filter_values[f"{col}_select"],
                 )
-                st.session_state[f"filter_{col}_select"] = selected
-                if selected:
-                    filtered_df = filtered_df[filtered_df[col].isin(selected)]
+                st.session_state.temp_filter_values[f"{col}_select"] = selected
+
+                # Only apply active filters
+                active_selected = st.session_state.active_filter_values.get(
+                    f"{col}_select"
+                )
+                if active_selected:
+                    filtered_df = filtered_df[filtered_df[col].isin(active_selected)]
 
     return filtered_df, skipped_cols
 
 
 def structured_data_filters_display(df: pd.DataFrame) -> pd.DataFrame:
-    # Add filters section
-    col1, col2 = st.columns([6, 1])  # Create columns for layout
+    col1, col2, col3 = st.columns([5, 1, 1])
     with col1:
         st.subheader("Structured Data Filters")
     with col2:
         if st.button("Reset Filters", type="primary"):
-            # Clear all filter-related session state variables
-            for key in list(st.session_state.keys()):
-                if isinstance(key, str) and key.startswith("filter_"):
-                    del st.session_state[key]
-            st.rerun()  # Rerun the app to reset the filters
+            # Clear all filter states
+            st.session_state.temp_filter_values = {}
+            st.session_state.active_filter_values = {}
+            st.rerun()
+    with col3:
+        if st.button("Apply Filters", type="primary"):
+            # Copy temporary values to active values
+            st.session_state.active_filter_values = (
+                st.session_state.temp_filter_values.copy()
+            )
+            st.rerun()
 
     with st.expander("Filter Data", expanded=False):
         value_filtered_df, skipped_cols = create_structured_data_filters(df)
