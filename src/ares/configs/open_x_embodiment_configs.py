@@ -47,6 +47,15 @@ class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
     state: np.ndarray | None = None
     depth: np.ndarray | None = None
     highres_image: np.ndarray | None = None
+    wrist_image: np.ndarray | None = None
+    end_effector_state: np.ndarray | None = None
+
+    @model_validator(mode="after")
+    def swap_in_highres_image(self) -> "OpenXEmbodimentStepObservation":
+        # use the highres image as image if available
+        if self.highres_image is not None:
+            self.image = self.highres_image
+        return self
 
 
 class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):

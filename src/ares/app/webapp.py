@@ -1,6 +1,8 @@
 import os
 import traceback
+from contextlib import contextmanager
 from datetime import datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -8,7 +10,10 @@ import streamlit as st
 from sqlalchemy import select
 
 from ares.app.export_data import export_options
-from ares.app.filter_helpers import embedding_data_filters, structured_data_filters
+from ares.app.filter_helpers import (
+    embedding_data_filters_display,
+    structured_data_filters_display,
+)
 from ares.app.init_data import initialize_data
 from ares.app.viz_helpers import (
     create_tabbed_visualizations,
@@ -28,49 +33,58 @@ video_paths = list(os.listdir(PI_DEMO_PATH))
 tmp_dump_dir = "/tmp/ares_dump"
 
 
+@contextmanager
+def filter_error_context(section_name: str) -> Any:
+    """Context manager for handling filter operation errors."""
+    try:
+        yield
+    except Exception as e:
+        st.error(f"Error in {section_name}: {str(e)}\n{traceback.format_exc()}")
+        # communicate stop to user
+        st.write("Stopping execution")
+        st.stop()
+        return None
+
+
+def load_data() -> pd.DataFrame:
+    # Initialize mock data at the start of the app
+    # initialize_mock_data(tmp_dump_dir)
+    initialize_data(tmp_dump_dir)
+    # Initial dataframe
+    df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
+    df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
+    return df
+
+
 # Streamlit app
 def main() -> None:
-    try:
+    # setup page and load data
+    with filter_error_context("loading data"):
         print("\n" + "=" * 100 + "\n")
         st.set_page_config(page_title=title, page_icon="📊", layout="wide")
         st.title(title)
 
-        # Initialize mock data at the start of the app
-        # initialize_mock_data(tmp_dump_dir)
-        initialize_data(tmp_dump_dir)
-        # Initial dataframe
-        df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
-        df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
+        df = load_data()
 
-        value_filtered_df = structured_data_filters(df)
-        st.write(f"Selected {len(value_filtered_df)} rows out of {len(df)} total")
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}\n{traceback.format_exc()}")
+    with filter_error_context("data filters"):
+        # Structured data filters
+        st.header(f"Data Filters")
+        value_filtered_df = structured_data_filters_display(df)
+        st.write(
+            f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
+        )
 
-    try:
-        # Create the visualization using state data
-        cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
-            st.session_state.reduced,
-            st.session_state.labels,
-            keep_mask=value_filtered_df.index.tolist(),
+        # Embedding data filters
+        filtered_df, cluster_fig, selection, selection_flag = (
+            embedding_data_filters_display(value_filtered_df)
         )
-        selection_flag, indices, selection = embedding_data_filters(
-            value_filtered_df, cluster_fig, cluster_to_trace
-        )
-        n_pts = len(indices)
-        clusters = st.session_state.labels[indices] if n_pts > 0 else []
-        n_clusters = len(np.unique(clusters))
-        filtered_df = value_filtered_df.iloc[
-            indices
-        ]  # Second stage of filtering (by cluster selection)
-        ######### end hack #########
         st.write(
             f"Selection found! Using '{'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'}' as bounds"
             if selection_flag
             else "No selection found, using all points"
         )
         st.write(
-            f"Found {n_pts} point{'' if n_pts == 1 else 's'} from {n_clusters} cluster{'' if n_clusters == 1 else 's'}"
+            f"Selected {len(filtered_df)} rows out of {len(value_filtered_df)} available via embedding filters"
         )
 
         if filtered_df.empty:
@@ -79,13 +93,7 @@ def main() -> None:
             )
             return
 
-        st.header("Selection Controls")
-        st.write("Double click to clear selection")
-        if st.button("Summarize Selection"):
-            st.write(f"selected {len(selection['points'])} points")
-            st.write(f"ex: {selection['points'][:5]}")
-            st.write(f"filtered df: {filtered_df.sample(5)}")
-
+    with filter_error_context("displaying data"):
         # show first 5 rows of dataframe
         show_dataframe(filtered_df.sample(5), title="Sampled 5 Rows")
 
@@ -120,17 +128,16 @@ def main() -> None:
 
         st.divider()  # Add horizontal line
 
+    with filter_error_context("exporting data"):
         # Export controls
         # Collect all visualizations
+        # TODO: add structured data filters to export
         all_visualizations = [
             *general_visualizations,
             *success_visualizations,
             *time_series_visualizations,
         ]
         export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
-
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}\n{traceback.format_exc()}")
 
 
 if __name__ == "__main__":

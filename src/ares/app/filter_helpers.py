@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -6,91 +7,89 @@ from ares.app.viz_helpers import infer_visualization_type
 from ares.clustering import visualize_clusters
 
 
-def create_data_filters(
+def create_structured_data_filters(
     df: pd.DataFrame, max_options: int = 9
 ) -> tuple[pd.DataFrame, list]:
     """Create filter controls for dataframe columns based on their types."""
     filtered_df = df.copy()
     skipped_cols = []
 
-    with st.expander("Filter Data", expanded=True):
-        filter_cols = st.columns(3)
+    filter_cols = st.columns(3)
 
-        for idx, col in enumerate(df.columns):
-            viz_info = infer_visualization_type(col, df)
-            if viz_info["viz_type"] is None:
-                skipped_cols.append(col)
-                continue
-            with filter_cols[idx % 3]:
-                if (
-                    pd.api.types.is_numeric_dtype(df[col])
-                    and viz_info["nunique"] > max_options
-                ):
-                    min_val = float(df[col].min())
-                    max_val = float(df[col].max())
-                    if min_val == max_val:
-                        skipped_cols.append(col)
-                        continue
+    for idx, col in enumerate(df.columns):
+        viz_info = infer_visualization_type(col, df)
+        if viz_info["viz_type"] is None:
+            skipped_cols.append(col)
+            continue
+        with filter_cols[idx % 3]:
+            if (
+                pd.api.types.is_numeric_dtype(df[col])
+                and viz_info["nunique"] > max_options
+            ):
+                min_val = float(df[col].min())
+                max_val = float(df[col].max())
+                if min_val == max_val:
+                    skipped_cols.append(col)
+                    continue
 
-                    # Initialize session state for this filter
-                    if f"filter_{col}_range" not in st.session_state:
-                        st.session_state[f"filter_{col}_range"] = (min_val, max_val)
+                # Initialize session state for this filter
+                if f"filter_{col}_range" not in st.session_state:
+                    st.session_state[f"filter_{col}_range"] = (min_val, max_val)
 
-                    # Create the slider
-                    values = st.slider(
-                        f"Filter {col}",
-                        min_value=min_val,
-                        max_value=max_val,
-                        value=st.session_state[f"filter_{col}_range"],
-                    )
-                    st.session_state[f"filter_{col}_range"] = values
-                    filtered_df = filtered_df[
-                        (filtered_df[col] >= values[0])
-                        & (filtered_df[col] <= values[1])
-                    ]
+                # Create the slider
+                values = st.slider(
+                    f"Filter {col}",
+                    min_value=min_val,
+                    max_value=max_val,
+                    value=st.session_state[f"filter_{col}_range"],
+                )
+                st.session_state[f"filter_{col}_range"] = values
+                filtered_df = filtered_df[
+                    (filtered_df[col] >= values[0]) & (filtered_df[col] <= values[1])
+                ]
 
-                elif viz_info["viz_type"] == "bar":
-                    options = df[col].unique()
-                    if len(options) > max_options:
-                        skipped_cols.append(col)
-                        continue
+            elif viz_info["viz_type"] == "bar":
+                options = df[col].unique()
+                if len(options) > max_options:
+                    skipped_cols.append(col)
+                    continue
 
-                    # Initialize session state for this filter
-                    if f"filter_{col}_select" not in st.session_state:
-                        st.session_state[f"filter_{col}_select"] = list(options)
+                # Initialize session state for this filter
+                if f"filter_{col}_select" not in st.session_state:
+                    st.session_state[f"filter_{col}_select"] = list(options)
 
-                    # Create the multiselect
-                    selected: list[str] = st.multiselect(
-                        f"Filter {col}",
-                        options=options,
-                        default=st.session_state[f"filter_{col}_select"],
-                    )
-                    st.session_state[f"filter_{col}_select"] = selected
-                    if selected:
-                        filtered_df = filtered_df[filtered_df[col].isin(selected)]
+                # Create the multiselect
+                selected: list[str] = st.multiselect(
+                    f"Filter {col}",
+                    options=options,
+                    default=st.session_state[f"filter_{col}_select"],
+                )
+                st.session_state[f"filter_{col}_select"] = selected
+                if selected:
+                    filtered_df = filtered_df[filtered_df[col].isin(selected)]
 
     return filtered_df, skipped_cols
 
 
-def structured_data_filters(df: pd.DataFrame) -> pd.DataFrame:
+def structured_data_filters_display(df: pd.DataFrame) -> pd.DataFrame:
     # Add filters section
-    st.header("Structured Data Filters")
     col1, col2 = st.columns([6, 1])  # Create columns for layout
     with col1:
-        st.subheader("Data Filters")
+        st.subheader("Structured Data Filters")
     with col2:
         if st.button("Reset Filters", type="primary"):
             # Clear all filter-related session state variables
             for key in list(st.session_state.keys()):
-                if key.startswith("filter_"):
+                if isinstance(key, str) and key.startswith("filter_"):
                     del st.session_state[key]
             st.rerun()  # Rerun the app to reset the filters
 
-    value_filtered_df, skipped_cols = create_data_filters(df)
-    if skipped_cols:
-        st.warning(
-            f"Skipped columns: {skipped_cols} due to high cardinality or lack of unique values"
-        )
+    with st.expander("Filter Data", expanded=False):
+        value_filtered_df, skipped_cols = create_structured_data_filters(df)
+        if skipped_cols:
+            st.warning(
+                f"Skipped columns: {skipped_cols} due to high cardinality or lack of unique values"
+            )
     return value_filtered_df
 
 
@@ -124,7 +123,7 @@ def handle_selection(
     return selection_flag, indices, selection
 
 
-def embedding_data_filters(
+def create_embedding_data_filters(
     value_filtered_df: pd.DataFrame, fig: go.Figure, cluster_to_trace: dict
 ) -> tuple[bool, list[int], dict]:
     # Display the plot and capture selected points from the event data
@@ -141,3 +140,29 @@ def embedding_data_filters(
         value_filtered_df, selection, cluster_to_trace, fig
     )
     return selection_flag, indices, selection
+
+
+def embedding_data_filters_display(
+    value_filtered_df: pd.DataFrame,
+) -> tuple[pd.DataFrame, go.Figure, dict, bool]:
+    st.subheader(f"Embedding Filters")
+    with st.expander("Embedding Selection", expanded=False):
+        cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
+            st.session_state.reduced,
+            st.session_state.labels,
+            keep_mask=value_filtered_df.index.tolist(),
+        )
+        selection_flag, indices, selection = create_embedding_data_filters(
+            value_filtered_df, cluster_fig, cluster_to_trace
+        )
+        st.write("**Selection Controls**")
+        st.write("Double click to clear selection")
+        if st.button("Summarize Selection (todo)"):
+            st.write(f"selected {len(selection['points'])} points")
+            st.write(f"ex: {selection['points'][:5]}")
+
+    n_pts = len(indices)
+    clusters = st.session_state.labels[indices] if n_pts > 0 else []
+    n_clusters = len(np.unique(clusters))
+    filtered_df = value_filtered_df.loc[indices]
+    return filtered_df, cluster_fig, selection, selection_flag

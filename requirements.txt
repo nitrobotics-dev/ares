@@ -29,6 +29,7 @@ umap-learn
 hdbscan
 kaleido
 pdfkit
+matplotlib
 
 # database
 faiss-cpu #TODO: try faiss-gpu

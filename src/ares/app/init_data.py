@@ -34,28 +34,31 @@ def initialize_data(tmp_dump_dir: str) -> None:
     if "embeddings" not in st.session_state:
         if os.path.exists(embeddings_path):
             # Load from disk
-            st.session_state.embeddings = np.load(embeddings_path)
-            clusters_data = np.load(clusters_path)
-            st.session_state.reduced = clusters_data["reduced"]
-            st.session_state.labels = clusters_data["labels"]
-            st.session_state.probs = clusters_data["probs"]
-        else:
-            # Create new random data and save to disk
-            embeddings = np.random.rand(available_len, 2)
-            for i in range(3):
-                embeddings[i * 200 : (i + 1) * 200] += i
+            loaded_embeddings = np.load(embeddings_path)
+            # Check if loaded data matches current dataset size
+            if len(loaded_embeddings) == available_len:
+                st.session_state.embeddings = loaded_embeddings
+                clusters_data = np.load(clusters_path)
+                st.session_state.reduced = clusters_data["reduced"]
+                st.session_state.labels = clusters_data["labels"]
+                st.session_state.probs = clusters_data["probs"]
+            else:
+                # Data size mismatch, create new embeddings
+                embeddings = np.random.rand(available_len, 2)
+                for i in range(3):
+                    embeddings[i * 200 : (i + 1) * 200] += i
 
-            reduced, labels, probs = cluster_embeddings(embeddings)
+                reduced, labels, probs = cluster_embeddings(embeddings)
 
-            # Save to disk
-            np.save(embeddings_path, embeddings)
-            np.savez(clusters_path, reduced=reduced, labels=labels, probs=probs)
+                # Save to disk
+                np.save(embeddings_path, embeddings)
+                np.savez(clusters_path, reduced=reduced, labels=labels, probs=probs)
 
-            # Store in session state
-            st.session_state.embeddings = embeddings
-            st.session_state.reduced = reduced
-            st.session_state.labels = labels
-            st.session_state.probs = probs
+                # Store in session state
+                st.session_state.embeddings = embeddings
+                st.session_state.reduced = reduced
+                st.session_state.labels = labels
+                st.session_state.probs = probs
 
 
 def initialize_mock_data(tmp_dump_dir: str, video_paths: list[str]) -> None:

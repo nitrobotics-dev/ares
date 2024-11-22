@@ -57,7 +57,6 @@ def cluster_embeddings(
 def visualize_clusters(
     reduced_embeddings: np.ndarray,
     cluster_labels: np.ndarray,
-    title: str = "Embedding Clusters",
     keep_mask: Optional[list] = None,
 ) -> Tuple[go.Figure, pd.DataFrame, dict[str, int]]:
     """
@@ -96,7 +95,7 @@ def visualize_clusters(
             masked_df,
             x="x",
             y="y",
-            title=title,
+            # title=title,
             template="plotly_white",
         )
         fig.update_traces(
