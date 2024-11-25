@@ -1,6 +1,7 @@
 import os
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import plotly
 import plotly.express as px
@@ -371,3 +372,68 @@ def display_video_grid(filtered_df: pd.DataFrame, max_videos: int = 5) -> None:
             video_path = video_paths[i % len(video_paths)]
             inp = {**row.to_dict(), "video_path": video_path}
             display_video_card(inp)
+
+
+# make a object to show all the information in a given row
+def show_one_row(row: pd.Series) -> None:
+    for col, val in row.items():
+        st.write(f"{col}: {val}")
+
+
+def plot_robot_array(
+    robot_array: np.ndarray, title_base: str, highlight_idx: int | None = None
+) -> plotly.graph_objects.Figure:
+    """Plot a 3D array with dimensions (trajectory, timestep, robot_state_dim).
+    Note that the "time sequence" is already aligned, so "timestep" is actually relative.
+    """
+    with st.expander(title_base, expanded=False):
+        assert (
+            robot_array.ndim == 3
+        ), f"robot_array must have 3 dimensions; received shape: {robot_array.shape}"
+
+        # Calculate grid dimensions - try to make it as square as possible
+        n_dims = robot_array.shape[2]
+        grid_size = int(np.ceil(np.sqrt(n_dims)))
+
+        # Create a grid of columns
+        cols = st.columns(grid_size)
+
+        # Create a figure for each dimension of the robot state
+        for dim in range(robot_array.shape[2]):
+            # Calculate row and column position
+            row = dim // grid_size
+            col = dim % grid_size
+
+            # If we need a new row of columns
+            if col == 0 and dim != 0:
+                cols = st.columns(grid_size)
+
+            with cols[col]:
+                fig = px.line(
+                    title=title_base + f" - Dimension {dim}",
+                    labels={
+                        "x": "Relative Timestep",
+                        "y": "Value",
+                        "color": "Trajectory",
+                    },
+                )
+
+                # Plot each trajectory
+                for traj in range(robot_array.shape[0]):
+                    color = "red" if traj == highlight_idx else "blue"
+                    width = 3 if traj == highlight_idx else 1
+                    opacity = 1.0 if traj == highlight_idx else 0.3
+
+                    fig.add_scatter(
+                        x=list(range(robot_array.shape[1])),
+                        y=robot_array[traj, :, dim],
+                        mode="lines",
+                        name=f"Trajectory {traj}",
+                        line=dict(color=color, width=width),
+                        opacity=opacity,
+                    )
+
+                fig.update_layout(showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+
+    return fig
