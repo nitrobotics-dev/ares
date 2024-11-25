@@ -195,3 +195,33 @@ def embedding_data_filters_display(
     n_clusters = len(np.unique(clusters))
     filtered_df = value_filtered_df.loc[indices]
     return filtered_df, cluster_fig, selection, selection_flag
+
+
+def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
+    # Create columns for row selection options
+    col1, col2, col3, col4 = st.columns(4)
+    row = None
+    # Option 1: Select by index
+    with col1:
+        idx = st.number_input(
+            "Select row by index", min_value=0, max_value=len(df) - 1, value=0
+        )
+        if st.button("Select by Index"):
+            row = df.iloc[idx]
+
+    # Option 2: Select by ID
+    with col2:
+        ids = df.id.unique().tolist()
+        selected_id = st.selectbox("Select row by ID", options=ids)
+        if st.button("Select by ID"):
+            row = df[df.id == selected_id].iloc[0]
+
+    with col3:
+        if st.button("Select by Path"):
+            row = df[df.path == selected_path].iloc[0]
+
+    if row is None:
+        st.warning("No row selected, defaulting to first row")
+        row = df.iloc[0]
+
+    return row

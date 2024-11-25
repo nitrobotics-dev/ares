@@ -13,6 +13,7 @@ from sqlalchemy import select
 from ares.app.export_data import export_options
 from ares.app.filter_helpers import (
     embedding_data_filters_display,
+    select_row_from_df_user,
     structured_data_filters_display,
 )
 from ares.app.init_data import initialize_data
@@ -74,25 +75,39 @@ def main() -> None:
 
         df = load_data()
 
-    # with filter_error_context("show example row"):
-    #     show_one_row(df.sample(1).iloc[0])
-
     with filter_error_context("plot robot arrays"):
-        row = df.iloc[0]
+        # Let user select a row from the dataframe using helper function
+        row = select_row_from_df_user(df)
+
+        # Display the selected row's details and video
+        show_one_row(
+            df, row.name
+        )  # Use row.name instead of row.index since it's a Series
+
+        # Show which row was selected
+        st.write(f"Selected row ID: {row.id}")
+
+        # Number of trajectories to display in plots
+        show_n = 1000
+
         index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, FaissIndex)
         all_vecs = index_manager.get_all_matrices()
         vecs = all_vecs[row.dataset_name + "-" + row.robot_embodiment + "-states"]
-        first_vecs = vecs[: min(50, len(vecs))]
-        st.write(f"Showing first {len(first_vecs)} trajectories' states")
-        plot_robot_array(first_vecs, title_base="Robot State Display", highlight_idx=0)
+        first_vecs = vecs[: min(show_n, len(vecs))]
 
+        st.write(f"Showing first {len(first_vecs)} trajectories' states")
+        with st.expander("Robot State Display", expanded=False):
+            plot_robot_array(
+                first_vecs, title_base="Robot State Display", highlight_idx=0
+            )
         # same for actions
         actions = all_vecs[row.dataset_name + "-" + row.robot_embodiment + "-actions"]
-        first_actions = actions[: min(50, len(actions))]
+        first_actions = actions[: min(show_n, len(actions))]
         st.write(f"Showing first {len(first_actions)} trajectories' actions")
-        plot_robot_array(
-            first_actions, title_base="Robot Action Display", highlight_idx=1
-        )
+        with st.expander("Robot Action Display", expanded=False):
+            plot_robot_array(
+                first_actions, title_base="Robot Action Display", highlight_idx=1
+            )
 
     # with filter_error_context("data filters"):
     #     # Structured data filters
