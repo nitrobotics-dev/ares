@@ -201,24 +201,43 @@ def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
     # Create columns for row selection options
     col1, col2, col3, col4 = st.columns(4)
     row = None
+
     # Option 1: Select by index
     with col1:
-        idx = st.number_input(
-            "Select row by index", min_value=0, max_value=len(df) - 1, value=0
+        idx_options = df.index.tolist()
+        idx: int | str = st.selectbox(
+            "Select by index",
+            options=["Choose an option"] + idx_options,
+            key="idx_select",
         )
         if st.button("Select by Index"):
-            row = df.iloc[idx]
+            if idx == "Choose an option":
+                st.warning("No index selected, defaulting to first row")
+                row = df.iloc[0]
+            else:
+                row = df.iloc[int(idx)]
 
     # Option 2: Select by ID
     with col2:
-        ids = df.id.unique().tolist()
-        selected_id = st.selectbox("Select row by ID", options=ids)
+        id_options = df.id.unique().tolist()
+        selected_id = int(
+            st.selectbox("Select by ID", options=id_options, key="id_select")
+        )
         if st.button("Select by ID"):
             row = df[df.id == selected_id].iloc[0]
 
+    # Option 3: Select by Path
     with col3:
+        path_options = df.path.unique().tolist()
+        selected_path = st.selectbox(
+            "Select by Path", options=path_options, key="path_select"
+        )
         if st.button("Select by Path"):
             row = df[df.path == selected_path].iloc[0]
+
+    with col4:
+        if st.button("Select Random"):
+            row = df.sample(1).iloc[0]
 
     if row is None:
         st.warning("No row selected, defaulting to first row")

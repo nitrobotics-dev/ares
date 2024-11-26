@@ -1,6 +1,8 @@
 import json
 import os
+import time
 import traceback
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
@@ -18,12 +20,13 @@ from ares.app.filter_helpers import (
 )
 from ares.app.init_data import initialize_data
 from ares.app.viz_helpers import (
+    create_robot_array_plot,
     create_tabbed_visualizations,
     display_video_grid,
     generate_automatic_visualizations,
+    generate_robot_array_plot_visualizations,
     generate_success_rate_visualizations,
     generate_time_series_visualizations,
-    plot_robot_array,
     show_dataframe,
     show_one_row,
 )
@@ -41,6 +44,11 @@ video_paths = list(os.listdir(PI_DEMO_PATH))
 
 tmp_dump_dir = "/tmp/ares_dump"
 
+# Add at the top level
+section_times: dict[str, float] = defaultdict(float)
+index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, FaissIndex)
+all_vecs = index_manager.get_all_matrices()
+
 
 @contextmanager
 def filter_error_context(section_name: str) -> Any:
@@ -55,6 +63,17 @@ def filter_error_context(section_name: str) -> Any:
         return None
 
 
+@contextmanager
+def timer_context(section_name: str) -> Any:
+    """Context manager for timing sections."""
+    start_time = time.time()
+    try:
+        yield
+    finally:
+        elapsed_time = time.time() - start_time
+        section_times[section_name] += elapsed_time
+
+
 def load_data() -> pd.DataFrame:
     # Initialize mock data at the start of the app
     # initialize_mock_data(tmp_dump_dir)
@@ -67,49 +86,35 @@ def load_data() -> pd.DataFrame:
 
 # Streamlit app
 def main() -> None:
-    # setup page and load data
-    with filter_error_context("loading data"):
+    # Define section names
+    section_loading = "loading data"
+    with filter_error_context(section_loading), timer_context(section_loading):
         print("\n" + "=" * 100 + "\n")
         st.set_page_config(page_title=title, page_icon="📊", layout="wide")
         st.title(title)
-
         df = load_data()
 
-    with filter_error_context("plot robot arrays"):
+    section_plot_robots = "plot robot arrays"
+    with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
         # Let user select a row from the dataframe using helper function
         row = select_row_from_df_user(df)
 
         # Display the selected row's details and video
         show_one_row(
-            df, row.name
+            df, row.name, all_vecs, show_n=100
         )  # Use row.name instead of row.index since it's a Series
 
         # Show which row was selected
         st.write(f"Selected row ID: {row.id}")
 
         # Number of trajectories to display in plots
-        show_n = 1000
+        robot_array_visualizations = generate_robot_array_plot_visualizations(
+            row, all_vecs, show_n=1000
+        )
 
-        index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, FaissIndex)
-        all_vecs = index_manager.get_all_matrices()
-        vecs = all_vecs[row.dataset_name + "-" + row.robot_embodiment + "-states"]
-        first_vecs = vecs[: min(show_n, len(vecs))]
-
-        st.write(f"Showing first {len(first_vecs)} trajectories' states")
-        with st.expander("Robot State Display", expanded=False):
-            plot_robot_array(
-                first_vecs, title_base="Robot State Display", highlight_idx=0
-            )
-        # same for actions
-        actions = all_vecs[row.dataset_name + "-" + row.robot_embodiment + "-actions"]
-        first_actions = actions[: min(show_n, len(actions))]
-        st.write(f"Showing first {len(first_actions)} trajectories' actions")
-        with st.expander("Robot Action Display", expanded=False):
-            plot_robot_array(
-                first_actions, title_base="Robot Action Display", highlight_idx=1
-            )
-
-    # with filter_error_context("data filters"):
+    # Uncomment and modify other sections:
+    # section_filters = "data filters"
+    # with filter_error_context(section_filters), timer_context(section_filters):
     #     # Structured data filters
     #     st.header(f"Data Filters")
     #     value_filtered_df = structured_data_filters_display(df)
@@ -136,7 +141,8 @@ def main() -> None:
     #         )
     #         return
 
-    # with filter_error_context("displaying data"):
+    # section_display = "displaying data"
+    # with filter_error_context(section_display), timer_context(section_display):
     #     # show first 5 rows of dataframe
     #     show_dataframe(
     #         filtered_df.sample(min(5, len(filtered_df))), title="Sampled 5 Rows"
@@ -173,7 +179,8 @@ def main() -> None:
 
     #     st.divider()  # Add horizontal line
 
-    # with filter_error_context("exporting data"):
+    # section_export = "exporting data"
+    # with filter_error_context(section_export), timer_context(section_export):
     #     # Export controls
     #     # Collect all visualizations
     #     # TODO: add structured data filters to export
@@ -181,8 +188,15 @@ def main() -> None:
     #         *general_visualizations,
     #         *success_visualizations,
     #         *time_series_visualizations,
+    #         *robot_array_visualizations,
     #     ]
     #     export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
+
+    # Print timing report at the end
+    print("\n=== Timing Report ===")
+    for section, elapsed_time in section_times.items():
+        print(f"{section}: {elapsed_time:.2f} seconds")
+    print("==================\n")
 
 
 if __name__ == "__main__":

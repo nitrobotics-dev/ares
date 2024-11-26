@@ -1,4 +1,6 @@
+import io
 import os
+import random
 from typing import Any
 
 import numpy as np
@@ -91,10 +93,8 @@ def create_bar_plot(
 
 
 def display_video_card(video: pd.Series) -> None:
-    if not pd.isna(video["video_path"]) and video["video_path"].endswith(
-        (".mp4", ".avi", ".mov")
-    ):
-        st.video(video["video_path"])
+    if not pd.isna(video["video_path"]):
+        st.video(get_video(video["video_path"]))
         st.write(f"**{video['id']}**")
         st.write(f"Task: {video['task_language_instruction']}")
         st.write(f"Upload Date: {video['ingestion_time'].strftime('%Y-%m-%d')}")
@@ -374,17 +374,47 @@ def display_video_grid(filtered_df: pd.DataFrame, max_videos: int = 5) -> None:
             display_video_card(inp)
 
 
-# make a object to show all the information in a given row
-def show_one_row(df: pd.DataFrame, idx: int) -> None:
+def get_video(data: str) -> str | bytes | io.BytesIO | np.ndarray:
+    if not isinstance(data, (str, bytes, io.BytesIO, np.ndarray)):
+        raise ValueError(f"Invalid video data type: {type(data)}")
+
+    if isinstance(data, str):
+        # determine if remote or local
+        if data.startswith(
+            "http"
+        ):  # TODO: add more checks for remote data + local cache
+            return data
+        else:
+            # hack for now --> replace with PI demo vids
+            valid_files = [
+                f
+                for f in os.listdir(PI_DEMO_PATH)
+                if not f.startswith(".") and "ds_store" not in f.lower()
+            ]
+            return os.path.join(PI_DEMO_PATH, random.choice(valid_files))
+    else:
+        return data
+
+
+def show_one_row(df: pd.DataFrame, idx: int, all_vecs: dict, show_n: int) -> None:
+    st.write(f"Showing row {idx}")
     row = df.iloc[idx]
     # video card
-    st.video(row["video_path"])
-    with st.expander("Row Details", expanded=False):
-        for col, val in row.items():
-            st.write(f"{col}: {val}")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.video(get_video(row["path"]))
+    with col2:
+        with st.expander("Row Details", expanded=False):
+            for col, val in row.items():
+                if len(str(val)) > 1000:
+                    continue
+                st.write(f"{col}: {val}")
+        generate_robot_array_plot_visualizations(
+            row, all_vecs, show_n, highlight_idx=idx
+        )
 
 
-def plot_robot_array(
+def create_robot_array_plot(
     robot_array: np.ndarray, title_base: str, highlight_idx: int | None = None
 ) -> plotly.graph_objects.Figure:
     """Plot a 3D array with dimensions (trajectory, timestep, robot_state_dim).
@@ -421,22 +451,70 @@ def plot_robot_array(
                 },
             )
 
-            # Plot each trajectory
-            for traj in range(robot_array.shape[0]):
-                color = "red" if traj == highlight_idx else "blue"
-                width = 3 if traj == highlight_idx else 1
-                opacity = 1.0 if traj == highlight_idx else 0.3
+            # Create arrays for all non-highlighted trajectories at once
+            mask = np.ones(robot_array.shape[0], dtype=bool)
+            if highlight_idx is not None:
+                mask[highlight_idx] = False
 
+            # Plot all non-highlighted trajectories in one go
+            x = np.tile(np.arange(robot_array.shape[1]), mask.sum())
+            y = robot_array[mask, :, dim].flatten()
+            traj_ids = np.repeat(
+                np.arange(robot_array.shape[0])[mask], robot_array.shape[1]
+            )
+
+            fig.add_scatter(
+                x=x,
+                y=y,
+                mode="lines",
+                line=dict(color="blue", width=1),
+                opacity=0.3,
+                name="Other Trajectories",
+                legendgroup="other",
+                showlegend=(dim == 0),  # Only show legend for first dimension
+                hovertemplate="Trajectory %{customdata}<br>Value: %{y}<extra></extra>",
+                customdata=traj_ids,
+            )
+
+            # Plot highlighted trajectory last (on top)
+            if highlight_idx is not None and highlight_idx < robot_array.shape[0]:
                 fig.add_scatter(
                     x=list(range(robot_array.shape[1])),
-                    y=robot_array[traj, :, dim],
+                    y=robot_array[highlight_idx, :, dim],
                     mode="lines",
-                    name=f"Trajectory {traj}",
-                    line=dict(color=color, width=width),
-                    opacity=opacity,
+                    name=f"Trajectory {highlight_idx}",
+                    line=dict(color="red", width=3),
+                    opacity=1.0,
+                    showlegend=(dim == 0),  # Only show legend for first dimension
                 )
 
             fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                key=f"{title_base}-dim-{dim}-{len(robot_array)}-{highlight_idx}",
+            )
 
     return fig
+
+
+def generate_robot_array_plot_visualizations(
+    row: pd.Series,
+    all_vecs: dict,
+    show_n: int = 1000,
+    keys: list[str] | None = None,
+    highlight_idx: int | None = None,
+) -> list[plotly.graph_objects.Figure]:
+    keys = keys or ["states", "actions"]
+    figs = []
+    for key in keys:
+        these_vecs = all_vecs[row.dataset_name + "-" + row.robot_embodiment + "-" + key]
+        shown_vecs = these_vecs[: min(show_n, len(these_vecs))]
+        with st.expander(f"Trajectory {key.title()} Display", expanded=False):
+            fig = create_robot_array_plot(
+                shown_vecs,
+                title_base=f"Trajectory {key.title()} Display",
+                highlight_idx=highlight_idx,
+            )
+            figs.append(fig)
+    return figs
