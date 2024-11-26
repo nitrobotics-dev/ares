@@ -421,7 +421,6 @@ def create_embedding_similarity_visualization(
         distances = np.delete(distances, idx)
         ids = np.delete(ids, idx)
         matrices = np.delete(matrices, idx)
-
     # Return the data instead of creating the visualization
     return {
         "distances": distances[:n_most_similar],
@@ -456,17 +455,20 @@ def create_similarity_tabs(
                         display_video_card(found_rows.iloc[0])
 
 
-def show_one_row(
+def show_hero_display(
     df: pd.DataFrame,
     idx: int,
     all_vecs: dict,
     show_n: int,
     index_manager: IndexManager,
-) -> None:
+) -> list[dict]:
     """
     Row 1: text
     Row 2: video col, detail + robot array plots
     Row 3: n tabs covering most similar based on state, action, video, text (embedding), text (metric)
+
+    Returns:
+        List of visualization figures to be included in export
     """
     st.write(f"Showing row {idx}")
     row = df.iloc[idx]
@@ -480,7 +482,7 @@ def show_one_row(
                 if len(str(val)) > 1000:
                     continue
                 st.write(f"{col}: {val}")
-        generate_robot_array_plot_visualizations(
+        array_figs = generate_robot_array_plot_visualizations(
             row, all_vecs, show_n, highlight_idx=idx
         )
 
@@ -498,12 +500,17 @@ def show_one_row(
     )
     text_viz_data = create_text_similarity_visualization(row, df, n_most_similar)
 
+    similarity_viz = [state_viz_data, action_viz_data, text_viz_data]
+
     # Create the tabs with the data
     create_similarity_tabs(
-        [state_viz_data, action_viz_data, text_viz_data],
+        similarity_viz,
         tab_names,
         df,
     )
+
+    # Return all visualizations for export
+    return array_figs + similarity_viz
 
 
 def create_robot_array_plot(

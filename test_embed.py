@@ -11,25 +11,14 @@ from ares.databases.embedding_database import (
     TEST_EMBEDDING_DB_PATH,
     FaissIndex,
     IndexManager,
+    rollout_to_embedding_pack,
+    rollout_to_index_name,
 )
 from ares.databases.structured_database import (
     TEST_ROBOT_DB_PATH,
     RolloutSQLModel,
     setup_database,
 )
-
-
-def rollout_to_index_name(rollout: Rollout) -> str:
-    return f"{rollout.dataset_name}-{rollout.robot.embodiment}"
-
-
-def rollout_to_embedding_pack(rollout: Rollout) -> Dict[str, np.ndarray | None]:
-    name = rollout_to_index_name(rollout)
-    return {
-        f"{name}-states": rollout.trajectory.states_array,
-        f"{name}-actions": rollout.trajectory.actions_array,
-    }
-
 
 TEST_TIME_STEPS = 100
 LIMIT = 2**31 - 1  # Maximum 32-bit signed integer

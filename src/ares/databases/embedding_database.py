@@ -326,7 +326,7 @@ class IndexManager:
 
     def search_matrix(
         self, name: str, query_matrix: np.ndarray, k: int
-    ) -> Tuple[np.ndarray, List[str], List[np.ndarray]]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Search for similar matrices, handling normalization"""
         index = self.indices[name]
         interpolated = self._interpolate_matrix(query_matrix, index.time_steps)
@@ -344,7 +344,7 @@ class IndexManager:
             denormalized = index.denormalize_matrix(matrix)
             matrices.append(denormalized)
 
-        return distances, ids, matrices
+        return distances, np.array(ids), np.array(matrices)
 
     def set_normalization(self, name: str, means: np.ndarray, stds: np.ndarray) -> None:
         """Set normalization constants for an existing index"""

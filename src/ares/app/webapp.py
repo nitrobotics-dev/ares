@@ -28,7 +28,7 @@ from ares.app.viz_helpers import (
     generate_success_rate_visualizations,
     generate_time_series_visualizations,
     show_dataframe,
-    show_one_row,
+    show_hero_display,
 )
 from ares.clustering import visualize_clusters
 from ares.databases.embedding_database import (
@@ -94,33 +94,24 @@ def main() -> None:
         st.title(title)
         df = load_data()
 
-    section_plot_robots = "plot robot arrays"
-    with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
+    section_plot_hero = "plot hero display"
+    with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
         # Let user select a row from the dataframe using helper function
         row = select_row_from_df_user(df)
-
-        # Display the selected row's details and video
-        show_one_row(
-            df, row.name, all_vecs, show_n=100, index_manager=index_manager
-        )  # Use row.name instead of row.index since it's a Series
-
-        # Show which row was selected
         st.write(f"Selected row ID: {row.id}")
+        hero_visualizations = show_hero_display(
+            df, row.name, all_vecs, show_n=100, index_manager=index_manager
+        )
 
+    section_plot_robots = "plot robot arrays"
+    with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
         # Number of trajectories to display in plots
         robot_array_visualizations = generate_robot_array_plot_visualizations(
             row,
             all_vecs,
             show_n=1000,
-            # scores={
-            #     k: np.array(
-            #         [np.random.random() > i / len(v) for i in range(v.shape[0])]
-            #     )
-            #     for k, v in all_vecs.items()
-            # },
         )
 
-    # Uncomment and modify other sections:
     # section_filters = "data filters"
     # with filter_error_context(section_filters), timer_context(section_filters):
     #     # Structured data filters
@@ -197,11 +188,13 @@ def main() -> None:
     #         *success_visualizations,
     #         *time_series_visualizations,
     #         *robot_array_visualizations,
+    #         *hero_visualizations,  # Add hero visualizations to export
     #     ]
     #     export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
 
     # Print timing report at the end
     print("\n=== Timing Report ===")
+    print(f"Total time: {sum(section_times.values()):.2f} seconds")
     for section, elapsed_time in section_times.items():
         print(f"{section}: {elapsed_time:.2f} seconds")
     print("==================\n")
