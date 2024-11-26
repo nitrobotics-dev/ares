@@ -415,7 +415,10 @@ def show_one_row(df: pd.DataFrame, idx: int, all_vecs: dict, show_n: int) -> Non
 
 
 def create_robot_array_plot(
-    robot_array: np.ndarray, title_base: str, highlight_idx: int | None = None
+    robot_array: np.ndarray,
+    title_base: str,
+    highlight_idx: int | None = None,
+    show_n: int | None = None,
 ) -> plotly.graph_objects.Figure:
     """Plot a 3D array with dimensions (trajectory, timestep, robot_state_dim).
     Note that the "time sequence" is already aligned, so "timestep" is actually relative.
@@ -423,6 +426,20 @@ def create_robot_array_plot(
     assert (
         robot_array.ndim == 3
     ), f"robot_array must have 3 dimensions; received shape: {robot_array.shape}"
+
+    if show_n is not None:
+        # sample N trajectories including highlighted idx if not none
+        if highlight_idx is not None:
+            indices = np.arange(robot_array.shape[0])
+            sampled_indices = np.random.choice(
+                indices, min(show_n, len(indices)), replace=False
+            )
+            sampled_indices = np.append(sampled_indices, highlight_idx)
+        else:
+            sampled_indices = np.random.choice(
+                robot_array.shape[0], min(show_n, robot_array.shape[0]), replace=False
+            )
+        robot_array = robot_array[sampled_indices]
 
     # Calculate grid dimensions - try to make it as square as possible
     n_dims = robot_array.shape[2]
@@ -508,13 +525,20 @@ def generate_robot_array_plot_visualizations(
     keys = keys or ["states", "actions"]
     figs = []
     for key in keys:
-        these_vecs = all_vecs[row.dataset_name + "-" + row.robot_embodiment + "-" + key]
-        shown_vecs = these_vecs[: min(show_n, len(these_vecs))]
+        name_key = row.dataset_name + "-" + row.robot_embodiment + "-" + key
+        if name_key not in all_vecs:
+            print(f"Key {name_key} not found in all_vecs!! substituting random")
+            name_key = random.choice(list(all_vecs.keys()))
+            if highlight_idx is not None and highlight_idx >= len(all_vecs[name_key]):
+                print(f"also substituting highlight_idx")
+                highlight_idx = np.random.choice(len(all_vecs[name_key]))
+        these_vecs = all_vecs[name_key]
         with st.expander(f"Trajectory {key.title()} Display", expanded=False):
             fig = create_robot_array_plot(
-                shown_vecs,
+                these_vecs,
                 title_base=f"Trajectory {key.title()} Display",
                 highlight_idx=highlight_idx,
+                show_n=show_n,
             )
             figs.append(fig)
     return figs
