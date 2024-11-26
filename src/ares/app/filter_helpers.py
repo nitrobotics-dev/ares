@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from ares.app.viz_helpers import infer_visualization_type
+from ares.app.data_analysis import infer_visualization_type
 from ares.clustering import visualize_clusters
 
 

@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 from sqlalchemy import select
 
+from ares.app.data_analysis import generate_automatic_visualizations
 from ares.app.export_data import export_options
 from ares.app.filter_helpers import (
     embedding_data_filters_display,
@@ -19,15 +20,13 @@ from ares.app.filter_helpers import (
     structured_data_filters_display,
 )
 from ares.app.init_data import initialize_data
+from ares.app.plot_primitives import show_dataframe
 from ares.app.viz_helpers import (
-    create_robot_array_plot,
     create_tabbed_visualizations,
     display_video_grid,
-    generate_automatic_visualizations,
     generate_robot_array_plot_visualizations,
     generate_success_rate_visualizations,
     generate_time_series_visualizations,
-    show_dataframe,
     show_hero_display,
 )
 from ares.clustering import visualize_clusters
@@ -94,103 +93,105 @@ def main() -> None:
         st.title(title)
         df = load_data()
 
+    section_filters = "data filters"
+    with filter_error_context(section_filters), timer_context(section_filters):
+        # Structured data filters
+        st.header(f"Data Filters")
+        value_filtered_df = structured_data_filters_display(df)
+        st.write(
+            f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
+        )
+
+        # Embedding data filters
+        filtered_df, cluster_fig, selection, selection_flag = (
+            embedding_data_filters_display(value_filtered_df)
+        )
+        st.write(
+            f"Selection found! Using '{'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'}' as bounds"
+            if selection_flag
+            else "No selection found, using all points"
+        )
+        st.write(
+            f"Selected {len(filtered_df)} rows out of {len(value_filtered_df)} available via embedding filters"
+        )
+
+        if filtered_df.empty:
+            st.warning(
+                "No data available for the selected points! Try adjusting your selection to receive analytics."
+            )
+            return
+
+        show_dataframe(
+            filtered_df.sample(min(5, len(filtered_df))), title="Data Sample"
+        )
+    st.divider()
+
+    section_display = "data distributions"
+    with filter_error_context(section_display), timer_context(section_display):
+        # Create overview of all data
+        st.header("Distribution Analytics")
+        general_visualizations = generate_automatic_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            general_visualizations, [viz["title"] for viz in general_visualizations]
+        )
+
+        st.header("Success Rate Analytics")
+        success_visualizations = generate_success_rate_visualizations(filtered_df)
+        create_tabbed_visualizations(
+            success_visualizations, [viz["title"] for viz in success_visualizations]
+        )
+
+        st.header("Time Series Trends")
+        time_series_visualizations = generate_time_series_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            time_series_visualizations,
+            [viz["title"] for viz in time_series_visualizations],
+        )
+
+        # show video cards of first 5 rows in a horizontal layout
+        display_video_grid(filtered_df)
+    st.divider()
+
     section_plot_hero = "plot hero display"
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
+        st.header("Rollout Display")
+
         # Let user select a row from the dataframe using helper function
         row = select_row_from_df_user(df)
         st.write(f"Selected row ID: {row.id}")
         hero_visualizations = show_hero_display(
             df, row.name, all_vecs, show_n=100, index_manager=index_manager
         )
+    st.divider()
 
     section_plot_robots = "plot robot arrays"
     with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
+        st.header("Robot Array Display")
         # Number of trajectories to display in plots
         robot_array_visualizations = generate_robot_array_plot_visualizations(
-            row,
+            row,  # need row to select dataset/robot embodiment of trajectories
             all_vecs,
             show_n=1000,
         )
+    st.divider()
 
-    # section_filters = "data filters"
-    # with filter_error_context(section_filters), timer_context(section_filters):
-    #     # Structured data filters
-    #     st.header(f"Data Filters")
-    #     value_filtered_df = structured_data_filters_display(df)
-    #     st.write(
-    #         f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
-    #     )
-
-    #     # Embedding data filters
-    #     filtered_df, cluster_fig, selection, selection_flag = (
-    #         embedding_data_filters_display(value_filtered_df)
-    #     )
-    #     st.write(
-    #         f"Selection found! Using '{'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'}' as bounds"
-    #         if selection_flag
-    #         else "No selection found, using all points"
-    #     )
-    #     st.write(
-    #         f"Selected {len(filtered_df)} rows out of {len(value_filtered_df)} available via embedding filters"
-    #     )
-
-    #     if filtered_df.empty:
-    #         st.warning(
-    #             "No data available for the selected points! Try adjusting your selection to receive analytics."
-    #         )
-    #         return
-
-    # section_display = "displaying data"
-    # with filter_error_context(section_display), timer_context(section_display):
-    #     # show first 5 rows of dataframe
-    #     show_dataframe(
-    #         filtered_df.sample(min(5, len(filtered_df))), title="Sampled 5 Rows"
-    #     )
-
-    #     st.divider()  # Add horizontal line
-
-    #     # Create overview of all data
-    #     st.header("Distribution Analytics")
-    #     general_visualizations = generate_automatic_visualizations(
-    #         filtered_df, time_column="ingestion_time"
-    #     )
-    #     create_tabbed_visualizations(
-    #         general_visualizations, [viz["title"] for viz in general_visualizations]
-    #     )
-
-    #     st.header("Success Rate Analytics")
-    #     success_visualizations = generate_success_rate_visualizations(filtered_df)
-    #     create_tabbed_visualizations(
-    #         success_visualizations, [viz["title"] for viz in success_visualizations]
-    #     )
-
-    #     st.header("Time Series Trends")
-    #     time_series_visualizations = generate_time_series_visualizations(
-    #         filtered_df, time_column="ingestion_time"
-    #     )
-    #     create_tabbed_visualizations(
-    #         time_series_visualizations,
-    #         [viz["title"] for viz in time_series_visualizations],
-    #     )
-
-    #     # show video cards of first 5 rows in a horizontal layout
-    #     display_video_grid(filtered_df)
-
-    #     st.divider()  # Add horizontal line
-
-    # section_export = "exporting data"
-    # with filter_error_context(section_export), timer_context(section_export):
-    #     # Export controls
-    #     # Collect all visualizations
-    #     # TODO: add structured data filters to export
-    #     all_visualizations = [
-    #         *general_visualizations,
-    #         *success_visualizations,
-    #         *time_series_visualizations,
-    #         *robot_array_visualizations,
-    #         *hero_visualizations,  # Add hero visualizations to export
-    #     ]
-    #     export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
+    section_export = "exporting data"
+    with filter_error_context(section_export), timer_context(section_export):
+        # Export controls
+        # Collect all visualizations
+        # TODO: add structured data filters to export
+        all_visualizations = [
+            *general_visualizations,
+            *success_visualizations,
+            *time_series_visualizations,
+            *robot_array_visualizations,
+            *hero_visualizations,  # Add hero visualizations to export
+        ]
+        export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
 
     # Print timing report at the end
     print("\n=== Timing Report ===")
