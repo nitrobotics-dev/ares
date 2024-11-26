@@ -12,6 +12,7 @@ Pillow
 imageio
 litellm
 opencv-python
+python-Levenshtein
 
 
 # datasets and utilities

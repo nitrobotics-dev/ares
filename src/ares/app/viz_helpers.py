@@ -10,6 +10,7 @@ import pandas as pd
 import plotly
 import plotly.express as px
 import streamlit as st
+from Levenshtein import distance as levenshtein_distance
 
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
 from ares.task_utils import PI_DEMO_PATH  # hack
@@ -397,99 +398,62 @@ def get_video(data: str) -> str | bytes | io.BytesIO | np.ndarray:
         return data
 
 
-def create_similarity_visualization(
+def create_embedding_similarity_visualization(
     row: pd.Series,
     df: pd.DataFrame,
     index_manager: IndexManager,
     feature_type: str,
     n_most_similar: int,
-) -> st.container:
-    """Create visualization for similar trajectories based on feature type.
-
-    Args:
-        row: Current row being analyzed
-        df: Full DataFrame containing all rows
-        index_manager: IndexManager instance for similarity search
-        feature_type: Type of feature to compare ('states' or 'actions')
-        n_most_similar: Number of similar examples to show
-
-    Returns:
-        Streamlit container with similarity visualization
-    """
+) -> dict:
+    """Create visualization for similar trajectories based on embedding feature type."""
     name = rollout_to_index_name(row, feature_type)
     trajectory_key = f"trajectory_{feature_type}"
-    distances, ids, metrics = index_manager.search_matrix(
+    distances, ids, matrices = index_manager.search_matrix(
         name,
         np.array(json.loads(row[trajectory_key])),
         n_most_similar + 1,  # to avoid self
     )
 
-    viz = st.container()
-    with viz:
-        similar_cols = st.columns(n_most_similar)
-        # check index of id_str to see if it matches row.id then remove that index
-        idx = np.where(ids == str(row.id))
-        if len(idx[0]) == 0:
-            st.write(f"No similar examples found for {row.id}")
-            return viz
+    # check index of id_str to see if it matches row.id then remove that index
+    idx = np.where(ids == str(row.id))
+    if len(idx[0]) != 0:
         idx = idx[0][0]
         distances = np.delete(distances, idx)
         ids = np.delete(ids, idx)
-        metrics = np.delete(metrics, idx)
+        matrices = np.delete(matrices, idx)
 
-        for i, (dist, id_str, _) in enumerate(zip(distances, ids, metrics)):
-
-            with similar_cols[i]:
-                st.write(f"Distance: {dist:.3f}")
-                found_rows = df[df["id"] == uuid.UUID(id_str)]
-                print(len(found_rows))
-                if len(found_rows) == 0:
-                    st.write(f"No row found for id: {id_str}")
-                else:
-                    display_video_card(found_rows.iloc[0])
-    return viz
+    # Return the data instead of creating the visualization
+    return {
+        "distances": distances[:n_most_similar],
+        "ids": ids[:n_most_similar],
+        "matrices": matrices[:n_most_similar] if matrices is not None else None,
+    }
 
 
 def create_similarity_tabs(
-    visualizations: list[Union[dict, st.delta_generator.DeltaGenerator]],
+    visualizations: list[dict],
     tab_names: list[str],
     df: pd.DataFrame,
 ) -> None:
-    """Create tabs specifically for similarity visualizations.
-
-    Args:
-        visualizations: List of visualizations (either dictionaries or streamlit containers)
-        tab_names: List of names for each tab
-        df: DataFrame containing the rollout data
-    """
+    """Create tabs specifically for similarity visualizations."""
     tabs = st.tabs(tab_names)
-    for tab, viz in zip(tabs, visualizations):
+    for tab, viz_data in zip(tabs, visualizations):
         with tab:
-            # If viz is a container, just display it
-            if isinstance(viz, st.delta_generator.DeltaGenerator):
-                viz.empty()  # Clear any existing content
-                viz  # Display the container
-            else:
-                # Handle dictionary case with plotly figure
-                st.plotly_chart(viz["figure"], use_container_width=True)
-
-                # Then render the similar videos if data exists
-                if "data" in viz:
-                    similar_cols = st.columns(len(viz["data"]["ids"]))
-                    for i, (dist, id_str, _) in enumerate(
-                        zip(
-                            viz["data"]["distances"],
-                            viz["data"]["ids"],
-                            viz["data"]["metrics"],
-                        )
-                    ):
-                        with similar_cols[i]:
-                            st.write(f"Distance: {dist:.3f}")
-                            found_rows = df[df["id"] == uuid.UUID(id_str)]
-                            if len(found_rows) == 0:
-                                st.write(f"No row found for id: {id_str}")
-                            else:
-                                display_video_card(found_rows.iloc[0])
+            similar_cols = st.columns(len(viz_data["ids"]))
+            for i, (dist, id_str) in enumerate(
+                zip(viz_data["distances"], viz_data["ids"])
+            ):
+                with similar_cols[i]:
+                    st.write(f"Distance: {dist:.3f}")
+                    # Convert id_str to UUID only if it's not already a UUID
+                    search_id = (
+                        id_str if isinstance(id_str, uuid.UUID) else uuid.UUID(id_str)
+                    )
+                    found_rows = df[df["id"] == search_id]
+                    if len(found_rows) == 0:
+                        st.write(f"No row found for id: {id_str}")
+                    else:
+                        display_video_card(found_rows.iloc[0])
 
 
 def show_one_row(
@@ -520,24 +484,26 @@ def show_one_row(
             row, all_vecs, show_n, highlight_idx=idx
         )
 
-    # Row 3: n tabs covering most similar based on state, action, video, text (embedding), text (metric)
-    # Create tabbed visualizations for different similarity metrics
+    # Row 3: n tabs covering most similar based on state, action, text
     st.write(f"Most similar examples to {row['id']}, based on:")
-    tab_names = ["State", "Action"]  # Only the tabs we're using
-    n_most_simliar = 3
-    visualizations = []
-    # get most similar states and display video cards
-    state_viz = create_similarity_visualization(
-        row, df, index_manager, "states", n_most_simliar
-    )
-    visualizations.append(state_viz)
+    tab_names = ["State", "Action", "Text"]
+    n_most_similar = 3
 
-    action_viz = create_similarity_visualization(
-        row, df, index_manager, "actions", n_most_simliar
+    # Get the similarity data
+    state_viz_data = create_embedding_similarity_visualization(
+        row, df, index_manager, "states", n_most_similar
     )
-    visualizations.append(action_viz)
+    action_viz_data = create_embedding_similarity_visualization(
+        row, df, index_manager, "actions", n_most_similar
+    )
+    text_viz_data = create_text_similarity_visualization(row, df, n_most_similar)
 
-    create_similarity_tabs(visualizations, tab_names, df)  # Pass df as argument
+    # Create the tabs with the data
+    create_similarity_tabs(
+        [state_viz_data, action_viz_data, text_viz_data],
+        tab_names,
+        df,
+    )
 
 
 def create_robot_array_plot(
@@ -686,7 +652,7 @@ def generate_robot_array_plot_visualizations(
         # HACK: if key not found, substitute random key
         if name_key not in all_vecs:
             print(f"Key {name_key} not found in all_vecs!! substituting random")
-            name_key = random.choice(list(all_vecs.keys()))
+            name_key = list(all_vecs.keys())[0]
             if highlight_idx is not None and highlight_idx >= len(all_vecs[name_key]):
                 print(f"also substituting highlight_idx")
                 highlight_idx = np.random.choice(len(all_vecs[name_key]))
@@ -704,3 +670,30 @@ def generate_robot_array_plot_visualizations(
             )
             figs.append(fig)
     return figs
+
+
+def create_text_similarity_visualization(
+    row: pd.Series,
+    df: pd.DataFrame,
+    n_most_similar: int,
+) -> dict:
+    """Create visualization for similar trajectories based on text similarity of task instructions."""
+    # Get the reference instruction
+    reference_instruction = row["task_language_instruction"]
+
+    # Calculate distances for all instructions
+    distances = df["task_language_instruction"].apply(
+        lambda x: levenshtein_distance(reference_instruction, x)
+    )
+
+    # Get indices of most similar (excluding self)
+    sorted_indices = distances.argsort()
+    # Remove self from results (where distance = 0)
+    sorted_indices = sorted_indices[distances[sorted_indices] > 0]
+    top_indices = sorted_indices[:n_most_similar]
+
+    return {
+        "distances": distances[top_indices].values,
+        "ids": df.iloc[top_indices]["id"].values,
+        "matrices": None,  # Keeping consistent with other similarity visualization returns
+    }
