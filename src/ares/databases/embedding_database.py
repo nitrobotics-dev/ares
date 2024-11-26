@@ -20,10 +20,39 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 
 import faiss
 import numpy as np
+import pandas as pd
 from scipy.interpolate import interp1d
+
+from ares.configs.base import Rollout
 
 BASE_EMBEDDING_DB_PATH = "/tmp/ares_dump/embedding_data"
 TEST_EMBEDDING_DB_PATH = "/tmp/ares_dump/test_embedding_data"
+
+
+def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
+    if isinstance(rollout, pd.Series):
+        return f"{rollout['dataset_name']}-{rollout['robot_embodiment']}-{suffix}"
+    return f"{rollout.dataset_name}-{rollout.robot.embodiment}-{suffix}"
+
+
+def rollout_to_embedding_pack(
+    rollout: Rollout | pd.Series, suffix: str
+) -> Dict[str, np.ndarray | None]:
+    name = rollout_to_index_name(rollout, suffix)
+    states = (
+        rollout.trajectory.states_array
+        if isinstance(rollout, Rollout)
+        else rollout["trajectory_states_array"]
+    )
+    actions = (
+        rollout.trajectory.actions_array
+        if isinstance(rollout, Rollout)
+        else rollout["trajectory_actions_array"]
+    )
+    return {
+        f"{name}-states": states,
+        f"{name}-actions": actions,
+    }
 
 
 class Index(ABC):
@@ -305,6 +334,7 @@ class IndexManager:
         query_vector = normalized.flatten()
 
         distances, ids, vectors = index.search(query_vector, k)
+        distances = distances[0]  # Take first row since only one query
 
         # Reshape and denormalize the results
         matrices = []

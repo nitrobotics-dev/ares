@@ -101,7 +101,7 @@ def main() -> None:
 
         # Display the selected row's details and video
         show_one_row(
-            df, row.name, all_vecs, show_n=100
+            df, row.name, all_vecs, show_n=100, index_manager=index_manager
         )  # Use row.name instead of row.index since it's a Series
 
         # Show which row was selected
@@ -109,7 +109,15 @@ def main() -> None:
 
         # Number of trajectories to display in plots
         robot_array_visualizations = generate_robot_array_plot_visualizations(
-            row, all_vecs, show_n=1000
+            row,
+            all_vecs,
+            show_n=1000,
+            # scores={
+            #     k: np.array(
+            #         [np.random.random() > i / len(v) for i in range(v.shape[0])]
+            #     )
+            #     for k, v in all_vecs.items()
+            # },
         )
 
     # Uncomment and modify other sections:

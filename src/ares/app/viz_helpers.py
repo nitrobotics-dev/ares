@@ -1,7 +1,9 @@
 import io
+import json
 import os
 import random
-from typing import Any
+import uuid
+from typing import Any, Union
 
 import numpy as np
 import pandas as pd
@@ -9,6 +11,7 @@ import plotly
 import plotly.express as px
 import streamlit as st
 
+from ares.databases.embedding_database import IndexManager, rollout_to_index_name
 from ares.task_utils import PI_DEMO_PATH  # hack
 
 
@@ -92,14 +95,14 @@ def create_bar_plot(
     return fig
 
 
-def display_video_card(video: pd.Series) -> None:
-    if not pd.isna(video["video_path"]):
-        st.video(get_video(video["video_path"]))
-        st.write(f"**{video['id']}**")
-        st.write(f"Task: {video['task_language_instruction']}")
-        st.write(f"Upload Date: {video['ingestion_time'].strftime('%Y-%m-%d')}")
+def display_video_card(row: pd.Series) -> None:
+    if not pd.isna(row["path"]):
+        st.video(get_video(row["path"]))
+        st.write(f"**{row['id']}**")
+        st.write(f"Task: {row['task_language_instruction']}")
+        st.write(f"Upload Date: {row['ingestion_time'].strftime('%Y-%m-%d')}")
     else:
-        st.warning(f"Invalid video path for {video['id'], video['video_path']}")
+        st.warning(f"Invalid video path for {row['id'], row['video_path']}")
 
 
 def show_dataframe(
@@ -369,9 +372,7 @@ def display_video_grid(filtered_df: pd.DataFrame, max_videos: int = 5) -> None:
 
     for i, (_, row) in enumerate(filtered_df.head(n_videos).iterrows()):
         with video_cols[i]:
-            video_path = video_paths[i % len(video_paths)]
-            inp = {**row.to_dict(), "video_path": video_path}
-            display_video_card(inp)
+            display_video_card(dict(row))
 
 
 def get_video(data: str) -> str | bytes | io.BytesIO | np.ndarray:
@@ -396,7 +397,113 @@ def get_video(data: str) -> str | bytes | io.BytesIO | np.ndarray:
         return data
 
 
-def show_one_row(df: pd.DataFrame, idx: int, all_vecs: dict, show_n: int) -> None:
+def create_similarity_visualization(
+    row: pd.Series,
+    df: pd.DataFrame,
+    index_manager: IndexManager,
+    feature_type: str,
+    n_most_similar: int,
+) -> st.container:
+    """Create visualization for similar trajectories based on feature type.
+
+    Args:
+        row: Current row being analyzed
+        df: Full DataFrame containing all rows
+        index_manager: IndexManager instance for similarity search
+        feature_type: Type of feature to compare ('states' or 'actions')
+        n_most_similar: Number of similar examples to show
+
+    Returns:
+        Streamlit container with similarity visualization
+    """
+    name = rollout_to_index_name(row, feature_type)
+    trajectory_key = f"trajectory_{feature_type}"
+    distances, ids, metrics = index_manager.search_matrix(
+        name,
+        np.array(json.loads(row[trajectory_key])),
+        n_most_similar + 1,  # to avoid self
+    )
+
+    viz = st.container()
+    with viz:
+        similar_cols = st.columns(n_most_similar)
+        # check index of id_str to see if it matches row.id then remove that index
+        idx = np.where(ids == str(row.id))
+        if len(idx[0]) == 0:
+            st.write(f"No similar examples found for {row.id}")
+            return viz
+        idx = idx[0][0]
+        distances = np.delete(distances, idx)
+        ids = np.delete(ids, idx)
+        metrics = np.delete(metrics, idx)
+
+        for i, (dist, id_str, _) in enumerate(zip(distances, ids, metrics)):
+
+            with similar_cols[i]:
+                st.write(f"Distance: {dist:.3f}")
+                found_rows = df[df["id"] == uuid.UUID(id_str)]
+                print(len(found_rows))
+                if len(found_rows) == 0:
+                    st.write(f"No row found for id: {id_str}")
+                else:
+                    display_video_card(found_rows.iloc[0])
+    return viz
+
+
+def create_similarity_tabs(
+    visualizations: list[Union[dict, st.delta_generator.DeltaGenerator]],
+    tab_names: list[str],
+    df: pd.DataFrame,
+) -> None:
+    """Create tabs specifically for similarity visualizations.
+
+    Args:
+        visualizations: List of visualizations (either dictionaries or streamlit containers)
+        tab_names: List of names for each tab
+        df: DataFrame containing the rollout data
+    """
+    tabs = st.tabs(tab_names)
+    for tab, viz in zip(tabs, visualizations):
+        with tab:
+            # If viz is a container, just display it
+            if isinstance(viz, st.delta_generator.DeltaGenerator):
+                viz.empty()  # Clear any existing content
+                viz  # Display the container
+            else:
+                # Handle dictionary case with plotly figure
+                st.plotly_chart(viz["figure"], use_container_width=True)
+
+                # Then render the similar videos if data exists
+                if "data" in viz:
+                    similar_cols = st.columns(len(viz["data"]["ids"]))
+                    for i, (dist, id_str, _) in enumerate(
+                        zip(
+                            viz["data"]["distances"],
+                            viz["data"]["ids"],
+                            viz["data"]["metrics"],
+                        )
+                    ):
+                        with similar_cols[i]:
+                            st.write(f"Distance: {dist:.3f}")
+                            found_rows = df[df["id"] == uuid.UUID(id_str)]
+                            if len(found_rows) == 0:
+                                st.write(f"No row found for id: {id_str}")
+                            else:
+                                display_video_card(found_rows.iloc[0])
+
+
+def show_one_row(
+    df: pd.DataFrame,
+    idx: int,
+    all_vecs: dict,
+    show_n: int,
+    index_manager: IndexManager,
+) -> None:
+    """
+    Row 1: text
+    Row 2: video col, detail + robot array plots
+    Row 3: n tabs covering most similar based on state, action, video, text (embedding), text (metric)
+    """
     st.write(f"Showing row {idx}")
     row = df.iloc[idx]
     # video card
@@ -413,33 +520,60 @@ def show_one_row(df: pd.DataFrame, idx: int, all_vecs: dict, show_n: int) -> Non
             row, all_vecs, show_n, highlight_idx=idx
         )
 
+    # Row 3: n tabs covering most similar based on state, action, video, text (embedding), text (metric)
+    # Create tabbed visualizations for different similarity metrics
+    st.write(f"Most similar examples to {row['id']}, based on:")
+    tab_names = ["State", "Action"]  # Only the tabs we're using
+    n_most_simliar = 3
+    visualizations = []
+    # get most similar states and display video cards
+    state_viz = create_similarity_visualization(
+        row, df, index_manager, "states", n_most_simliar
+    )
+    visualizations.append(state_viz)
+
+    action_viz = create_similarity_visualization(
+        row, df, index_manager, "actions", n_most_simliar
+    )
+    visualizations.append(action_viz)
+
+    create_similarity_tabs(visualizations, tab_names, df)  # Pass df as argument
+
 
 def create_robot_array_plot(
     robot_array: np.ndarray,
     title_base: str,
     highlight_idx: int | None = None,
     show_n: int | None = None,
+    scores: np.ndarray | None = None,
+    colorscale: str = "RdYlGn",
 ) -> plotly.graph_objects.Figure:
     """Plot a 3D array with dimensions (trajectory, timestep, robot_state_dim).
-    Note that the "time sequence" is already aligned, so "timestep" is actually relative.
+
+    Args:
+        robot_array: Array of shape (trajectory, timestep, robot_state_dim)
+        title_base: Base title for the plot
+        highlight_idx: Index of trajectory to highlight
+        show_n: Number of trajectories to show
+        scores: Optional array of scores for each trajectory (0 to 1)
+        colorscale: Plotly colorscale to use for scoring
     """
     assert (
         robot_array.ndim == 3
     ), f"robot_array must have 3 dimensions; received shape: {robot_array.shape}"
 
     if show_n is not None:
-        # sample N trajectories including highlighted idx if not none
+        # Sample trajectories (including highlighted idx if specified)
+        indices = np.arange(robot_array.shape[0])
+        sampled_indices = np.random.choice(
+            indices, min(show_n, len(indices)), replace=False
+        )
         if highlight_idx is not None:
-            indices = np.arange(robot_array.shape[0])
-            sampled_indices = np.random.choice(
-                indices, min(show_n, len(indices)), replace=False
-            )
-            sampled_indices = np.append(sampled_indices, highlight_idx)
-        else:
-            sampled_indices = np.random.choice(
-                robot_array.shape[0], min(show_n, robot_array.shape[0]), replace=False
-            )
+            sampled_indices = np.unique(np.append(sampled_indices, highlight_idx))
+
         robot_array = robot_array[sampled_indices]
+        if scores is not None:
+            scores = scores[sampled_indices]
 
     # Calculate grid dimensions - try to make it as square as possible
     n_dims = robot_array.shape[2]
@@ -464,36 +598,54 @@ def create_robot_array_plot(
                 labels={
                     "x": "Relative Timestep",
                     "y": "Value",
-                    "color": "Trajectory",
+                    "color": "Score" if scores is not None else "Trajectory",
                 },
             )
 
-            # Create arrays for all non-highlighted trajectories at once
-            mask = np.ones(robot_array.shape[0], dtype=bool)
-            if highlight_idx is not None:
-                mask[highlight_idx] = False
+            if scores is not None:
+                # Color by score mode
+                for i in range(len(robot_array)):
+                    if highlight_idx is not None and i == highlight_idx:
+                        continue  # Skip highlighted trajectory for now
 
-            # Plot all non-highlighted trajectories in one go
-            x = np.tile(np.arange(robot_array.shape[1]), mask.sum())
-            y = robot_array[mask, :, dim].flatten()
-            traj_ids = np.repeat(
-                np.arange(robot_array.shape[0])[mask], robot_array.shape[1]
-            )
+                    color = px.colors.sample_colorscale(colorscale, float(scores[i]))[0]
 
-            fig.add_scatter(
-                x=x,
-                y=y,
-                mode="lines",
-                line=dict(color="blue", width=1),
-                opacity=0.3,
-                name="Other Trajectories",
-                legendgroup="other",
-                showlegend=(dim == 0),  # Only show legend for first dimension
-                hovertemplate="Trajectory %{customdata}<br>Value: %{y}<extra></extra>",
-                customdata=traj_ids,
-            )
+                    fig.add_scatter(
+                        x=list(range(robot_array.shape[1])),
+                        y=robot_array[i, :, dim],
+                        mode="lines",
+                        line=dict(color=color, width=1),
+                        opacity=0.5,
+                        name=f"Score: {scores[i]:.2f}",
+                        showlegend=(dim == 0 and i < 5),  # Show first few in legend
+                        hovertemplate=f"Score: {scores[i]:.2f}<br>Value: %{{y}}<extra></extra>",
+                    )
+            else:
+                # Original background trajectory mode
+                mask = np.ones(robot_array.shape[0], dtype=bool)
+                if highlight_idx is not None:
+                    mask[highlight_idx] = False
 
-            # Plot highlighted trajectory last (on top)
+                x = np.tile(np.arange(robot_array.shape[1]), mask.sum())
+                y = robot_array[mask, :, dim].flatten()
+                traj_ids = np.repeat(
+                    np.arange(robot_array.shape[0])[mask], robot_array.shape[1]
+                )
+
+                fig.add_scatter(
+                    x=x,
+                    y=y,
+                    mode="lines",
+                    line=dict(color="blue", width=1),
+                    opacity=0.3,
+                    name="Other Trajectories",
+                    legendgroup="other",
+                    showlegend=(dim == 0),
+                    hovertemplate="Trajectory %{customdata}<br>Value: %{y}<extra></extra>",
+                    customdata=traj_ids,
+                )
+
+            # Add highlighted trajectory last (on top) if specified
             if highlight_idx is not None and highlight_idx < robot_array.shape[0]:
                 fig.add_scatter(
                     x=list(range(robot_array.shape[1])),
@@ -502,7 +654,7 @@ def create_robot_array_plot(
                     name=f"Trajectory {highlight_idx}",
                     line=dict(color="red", width=3),
                     opacity=1.0,
-                    showlegend=(dim == 0),  # Only show legend for first dimension
+                    showlegend=(dim == 0),
                 )
 
             fig.update_layout(showlegend=False)
@@ -521,24 +673,34 @@ def generate_robot_array_plot_visualizations(
     show_n: int = 1000,
     keys: list[str] | None = None,
     highlight_idx: int | None = None,
+    scores: dict[str, np.ndarray] | None = None,
 ) -> list[plotly.graph_objects.Figure]:
+    if highlight_idx is not None and scores is not None:
+        raise ValueError(
+            f"Cannot provide both highlight_idx and scores. Received highlight_idx: {highlight_idx}, scores: {scores}"
+        )
     keys = keys or ["states", "actions"]
     figs = []
     for key in keys:
         name_key = row.dataset_name + "-" + row.robot_embodiment + "-" + key
+        # HACK: if key not found, substitute random key
         if name_key not in all_vecs:
             print(f"Key {name_key} not found in all_vecs!! substituting random")
             name_key = random.choice(list(all_vecs.keys()))
             if highlight_idx is not None and highlight_idx >= len(all_vecs[name_key]):
                 print(f"also substituting highlight_idx")
                 highlight_idx = np.random.choice(len(all_vecs[name_key]))
+
         these_vecs = all_vecs[name_key]
+        these_scores = scores.get(name_key) if scores else None
+
         with st.expander(f"Trajectory {key.title()} Display", expanded=False):
             fig = create_robot_array_plot(
                 these_vecs,
                 title_base=f"Trajectory {key.title()} Display",
                 highlight_idx=highlight_idx,
                 show_n=show_n,
+                scores=these_scores,
             )
             figs.append(fig)
     return figs
