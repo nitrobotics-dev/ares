@@ -25,8 +25,8 @@ from scipy.interpolate import interp1d
 
 from ares.configs.base import Rollout
 
-BASE_EMBEDDING_DB_PATH = "/tmp/ares_dump/embedding_data"
-TEST_EMBEDDING_DB_PATH = "/tmp/ares_dump/test_embedding_data"
+BASE_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/embedding_data"
+TEST_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/test_embedding_data"
 
 
 def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
@@ -36,9 +36,8 @@ def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
 
 
 def rollout_to_embedding_pack(
-    rollout: Rollout | pd.Series, suffix: str
+    rollout: Rollout | pd.Series,
 ) -> Dict[str, np.ndarray | None]:
-    name = rollout_to_index_name(rollout, suffix)
     states = (
         rollout.trajectory.states_array
         if isinstance(rollout, Rollout)
@@ -50,8 +49,8 @@ def rollout_to_embedding_pack(
         else rollout["trajectory_actions_array"]
     )
     return {
-        f"{name}-states": states,
-        f"{name}-actions": actions,
+        rollout_to_index_name(rollout, suffix="states"): states,
+        rollout_to_index_name(rollout, suffix="actions"): actions,
     }
 
 
@@ -198,7 +197,7 @@ class FaissIndex(Index):
 class IndexManager:
     def __init__(self, base_dir: str, index_class: Type[Index], max_backups: int = 1):
         self.base_dir = Path(base_dir)
-        self.base_dir.mkdir(exist_ok=True)
+        self.base_dir.mkdir(exist_ok=True, parents=True)
         self.index_class = index_class
         self.max_backups = max_backups
         self.indices: Dict[str, Index] = {}
@@ -356,21 +355,19 @@ class IndexManager:
 
     def get_all_matrices(
         self, name: str | list[str] | None = None
-    ) -> Dict[str, np.ndarray]:
+    ) -> Dict[str, np.ndarray | None]:
         """Get all vectors the manager, reshaping them to matrices. Pass a name or list of names to get a single index's vectors."""
-        if not name:
-            return {
-                name: index.get_all_vectors().reshape(
-                    -1, index.time_steps, index.feature_dim
-                )
-                for name, index in self.indices.items()
-            }
         if isinstance(name, str):
             name = [name]
+        elif name is None:
+            name = list(self.indices.keys())
 
         return {
-            n: self.indices[n]
-            .get_all_vectors()
-            .reshape(-1, self.indices[n].time_steps, self.indices[n].feature_dim)
-            for n in name
+            n: (
+                index.get_all_vectors().reshape(-1, index.time_steps, index.feature_dim)
+                if index.n_entries > 0
+                else None
+            )
+            for n, index in self.indices.items()
+            if n in name
         }

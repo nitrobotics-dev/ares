@@ -22,7 +22,7 @@ from ares.databases.structured_database import (
     add_rollout,
     setup_database,
 )
-from ares.extractor import RandomInformationExtractor
+from ares.models.extractor import RandomInformationExtractor
 
 
 def build_dataset(
@@ -50,11 +50,10 @@ if __name__ == "__main__":
     # dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
     # dataset_name = "cmu_play_fusion"
     # dataset_name = "cmu_franka_exploration_dataset_converted_externally_to_rlds"
-    # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
-
+    # # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
     # dataset_name = "asu_table_top_converted_externally_to_rlds"
     # dataset_name = "berkeley_fanuc_manipulation"
-    dataset_name = "cmu_stretch"
+    # dataset_name = "cmu_stretch"
 
     # ones that failed
     # dataset_name = "jaco_play"
@@ -86,7 +85,6 @@ if __name__ == "__main__":
         episode = OpenXEmbodimentEpisode(**ep)
         rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
         rollouts.append(rollout)
-        # breakpoint()
         # just track this
         start_time = time.time()
         add_rollout(engine, rollout, RolloutSQLModel)

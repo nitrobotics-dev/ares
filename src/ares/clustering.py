@@ -4,7 +4,7 @@ Cluster embeddings using UMAP for dimensionality reduction and HDBSCAN for clust
 
 import json
 import os
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import hdbscan
 import numpy as np
@@ -13,8 +13,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import umap
 
+from ares.app.plot_primitives import create_line_plot
+
 # At the top with other imports
-SELECTION_FILE = "/tmp/selected_points.json"
+SELECTION_FILE = "/workspaces/ares/data/tmp/selected_points.json"
 
 
 def cluster_embeddings(
@@ -130,7 +132,6 @@ def visualize_clusters(
             x="x",
             y="y",
             color="cluster",
-            title=title,
             color_discrete_sequence=colors,
             template="plotly_white",
         )

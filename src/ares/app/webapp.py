@@ -28,6 +28,7 @@ from ares.app.viz_helpers import (
     generate_success_rate_visualizations,
     generate_time_series_visualizations,
     show_hero_display,
+    total_statistics,
 )
 from ares.clustering import visualize_clusters
 from ares.databases.embedding_database import (
@@ -41,7 +42,7 @@ from ares.task_utils import PI_DEMO_PATH
 title = "ARES Dashboard"
 video_paths = list(os.listdir(PI_DEMO_PATH))
 
-tmp_dump_dir = "/tmp/ares_dump"
+tmp_dump_dir = "/workspaces/ares/data/tmp/"
 
 # Add at the top level
 section_times: dict[str, float] = defaultdict(float)
@@ -75,8 +76,9 @@ def timer_context(section_name: str) -> Any:
 
 def load_data() -> pd.DataFrame:
     # Initialize mock data at the start of the app
-    # initialize_mock_data(tmp_dump_dir)
     initialize_data(tmp_dump_dir)
+    print(f"Initialized state: {list(st.session_state.keys())}")
+
     # Initial dataframe
     df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
     df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
@@ -92,6 +94,9 @@ def main() -> None:
         st.set_page_config(page_title=title, page_icon="📊", layout="wide")
         st.title(title)
         df = load_data()
+
+        total_statistics(df)
+        st.divider()
 
     section_filters = "data filters"
     with filter_error_context(section_filters), timer_context(section_filters):

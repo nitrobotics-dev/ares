@@ -179,7 +179,7 @@ def export_options(
     with export_col1:
         export_path = st.text_input(
             "Export Directory",
-            value="/tmp",
+            value="/workspaces/ares/data/tmp/",
             help="Directory where exported files will be saved",
         )
 

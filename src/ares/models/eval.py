@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from ares.configs.base import pydantic_to_field_instructions
 from ares.image_utils import choose_and_preprocess_frames, split_video_to_frames
-from ares.llm import LLM
+from ares.models.llm import LLM
 from ares.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 
 

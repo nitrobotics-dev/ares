@@ -264,6 +264,7 @@ def generate_robot_array_plot_visualizations(
         # HACK: if key not found, substitute random key
         if name_key not in all_vecs:
             print(f"Key {name_key} not found in all_vecs!! substituting random")
+            breakpoint()
             name_key = list(all_vecs.keys())[0]
             if highlight_idx is not None and highlight_idx >= len(all_vecs[name_key]):
                 print(f"also substituting highlight_idx")
@@ -314,3 +315,19 @@ def create_text_similarity_visualization(
         "ids": df.iloc[top_indices]["id"].values,
         "matrices": None,  # Keeping consistent with other similarity visualization returns
     }
+
+
+def total_statistics(df: pd.DataFrame) -> None:
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.subheader(f"Total rollouts:")
+        st.write(str(len(df)))
+    with col2:
+        st.subheader(f"Total length:")
+        st.write(str(df.length.sum()) + " steps")
+    with col3:
+        st.subheader(f"Total robots:")
+        st.write(str(df["robot_embodiment"].nunique()))
+    with col4:
+        st.subheader(f"Total datasets:")
+        st.write(str(df["dataset_name"].nunique()))

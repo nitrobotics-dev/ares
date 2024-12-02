@@ -17,7 +17,7 @@ from ares.configs.base import (
     pydantic_to_field_instructions,
 )
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
-from ares.llm import LLM
+from ares.models.llm import LLM
 
 
 def merge_dicts(dict1: dict, dict2: dict) -> dict:
@@ -130,7 +130,7 @@ class RandomInformationExtractor(InformationExtractor):
     def random_string(self, length_bound: int = 10) -> str:
         return "".join(
             np.random.choice(
-                string.ascii_lowercase.split(),
+                list(string.ascii_lowercase),
                 size=np.random.randint(1, length_bound + 1),
             )
         )
@@ -193,21 +193,23 @@ class RandomInformationExtractor(InformationExtractor):
         episode_info_dict = hard_coded_episode_info_extraction(episode)
         hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
 
-        robot = self.finish_random_object(Robot, hardcoded_info["robot"])
-        environment = self.finish_random_object(
-            Environment, hardcoded_info["environment"]
-        )
-        task = self.finish_random_object(Task, hardcoded_info["task"])
-        trajectory = self.finish_random_object(Trajectory, hardcoded_info["trajectory"])
+        # Create component objects in a loop
+        components = {
+            "robot": Robot,
+            "environment": Environment,
+            "task": Task,
+            "trajectory": Trajectory,
+        }
+
+        objects = {
+            name: self.finish_random_object(cls, hardcoded_info[name])
+            for name, cls in components.items()
+        }
+
+        # Create final rollout with all components
         rollout = self.finish_random_object(
             Rollout,
-            {
-                **hardcoded_info["rollout"],
-                "robot": robot,
-                "environment": environment,
-                "task": task,
-                "trajectory": trajectory,
-            },
+            {**hardcoded_info["rollout"], **objects},
         )
         return rollout
 
