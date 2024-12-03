@@ -7,6 +7,7 @@ import streamlit as st
 
 from ares.app.data_analysis import infer_visualization_type
 from ares.clustering import visualize_clusters
+from ares.models.llm import summarize
 
 # TODO: use form filter button! https://discuss.streamlit.io/t/faq-how-to-prevent-app-reruns/63916
 
@@ -210,12 +211,14 @@ def embedding_data_filters_display(
                         p["customdata"][raw_data_idx]
                     )
             st.write(
-                f"selected {sum(len(v) for v in cluster_to_data.values())} points in {len(cluster_to_data)} clusters"
+                f"Selected {sum(len(v) for v in cluster_to_data.values())} points in {len(cluster_to_data)} clusters"
             )
-            st.write(f"send to llm:")
             for k, v in cluster_to_data.items():
+                v_sample = np.random.choice(v, min(10, len(v)), replace=False)
+                st.write(f"**Cluster {k}**")
+                st.write(f"Ex: {'; '.join(v_sample[:5])}")
                 st.write(
-                    f"Cluster {k} ex: {np.random.choice(v, min(5, len(v)), replace=False)}"
+                    f"Summary: {summarize(v_sample, description='a cluster of points describing robot tasks.')}"
                 )
 
     filtered_df = df[df.id.astype(str).isin(map(str, selected_ids))]

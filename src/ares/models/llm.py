@@ -9,6 +9,7 @@ from jinja2 import Environment, FileSystemLoader
 from litellm import completion
 from litellm.utils import ModelResponse
 from PIL import Image
+from sentence_transformers import SentenceTransformer
 from transformers import AutoModel, AutoProcessor
 from vertexai.generative_models import GenerativeModel, Part
 
@@ -37,7 +38,7 @@ class LLM:
     def __init__(self, provider: str, llm_name: str):
         self.provider = provider
         self.llm_name = llm_name
-        # self.check_valid_key()
+        self.check_valid_key()
 
     def check_valid_key(self) -> bool:
         # note: don't use litellm util here, it uses 10 tokens!
@@ -194,9 +195,6 @@ class Embedder:
 SigLIPEmbedder = Embedder(provider="google", llm_name="siglip-base-patch16-224")
 
 
-from sentence_transformers import SentenceTransformer
-
-
 class SentenceTransformerEmbedder:
     def __init__(self, provider: str, llm_name: str):
         self.model = SentenceTransformer(
@@ -207,6 +205,17 @@ class SentenceTransformerEmbedder:
         return np.array(self.model.encode(prefix + inp))
 
 
-NOMIC_EMBEDDER = SentenceTransformerEmbedder(
-    provider="nomic-ai", llm_name="nomic-embed-text-v1"
-)
+# NOMIC_EMBEDDER = SentenceTransformerEmbedder(
+#     provider="nomic-ai", llm_name="nomic-embed-text-v1"
+# )
+
+# gemini_15_flash = LLM(provider="gemini", llm_name="gemini-1.5-flash")
+openai_4o_mini = LLM(provider="openai", llm_name="gpt-4o-mini")
+
+
+def summarize(data: list[str], description: str) -> str:
+    messages, response = openai_4o_mini.ask(
+        "summarizing.jinja2",
+        {"data": "\n".join(data), "description": description},
+    )
+    return response.choices[0].message.content

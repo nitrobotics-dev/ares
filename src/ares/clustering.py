@@ -13,11 +13,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import umap
 
-from ares.app.plot_primitives import create_line_plot
-
-# At the top with other imports
-SELECTION_FILE = "/workspaces/ares/data/tmp/selected_points.json"
-
 
 def cluster_embeddings(
     embeddings: np.ndarray,
@@ -145,12 +140,11 @@ def visualize_clusters(
                 "point_index": True,
                 "raw_data": True,
             },
-            # hover_name="cluster",
         ).data
 
         # Update selection properties and track traces
         for trace in cluster_traces:
-            trace.selected = dict(marker=dict(color="red", size=5))
+            trace.selected = dict(marker=dict(size=5))
             trace.unselected = dict(marker=dict(opacity=0.3, size=5, color="lightgray"))
             trace.marker.size = 5
             # Map cluster name to trace index
@@ -167,7 +161,7 @@ def visualize_clusters(
             color="cluster",
             color_discrete_sequence=colors,
             template="plotly_white",
-            custom_data=custom_data,
+            custom_data=custom_data_keys,
             hover_data={
                 "x": False,
                 "y": False,
@@ -176,12 +170,11 @@ def visualize_clusters(
                 "point_index": True,
                 "raw_data": True,
             },
-            # hover_name="cluster",
         )
 
         # Update selection properties and track traces
         for trace in fig.data:
-            trace.selected = dict(marker=dict(color="red", size=5))
+            trace.selected = dict(marker=dict(size=5), hoverinfo="all")
             trace.unselected = dict(marker=dict(opacity=0.3, size=5, color="lightgray"))
             trace.marker.size = 5
             # Map cluster name to trace index
@@ -200,6 +193,7 @@ def visualize_clusters(
         dragmode="select",
         clickmode="event+select",
         selectionrevision=True,
+        hovermode="closest",
     )
 
     # Add centroids
@@ -257,7 +251,7 @@ def visualize_clusters(
                 trace.marker.line = dict(color="black", width=2)
                 trace.showlegend = False
                 trace.opacity = 0.5
-                trace.selected = dict(marker=dict(color="red"))
+                # trace.selected = dict(marker=dict(color="red"))
                 trace.unselected = dict(marker=dict(opacity=0.15))
                 centroid_trace_indices.append(current_trace)  # Store the trace index
                 current_trace += 1
