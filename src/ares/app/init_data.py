@@ -7,6 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ares.clustering import cluster_embeddings
+from ares.databases.embedding_database import (
+    TEST_EMBEDDING_DB_PATH,
+    FaissIndex,
+    IndexManager,
+)
 from ares.databases.structured_database import (
     TEST_ROBOT_DB_PATH,
     RolloutSQLModel,
@@ -14,91 +19,95 @@ from ares.databases.structured_database import (
 )
 
 
+def load_cached_embeddings(
+    tmp_dump_dir: str, index_name: str, stored_embeddings: np.ndarray
+) -> tuple | None:
+    """Try to load cached embeddings and clusters for given index"""
+    embeddings_path = os.path.join(tmp_dump_dir, f"{index_name}_embeddings.npy")
+    clusters_path = os.path.join(tmp_dump_dir, f"{index_name}_clusters.npz")
+
+    if not (os.path.exists(embeddings_path) and os.path.exists(clusters_path)):
+        return None
+
+    loaded_embeddings = np.load(embeddings_path)
+    if not (
+        len(loaded_embeddings) == len(stored_embeddings)
+        and np.allclose(loaded_embeddings, stored_embeddings)
+    ):
+        import pdb
+
+        pdb.set_trace()  # Break if cached data doesn't match
+        return None
+
+    # Valid cached data found - load everything
+    clusters_data = np.load(clusters_path)
+    return (
+        loaded_embeddings,
+        clusters_data["reduced"],
+        clusters_data["labels"],
+    )
+
+
+def save_embeddings(
+    tmp_dump_dir: str,
+    index_name: str,
+    embeddings: np.ndarray,
+    reduced: np.ndarray,
+    labels: np.ndarray,
+) -> None:
+    """Save embeddings and clusters to disk"""
+    embeddings_path = os.path.join(tmp_dump_dir, f"{index_name}_embeddings.npy")
+    clusters_path = os.path.join(tmp_dump_dir, f"{index_name}_clusters.npz")
+
+    np.save(embeddings_path, embeddings)
+    np.savez(clusters_path, reduced=reduced, labels=labels)
+
+
+def store_in_session(
+    index_name: str,
+    embeddings: np.ndarray,
+    reduced: np.ndarray,
+    labels: np.ndarray,
+) -> None:
+    """Store embeddings and clusters in session state"""
+    st.session_state[f"{index_name}_embeddings"] = embeddings
+    st.session_state[f"{index_name}_reduced"] = reduced
+    st.session_state[f"{index_name}_labels"] = labels
+
+
 def initialize_data(tmp_dump_dir: str) -> None:
     """Initialize database connection and load/create embeddings"""
+    # Initialize database and session if needed
     if "ENGINE" not in st.session_state or "SESSION" not in st.session_state:
         engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
         sess = Session(engine)
         st.session_state.ENGINE = engine
         st.session_state.SESSION = sess
 
-    # get len of available dataset
-    available_len = len(pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE))
+    # Initialize index manager
+    index_manager = IndexManager(
+        base_dir=TEST_EMBEDDING_DB_PATH, index_class=FaissIndex
+    )
+    st.session_state.INDEX_MANAGER = index_manager
 
     # Create tmp directory if it doesn't exist
     os.makedirs(tmp_dump_dir, exist_ok=True)
-    embeddings_path = os.path.join(tmp_dump_dir, "embeddings.npy")
-    clusters_path = os.path.join(tmp_dump_dir, "clusters.npz")
 
-    # Try to load existing embeddings first
-    if os.path.exists(embeddings_path) and os.path.exists(clusters_path):
-        loaded_embeddings = np.load(embeddings_path)
-        if len(loaded_embeddings) == available_len:
-            # Valid cached data found - load everything
-            clusters_data = np.load(clusters_path)
-            st.session_state.embeddings = loaded_embeddings
-            st.session_state.reduced = clusters_data["reduced"]
-            st.session_state.labels = clusters_data["labels"]
-            st.session_state.probs = clusters_data["probs"]
-            return
+    # Process each index type
+    for index_name in ["task", "description"]:
+        stored_embeddings = index_manager.indices[index_name].get_all_vectors()
 
-    # Either files don't exist or data size mismatch - create new embeddings
-    embeddings = np.random.rand(available_len, 2)
-    for i in range(3):
-        embeddings[i * 200 : (i + 1) * 200] += i
-
-    reduced, labels, probs = cluster_embeddings(embeddings)
-
-    # Save to disk
-    np.save(embeddings_path, embeddings)
-    np.savez(clusters_path, reduced=reduced, labels=labels, probs=probs)
-
-    # Store in session state
-    st.session_state.embeddings = embeddings
-    st.session_state.reduced = reduced
-    st.session_state.labels = labels
-    st.session_state.probs = probs
-
-
-def initialize_mock_data(tmp_dump_dir: str, video_paths: list[str]) -> None:
-    """Initialize or load mock data"""
-    mock_data_path = os.path.join(tmp_dump_dir, "mock_data.pkl")
-
-    if "MOCK_DATA" not in st.session_state:
-        if os.path.exists(mock_data_path):
-            # Load from disk
-            st.session_state.MOCK_DATA = pd.read_pickle(mock_data_path)
+        # Try loading from cache first
+        cached_data = load_cached_embeddings(
+            tmp_dump_dir, index_name, stored_embeddings
+        )
+        if cached_data is not None:
+            embeddings, reduced, labels = cached_data
         else:
-            # Create new random data
-            base_dates = pd.date_range(end=pd.Timestamp.now(), periods=365)
-            np.random.seed(42)  # Set seed for reproducibility
-            random_offsets = np.random.randint(0, 365, size=365)
-            dates = [
-                date - pd.Timedelta(days=int(offset))
-                for date, offset in zip(base_dates, random_offsets)
-            ]
+            # Create new embeddings and clusters
+            embeddings = stored_embeddings
+            reduced, labels, _ = cluster_embeddings(embeddings)
+            save_embeddings(tmp_dump_dir, index_name, embeddings, reduced, labels)
 
-            sampled_paths = np.random.choice(video_paths, size=365)
-
-            mock_data = pd.DataFrame(
-                {
-                    "creation_time": dates,
-                    "length": np.random.randint(1, 100, size=365),
-                    "task_success": np.array(
-                        [np.random.uniform(i / 365, 1) for i in range(365)]
-                    ),
-                    "id": [f"vid_{i}" for i in range(365)],
-                    "task": [f"Robot Task {i}" for i in np.random.randint(0, 10, 365)],
-                    "views": np.random.randint(100, 1000, size=365),
-                    "video_path": [
-                        f"/workspaces/ares/data/pi_demos/{path}"
-                        for path in sampled_paths
-                    ],
-                }
-            )
-
-            # Save to disk
-            mock_data.to_pickle(mock_data_path)
-
-            # Store in session state
-            st.session_state.MOCK_DATA = mock_data
+        # Store in session state
+        store_in_session(index_name, embeddings, reduced, labels)

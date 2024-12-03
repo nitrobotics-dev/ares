@@ -177,9 +177,9 @@ def embedding_data_filters_display(
     st.subheader(f"Embedding Filters")
     with st.expander("Embedding Selection", expanded=False):
         cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
-            st.session_state.reduced,
-            st.session_state.labels,
-            keep_mask=value_filtered_df.index.tolist(),
+            st.session_state["task_reduced"],  # for now, hardcode to task
+            st.session_state["task_labels"],
+            keep_mask=value_filtered_df.index.tolist(),  # TODO: change to ID
         )
         selection_flag, indices, selection = create_embedding_data_filters(
             value_filtered_df, cluster_fig, cluster_to_trace
@@ -191,7 +191,9 @@ def embedding_data_filters_display(
             st.write(f"ex: {selection['points'][:5]}")
 
     n_pts = len(indices)
-    clusters = st.session_state.labels[indices] if n_pts > 0 else []
+    clusters = (
+        st.session_state["task_labels"][indices] if n_pts > 0 else []
+    )  # HACK: hardcode to task rn
     n_clusters = len(np.unique(clusters))
     filtered_df = value_filtered_df.loc[indices]
     return filtered_df, cluster_fig, selection, selection_flag

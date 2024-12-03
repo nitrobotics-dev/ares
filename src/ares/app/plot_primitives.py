@@ -138,12 +138,13 @@ def create_robot_array_plot(
 
     traces = []
     for dim in range(n_dims):
+        dim_traces = []  # Create a new list for this dimension's traces
         if scores is not None:
             for i in range(len(robot_array)):
                 if highlight_idx is not None and i == highlight_idx:
                     continue
                 color = px.colors.sample_colorscale(colorscale, float(scores[i]))[0]
-                traces.append(
+                dim_traces.append(
                     go.Scatter(
                         x=list(range(robot_array.shape[1])),
                         y=robot_array[i, :, dim],
@@ -167,7 +168,7 @@ def create_robot_array_plot(
                 np.arange(robot_array.shape[0])[mask], robot_array.shape[1]
             )
 
-            traces.append(
+            dim_traces.append(
                 go.Scatter(
                     x=x,
                     y=y,
@@ -183,7 +184,7 @@ def create_robot_array_plot(
             )
 
         if highlight_idx is not None and highlight_idx < robot_array.shape[0]:
-            traces.append(
+            dim_traces.append(
                 go.Scatter(
                     x=list(range(robot_array.shape[1])),
                     y=robot_array[highlight_idx, :, dim],
@@ -194,7 +195,10 @@ def create_robot_array_plot(
                     showlegend=dim == 0,  # Only show legend for first dimension
                 ),
             )
-    fig.add_traces(traces, rows=dim + 1, cols=1)
+
+        # Add traces for this dimension to its subplot
+        fig.add_traces(dim_traces, rows=dim + 1, cols=1)
+
     # Update layout
     fig.update_layout(
         height=250 * n_dims,  # Adjust height based on number of dimensions

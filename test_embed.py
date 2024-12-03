@@ -56,7 +56,7 @@ for key in ["task", "description"]:  # "video"!!!
         norm_means=None,
         norm_stds=None,
     )
-    for rollout in tqdm(rollouts, desc=f"Embedding {key}"):
+    for rollout in tqdm(rollouts, desc=f"Embedding '{key}'"):
         inp = (
             rollout.task.language_instruction
             if key == "description"
@@ -64,7 +64,7 @@ for key in ["task", "description"]:  # "video"!!!
         )
         embedding = EMBEDDER.embed(inp)
         index_manager.add_vector(name, embedding, str(rollout.id))
-
+index_manager.save()
 breakpoint()
 
 for rollout in rollouts:
