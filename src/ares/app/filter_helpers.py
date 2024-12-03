@@ -6,6 +6,8 @@ import streamlit as st
 from ares.app.data_analysis import infer_visualization_type
 from ares.clustering import visualize_clusters
 
+# TODO: use form filter button! https://discuss.streamlit.io/t/faq-how-to-prevent-app-reruns/63916
+
 
 def create_structured_data_filters(
     df: pd.DataFrame, max_options: int = 9
@@ -172,17 +174,23 @@ def create_embedding_data_filters(
 
 
 def embedding_data_filters_display(
-    value_filtered_df: pd.DataFrame,
+    df: pd.DataFrame,
+    reduced: np.ndarray,
+    labels: np.ndarray,
+    raw_data_key: str,
+    id_key: str = "id",
 ) -> tuple[pd.DataFrame, go.Figure, dict, bool]:
     st.subheader(f"Embedding Filters")
     with st.expander("Embedding Selection", expanded=False):
         cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
-            st.session_state["task_reduced"],  # for now, hardcode to task
-            st.session_state["task_labels"],
-            keep_mask=value_filtered_df.index.tolist(),  # TODO: change to ID
+            reduced,
+            labels,
+            raw_data=df[raw_data_key].tolist(),
+            ids=df[id_key].apply(str).tolist(),
+            keep_mask=df.index.tolist(),  # TODO: change to ID
         )
         selection_flag, indices, selection = create_embedding_data_filters(
-            value_filtered_df, cluster_fig, cluster_to_trace
+            df, cluster_fig, cluster_to_trace
         )
         st.write("**Selection Controls**")
         st.write("Double click to clear selection")
@@ -191,11 +199,9 @@ def embedding_data_filters_display(
             st.write(f"ex: {selection['points'][:5]}")
 
     n_pts = len(indices)
-    clusters = (
-        st.session_state["task_labels"][indices] if n_pts > 0 else []
-    )  # HACK: hardcode to task rn
+    clusters = labels[indices] if n_pts > 0 else []
     n_clusters = len(np.unique(clusters))
-    filtered_df = value_filtered_df.loc[indices]
+    filtered_df = df.loc[indices]
     return filtered_df, cluster_fig, selection, selection_flag
 
 

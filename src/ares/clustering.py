@@ -59,16 +59,38 @@ def cluster_embeddings(
 def visualize_clusters(
     reduced_embeddings: np.ndarray,
     cluster_labels: np.ndarray,
+    raw_data: list,
+    ids: Optional[list] = None,
     keep_mask: Optional[list] = None,
 ) -> Tuple[go.Figure, pd.DataFrame, dict[str, int]]:
     """
     Create an interactive 2D visualization of the clustered embeddings.
     Returns figure and dataframe for selection tracking.
+
+    Args:
+        reduced_embeddings: UMAP-reduced embeddings (2D)
+        cluster_labels: Cluster assignments for each embedding
+        raw_data: Original text/data for each point
+        ids: Optional list of IDs for each point
+        keep_mask: Optional mask to gray out some points
     """
-    # Create a color map
+    # Initialize trace counter and mapping at the start
+    current_trace = 0
+    trace_mapping = {}
+
     n_clusters = len(np.unique(cluster_labels))
-    # Use Set1 palette but ensure discrete colors
-    colors = px.colors.qualitative.Set1[:n_clusters]
+    colors = (
+        px.colors.qualitative.Set1
+        + px.colors.qualitative.Set2
+        + px.colors.qualitative.Set3
+        + px.colors.qualitative.Dark2
+    )
+
+    if n_clusters > len(colors):
+        print(
+            f"Warning: More clusters ({n_clusters}) than available colors ({len(colors)}). Colors will be reused."
+        )
+    colors = colors[:n_clusters]
 
     df = pd.DataFrame(
         {
@@ -76,55 +98,60 @@ def visualize_clusters(
             "y": reduced_embeddings[:, 1],
             "cluster": [str(x) if x != -1 else "Noise" for x in cluster_labels],
             "point_index": range(len(cluster_labels)),
+            "raw_data": [str(x)[:100] for x in raw_data],  # HACK
+            "id": ids if ids is not None else range(len(cluster_labels)),
+            "x_coord": reduced_embeddings[:, 0].round(3),
+            "y_coord": reduced_embeddings[:, 1].round(3),
+            "masked": False,
         }
     )
 
-    # If mask is provided, create two separate dataframes
+    # If mask is provided, update the masked column
     if keep_mask is not None:
         mask_array = np.zeros(len(df), dtype=bool)
         mask_array[keep_mask] = True
         df["masked"] = ~mask_array
 
-    # Initialize trace mapping at the start of visualization
-    trace_mapping = {}
-    current_trace = 0
-
-    # Create figure with masked points first (if mask exists)
+    # If mask is provided, create two separate dataframes
     if keep_mask is not None:
         # Plot masked (grayed out) points first
         masked_df = df[df["masked"]]
-        fig = px.scatter(
-            masked_df,
-            x="x",
-            y="y",
-            # title=title,
-            template="plotly_white",
-        )
+        fig = px.scatter(masked_df, x="x", y="y", template="plotly_white")
         fig.update_traces(
-            marker=dict(color="lightgray", size=3, opacity=0.3),
+            marker=dict(color="lightgray", size=5, opacity=0.3),
             showlegend=False,
             hoverinfo="skip",
             selectedpoints=None,
         )
-        trace_mapping["masked_points"] = current_trace
-        current_trace += 1
 
-        # Plot unmasked points on top, but track original indices
+        # Plot unmasked points
         unmasked_df = df[~df["masked"]].copy()
-        unmasked_df["original_index"] = unmasked_df.index  # Store original indices
+        unmasked_df["original_index"] = unmasked_df.index
         cluster_traces = px.scatter(
             unmasked_df,
             x="x",
             y="y",
             color="cluster",
             color_discrete_sequence=colors,
-            custom_data=["original_index"],  # Include original indices in hover data
+            custom_data=["original_index", "raw_data", "id", "point_index"],
+            hover_data={
+                "x": False,
+                "y": False,
+                "cluster": True,
+                "id": True,
+                "point_index": True,
+                "raw_data": True,
+            },
+            hover_name="cluster",
         ).data
+
+        # Update selection properties for each trace
+        for trace in cluster_traces:
+            trace.selected = dict(marker=dict(color="red", size=5))
+            trace.unselected = dict(marker=dict(opacity=0.3, size=5, color="lightgray"))
+            trace.marker.size = 5
+
         fig.add_traces(cluster_traces)
-        # Map each cluster trace
-        for cluster in sorted(unmasked_df["cluster"].unique()):
-            trace_mapping[f"cluster_{cluster}"] = current_trace
-            current_trace += 1
     else:
         # Original plotting logic for no mask
         fig = px.scatter(
@@ -134,20 +161,23 @@ def visualize_clusters(
             color="cluster",
             color_discrete_sequence=colors,
             template="plotly_white",
+            custom_data=["point_index", "raw_data", "id"],
+            hover_data={
+                "x": False,
+                "y": False,
+                "cluster": True,
+                "id": True,
+                "point_index": True,
+                "raw_data": True,
+            },
+            # hover_name="cluster",
         )
-        # Map each cluster trace
-        for cluster in sorted(df["cluster"].unique()):
-            trace_mapping[f"cluster_{cluster}"] = current_trace
-            current_trace += 1
 
-    # Update traces and layout
-    fig.update_traces(
-        marker_size=3,
-        selectedpoints=[],
-        mode="markers",
-        selected=dict(marker=dict(color="red")),
-        selector=dict(type="scatter"),
-    )
+        # Update selection properties for each trace
+        for trace in fig.data:
+            trace.selected = dict(marker=dict(color="red", size=5))
+            trace.unselected = dict(marker=dict(opacity=0.3, size=5, color="lightgray"))
+            trace.marker.size = 5
 
     fig.update_layout(
         xaxis_title="UMAP 1",
@@ -157,46 +187,70 @@ def visualize_clusters(
             tickmode="array",
             ticktext=[str(i) for i in sorted(df["cluster"].unique())],
             tickvals=list(range(len(df["cluster"].unique()))),
-            yanchor="top",
-            y=1,
-            x=1.2,
         ),
-        # Update selection behavior
         dragmode="select",
         clickmode="event+select",
-        selectionrevision=True,  # This helps persist selections
+        selectionrevision=True,
     )
 
     # Add centroids
     centroid_x = []
     centroid_y = []
-    centroid_colors = []
+    centroid_cluster = []
     centroid_names = []
+    centroid_count = []
+    total = len(cluster_labels)
 
-    for cluster in np.unique(cluster_labels):
-        # if cluster != -1:  # Skip noise points
+    cluster_to_count = dict(zip(*np.unique(cluster_labels, return_counts=True)))
+    for cluster, count in cluster_to_count.items():
         mask = cluster_labels == cluster
-        if mask.any():  # Only add centroid if cluster has points
+        if (
+            mask.any() and cluster != -1
+        ):  # Only add centroid if cluster has points and is not noise
             centroid = reduced_embeddings[mask].mean(axis=0)
             centroid_x.append(centroid[0])
             centroid_y.append(centroid[1])
-            centroid_colors.append(colors[cluster])
             centroid_names.append(f"Centroid {cluster}")
+            centroid_cluster.append(str(cluster))
+            centroid_count.append(count)
 
     if centroid_x:
         centroid_df = pd.DataFrame(
-            {"x": centroid_x, "y": centroid_y, "cluster": centroid_names}
+            {
+                "x": centroid_x,
+                "y": centroid_y,
+                "cluster": centroid_cluster,
+                "name": centroid_names,
+                "count": centroid_count,
+            }
         )
-        fig.add_traces(
-            px.scatter(
-                centroid_df,
-                x="x",
-                y="y",
-                color_discrete_sequence=["black"],
-                symbol_sequence=["triangle-up"],
-                size=[5] * len(centroid_df),
-            ).data
-        )
+        centroid_traces = px.scatter(
+            centroid_df,
+            x="x",
+            y="y",
+            hover_data={"name": True, "x": False, "y": False, "count": True},
+            color="cluster",
+            color_discrete_sequence=colors,
+            # symbol_sequence=["triangle-up"],
+            symbol_sequence=["circle"],
+            size=[x for x in centroid_count],
+        ).data
+
+        # Update centroid traces
+        for trace in centroid_traces:
+            cluster_num = trace.name
+            if cluster_num in df["cluster"].unique():
+                cluster_color = [
+                    t.marker.color for t in fig.data if t.name == cluster_num
+                ][0]
+                trace.marker.color = cluster_color
+                trace.marker.line = dict(color="black", width=2)
+                trace.showlegend = False
+                trace.opacity = 0.5
+                trace.selected = dict(marker=dict(color="red"))
+                trace.unselected = dict(marker=dict(opacity=0.15))
+
+        fig.add_traces(centroid_traces)
         trace_mapping["centroids"] = current_trace
 
     return fig, df, trace_mapping
