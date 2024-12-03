@@ -25,13 +25,10 @@ class BaseConfig(BaseModel):
 
 
 class Robot(BaseConfig):
-    # name: str --> "generic"
-    # sensor: str --> just single camera for now
     embodiment: str
     gripper: str
     morphology: str
     action_space: str
-    # TODO: make sure everything is recursive then add Sensor class
     rgb_cams: int
     depth_cams: int
     wrist_cams: int
@@ -46,8 +43,8 @@ class Environment(BaseConfig):
 class Task(BaseConfig):
     language_instruction: str
     language_instruction_type: str
-    success_criteria: str
-    success: float
+    success_criteria: str | None
+    success: float | None
 
     @model_validator(mode="after")
     def check_success(self) -> "Task":
@@ -94,6 +91,7 @@ class Rollout(BaseConfig):
     ingestion_time: datetime
     path: str
     dataset_name: str
+    # description: str | None
     length: int
     robot: Robot
     environment: Environment

@@ -78,72 +78,72 @@ if __name__ == "__main__":
     # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
-    rollouts: list[Rollout] = []
-    all_times = []
-    tic = time.time()
-    for i, ep in tqdm(enumerate(ds)):
-        episode = OpenXEmbodimentEpisode(**ep)
-        rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
-        rollouts.append(rollout)
-        # just track this
-        start_time = time.time()
-        add_rollout(engine, rollout, RolloutSQLModel)
-        all_times.append(time.time() - start_time)
+    # rollouts: list[Rollout] = []
+    # all_times = []
+    # tic = time.time()
+    # for i, ep in tqdm(enumerate(ds)):
+    #     episode = OpenXEmbodimentEpisode(**ep)
+    #     rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
+    #     rollouts.append(rollout)
+    #     # just track this
+    #     start_time = time.time()
+    #     add_rollout(engine, rollout, RolloutSQLModel)
+    #     all_times.append(time.time() - start_time)
 
-    print(f"Total rollouts: {len(rollouts)}")
-    print(f"Total time: {time.time() - tic}")
-    print(f"Mean time: {np.mean(all_times)}")
+    # print(f"Total rollouts: {len(rollouts)}")
+    # print(f"Total time: {time.time() - tic}")
+    # print(f"Mean time: {np.mean(all_times)}")
 
-    sess = Session(engine)
-    # get a df.head() basically
-    # Get first few rows from RolloutSQLModel table
-    first_rows = sess.query(RolloutSQLModel).limit(5).all()
-    last_rows = (
-        sess.query(RolloutSQLModel).order_by(RolloutSQLModel.id.desc()).limit(5).all()
-    )
-    rows = first_rows + last_rows
-    # breakpoint()
-    # row = rows[0]
-    # rollout = recreate_model(rows[0], Rollout)
-    breakpoint()
-    # Print sample rows
-    # for row in rows:
-    #     print(f"\nRollout {row.id}:")
-    #     print(f"Path: {row.path}")
-    #     print(f"Task Success: {row.task_success}")
-    #     print(f"Language Instruction: {row.task_language_instruction}")
-    #     breakpoint()
-
-    row_count = sess.execute(
-        select(func.count()).select_from(RolloutSQLModel)
-    ).scalar_one()
-    print(f"row count: {row_count}")
-    # res = (
-    #     sess.query(RolloutSQLModel)
-    #     .filter(RolloutSQLModel.task_success > 0.5)
-    #     .all()
+    # sess = Session(engine)
+    # # get a df.head() basically
+    # # Get first few rows from RolloutSQLModel table
+    # first_rows = sess.query(RolloutSQLModel).limit(5).all()
+    # last_rows = (
+    #     sess.query(RolloutSQLModel).order_by(RolloutSQLModel.id.desc()).limit(5).all()
     # )
-    # print(f"mean wins: {len(res) / row_count}")
-    res = sess.scalars(sess.query(RolloutSQLModel.task_language_instruction)).all()
-    res = sess.scalars(sess.query(RolloutSQLModel.trajectory_is_last)).all()
+    # rows = first_rows + last_rows
+    # # breakpoint()
+    # # row = rows[0]
+    # # rollout = recreate_model(rows[0], Rollout)
+    # breakpoint()
+    # # Print sample rows
+    # # for row in rows:
+    # #     print(f"\nRollout {row.id}:")
+    # #     print(f"Path: {row.path}")
+    # #     print(f"Task Success: {row.task_success}")
+    # #     print(f"Language Instruction: {row.task_language_instruction}")
+    # #     breakpoint()
 
-    # get unique dataset_name
-    res = sess.scalars(sess.query(RolloutSQLModel.dataset_name)).unique()
-    print(f"unique dataset_name: {list(res)}")
-    # comparison df
-    comparison_df = pd.read_sql(
-        select(
-            RolloutSQLModel.trajectory_is_last,
-            RolloutSQLModel.trajectory_is_terminal,
-        ),
-        engine,
-    )
+    # row_count = sess.execute(
+    #     select(func.count()).select_from(RolloutSQLModel)
+    # ).scalar_one()
+    # print(f"row count: {row_count}")
+    # # res = (
+    # #     sess.query(RolloutSQLModel)
+    # #     .filter(RolloutSQLModel.task_success > 0.5)
+    # #     .all()
+    # # )
+    # # print(f"mean wins: {len(res) / row_count}")
+    # res = sess.scalars(sess.query(RolloutSQLModel.task_language_instruction)).all()
+    # res = sess.scalars(sess.query(RolloutSQLModel.trajectory_is_last)).all()
 
-    # Print summary statistics
-    print(
-        (
-            comparison_df.trajectory_is_last == comparison_df.trajectory_is_terminal
-        ).mean()
-    )
+    # # get unique dataset_name
+    # res = sess.scalars(sess.query(RolloutSQLModel.dataset_name)).unique()
+    # print(f"unique dataset_name: {list(res)}")
+    # # comparison df
+    # comparison_df = pd.read_sql(
+    #     select(
+    #         RolloutSQLModel.trajectory_is_last,
+    #         RolloutSQLModel.trajectory_is_terminal,
+    #     ),
+    #     engine,
+    # )
+
+    # # Print summary statistics
+    # print(
+    #     (
+    #         comparison_df.trajectory_is_last == comparison_df.trajectory_is_terminal
+    #     ).mean()
+    # )
 
     breakpoint()

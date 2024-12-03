@@ -250,6 +250,25 @@ class IndexManager:
 
         return interpolated
 
+    def add_vector(self, name: str, vector: np.ndarray, entry_id: str) -> None:
+        """Add a vector directly to the index"""
+        if name not in self.indices:
+            feature_dim = vector.shape[0]
+            self.init_index(name, feature_dim=feature_dim, time_steps=1)
+
+        index = self.indices[name]
+        if vector.shape[0] != index.total_dim:
+            raise ValueError(
+                f"Vector dimension {vector.shape[0]} does not match index dimension {index.total_dim}"
+            )
+
+        try:
+            index.add_vector(vector, entry_id)
+        except Exception as e:
+            print(f"Error adding vector to index {name}: {e}; {traceback.format_exc()}")
+            breakpoint()
+        self.metadata[name]["n_entries"] += 1
+
     def add_matrix(self, name: str, matrix: np.ndarray, entry_id: str) -> None:
         """Add a matrix to the index, applying interpolation and normalization"""
         if name not in self.indices:
@@ -263,12 +282,7 @@ class IndexManager:
         interpolated = self._interpolate_matrix(matrix, index.time_steps)
         normalized = index.normalize_matrix(interpolated)
         vector = normalized.flatten()
-        try:
-            index.add_vector(vector, entry_id)
-        except Exception as e:
-            print(f"Error adding vector to index {name}: {e}; {traceback.format_exc()}")
-            breakpoint()
-        self.metadata[name]["n_entries"] += 1
+        self.add_vector(name, vector, entry_id)
 
     def load(self) -> None:
         """Load indices and metadata from disk"""

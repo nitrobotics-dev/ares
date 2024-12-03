@@ -13,6 +13,8 @@ imageio
 litellm
 opencv-python
 python-Levenshtein
+sentencepiece
+einops
 
 
 # datasets and utilities

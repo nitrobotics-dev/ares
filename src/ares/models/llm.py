@@ -3,11 +3,13 @@ import os
 import typing as t
 
 import numpy as np
+import torch
 import vertexai
 from jinja2 import Environment, FileSystemLoader
 from litellm import completion
 from litellm.utils import ModelResponse
 from PIL import Image
+from transformers import AutoModel, AutoProcessor
 from vertexai.generative_models import GenerativeModel, Part
 
 from ares.image_utils import encode_image
@@ -51,8 +53,10 @@ class LLM:
         return True
 
     def _get_prompt(self, prompt_filename: str, info: dict) -> str:
-        # Set up Jinja environment to load templates from src/ares directory
-        jinja_env = Environment(loader=FileSystemLoader(os.path.dirname(__file__)))
+        # Set up Jinja environment to load templates from src/ares/models/prompts directory
+        jinja_env = Environment(
+            loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), "prompts"))
+        )
         template = jinja_env.get_template(prompt_filename)
         # Render template with information
         return template.render(**info)
@@ -147,3 +151,62 @@ class GeminiVideoLLM(LLM):
             generation_config=self.generation_config,
         )
         return messages, responses
+
+
+class Embedder:
+    def __init__(self, provider: str, llm_name: str):
+        self.provider = provider
+        self.llm_name = llm_name
+        self._setup_model()
+
+    def _setup_model(self) -> None:
+        """Initialize model and processor. Should be implemented by child classes."""
+        name = f"{self.provider}/{self.llm_name}"
+        self.processor = AutoProcessor.from_pretrained(name)
+        self.model = AutoModel.from_pretrained(name)
+
+    def _process_image_input(
+        self, inp: t.Union[Image.Image, np.ndarray]
+    ) -> Image.Image:
+        """Convert various image input types to PIL Image."""
+        if isinstance(inp, np.ndarray):
+            return Image.fromarray(inp)
+        elif isinstance(inp, str):
+            return Image.open(inp)
+        return inp
+
+    def embed(self, inp: t.Union[str, Image.Image, np.ndarray]) -> np.ndarray:
+        """Embed text or image input."""
+        with torch.inference_mode():
+            if isinstance(inp, str):
+                # Text embedding
+                inputs = self.processor(text=[inp], padding=True, return_tensors="pt")
+                outputs = self.model.get_text_features(**inputs)
+                return outputs.detach().numpy()[0]
+            else:
+                # Image embedding
+                image = self._process_image_input(inp)
+                inputs = self.processor(images=image, return_tensors="pt")
+                outputs = self.model.get_image_features(**inputs)
+                return outputs.detach().numpy()[0]
+
+
+SigLIPEmbedder = Embedder(provider="google", llm_name="siglip-base-patch16-224")
+
+
+from sentence_transformers import SentenceTransformer
+
+
+class SentenceTransformerEmbedder:
+    def __init__(self, provider: str, llm_name: str):
+        self.model = SentenceTransformer(
+            f"{provider}/{llm_name}", trust_remote_code=True
+        )
+
+    def embed(self, inp: str, prefix: str = "clustering: ") -> np.ndarray:
+        return np.array(self.model.encode(prefix + inp))
+
+
+NOMIC_EMBEDDER = SentenceTransformerEmbedder(
+    provider="nomic-ai", llm_name="nomic-embed-text-v1"
+)

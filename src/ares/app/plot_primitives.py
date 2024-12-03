@@ -109,13 +109,21 @@ def create_robot_array_plot(
     if show_n is not None:
         indices = np.arange(robot_array.shape[0])
         sampled_indices = np.random.choice(
-            indices, min(show_n, len(indices)), replace=False
+            indices, min(show_n, len(indices), 1000), replace=False
         )
         if highlight_idx is not None:
             sampled_indices = np.unique(np.append(sampled_indices, highlight_idx))
         robot_array = robot_array[sampled_indices]
-        if scores is not None:
-            scores = scores[sampled_indices]
+
+    # limit number of timesteps to 100 per trace
+    if robot_array.shape[1] > 100:
+        step = robot_array.shape[1] // 100
+        robot_array = robot_array[:, ::step, :]
+
+    # limit scores to sampled indices
+    if scores is not None:
+        scores = scores[sampled_indices]
+        scores = scores[::step]
 
     # Create subplots - one for each dimension
     n_dims = robot_array.shape[2]
@@ -123,18 +131,19 @@ def create_robot_array_plot(
         rows=n_dims,
         cols=1,
         subplot_titles=[f"Dimension {i+1}" for i in range(n_dims)],
-        shared_xaxes=True,
-        vertical_spacing=0.02,
+        shared_xaxes=False,
+        vertical_spacing=0.05,
     )
     fig.update_layout(title=title_base, showlegend=True)
 
+    traces = []
     for dim in range(n_dims):
         if scores is not None:
             for i in range(len(robot_array)):
                 if highlight_idx is not None and i == highlight_idx:
                     continue
                 color = px.colors.sample_colorscale(colorscale, float(scores[i]))[0]
-                fig.add_trace(
+                traces.append(
                     go.Scatter(
                         x=list(range(robot_array.shape[1])),
                         y=robot_array[i, :, dim],
@@ -146,8 +155,6 @@ def create_robot_array_plot(
                         and dim == 0,  # Only show legend for first dimension
                         hovertemplate=f"Score: {scores[i]:.2f}<br>Value: %{{y}}<extra></extra>",
                     ),
-                    row=dim + 1,
-                    col=1,
                 )
         else:
             mask = np.ones(robot_array.shape[0], dtype=bool)
@@ -160,7 +167,7 @@ def create_robot_array_plot(
                 np.arange(robot_array.shape[0])[mask], robot_array.shape[1]
             )
 
-            fig.add_trace(
+            traces.append(
                 go.Scatter(
                     x=x,
                     y=y,
@@ -173,12 +180,10 @@ def create_robot_array_plot(
                     hovertemplate="Trajectory %{customdata}<br>Value: %{y}<extra></extra>",
                     customdata=traj_ids,
                 ),
-                row=dim + 1,
-                col=1,
             )
 
         if highlight_idx is not None and highlight_idx < robot_array.shape[0]:
-            fig.add_trace(
+            traces.append(
                 go.Scatter(
                     x=list(range(robot_array.shape[1])),
                     y=robot_array[highlight_idx, :, dim],
@@ -188,17 +193,15 @@ def create_robot_array_plot(
                     opacity=1.0,
                     showlegend=dim == 0,  # Only show legend for first dimension
                 ),
-                row=dim + 1,
-                col=1,
             )
-
+    fig.add_traces(traces, rows=dim + 1, cols=1)
     # Update layout
     fig.update_layout(
         height=250 * n_dims,  # Adjust height based on number of dimensions
         yaxis_title="Value",
         xaxis_title="Relative Timestep",
+        hovermode="closest",
     )
-
     return fig
 
 

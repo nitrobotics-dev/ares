@@ -77,8 +77,6 @@ def timer_context(section_name: str) -> Any:
 def load_data() -> pd.DataFrame:
     # Initialize mock data at the start of the app
     initialize_data(tmp_dump_dir)
-    print(f"Initialized state: {list(st.session_state.keys())}")
-
     # Initial dataframe
     df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
     df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
