@@ -46,8 +46,6 @@ tmp_dump_dir = "/workspaces/ares/data/tmp/"
 
 # Add at the top level
 section_times: dict[str, float] = defaultdict(float)
-index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, FaissIndex)
-all_vecs = index_manager.get_all_matrices()
 
 
 @contextmanager
@@ -177,7 +175,7 @@ def main() -> None:
     #     row = select_row_from_df_user(df)
     #     st.write(f"Selected row ID: {row.id}")
     #     hero_visualizations = show_hero_display(
-    #         df, row.name, all_vecs, show_n=100, index_manager=index_manager
+    #         df, row.name, st.session_state.all_vecs, show_n=100, index_manager=index_manager
     #     )
     # st.divider()
 
@@ -187,7 +185,7 @@ def main() -> None:
     #     # Number of trajectories to display in plots
     #     robot_array_visualizations = generate_robot_array_plot_visualizations(
     #         row,  # need row to select dataset/robot embodiment of trajectories
-    #         all_vecs,
+    #         st.session_state.all_vecs,
     #         show_n=1000,
     #     )
     # st.divider()

@@ -89,6 +89,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
         base_dir=TEST_EMBEDDING_DB_PATH, index_class=FaissIndex
     )
     st.session_state.INDEX_MANAGER = index_manager
+    st.session_state.all_vecs = index_manager.get_all_matrices()
 
     # Create tmp directory if it doesn't exist
     os.makedirs(tmp_dump_dir, exist_ok=True)

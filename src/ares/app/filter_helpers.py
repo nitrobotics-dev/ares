@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -127,35 +129,38 @@ def structured_data_filters_display(df: pd.DataFrame) -> pd.DataFrame:
 def handle_selection(
     value_filtered_df: pd.DataFrame,
     selection: dict,
-    cluster_to_trace: dict,
+    cluster_to_trace: dict[str, int],
     fig: go.Figure,
+    custom_data_keys: list[str],
 ) -> tuple[bool, list[int], dict]:
     # determine if selection was made OR if just no points selected
-    selection_flag = any(
+    if selection_flag := any(
         len(selection.get(k, [])) > 0 for k in ["box", "lasso", "points"]
-    )
-    if selection_flag:
+    ):
         # selection made!
-        indices = []
-        valid_traces = [v for k, v in cluster_to_trace.items() if "cluster" in k]
+        selected_ids = []
+        valid_traces = [
+            v for k, v in cluster_to_trace.items() if "centroid" not in k.lower()
+        ]
+        id_idx = custom_data_keys.index("id")
         for point in selection["points"]:
             if point["curve_number"] in valid_traces:
-                # Get the point's position within its trace
                 point_number = point["point_number"]
-                # Get the trace data
                 trace_data = fig.data[point["curve_number"]]
-                # Get the original index from custom_data
-                original_idx = trace_data.customdata[point_number][0]
-                indices.append(original_idx)
+                original_idx = trace_data.customdata[point_number][id_idx]
+                selected_ids.append(original_idx)
 
     else:
         # no selection made, use all filtered points
-        indices = value_filtered_df.index.tolist()
-    return selection_flag, indices, selection
+        selected_ids = value_filtered_df.id.tolist()
+    return selection_flag, selected_ids, selection
 
 
 def create_embedding_data_filters(
-    value_filtered_df: pd.DataFrame, fig: go.Figure, cluster_to_trace: dict
+    value_filtered_df: pd.DataFrame,
+    fig: go.Figure,
+    cluster_to_trace: dict[str, int],
+    custom_data_keys: list[str],
 ) -> tuple[bool, list[int], dict]:
     # Display the plot and capture selected points from the event data
     event = st.plotly_chart(
@@ -167,10 +172,10 @@ def create_embedding_data_filters(
     )
     selection = getattr(event, "selection", dict())
     # handle finding the indices of the selected points
-    selection_flag, indices, selection = handle_selection(
-        value_filtered_df, selection, cluster_to_trace, fig
+    selection_flag, selected_ids, selection = handle_selection(
+        value_filtered_df, selection, cluster_to_trace, fig, custom_data_keys
     )
-    return selection_flag, indices, selection
+    return selection_flag, selected_ids, selection
 
 
 def embedding_data_filters_display(
@@ -181,27 +186,39 @@ def embedding_data_filters_display(
     id_key: str = "id",
 ) -> tuple[pd.DataFrame, go.Figure, dict, bool]:
     st.subheader(f"Embedding Filters")
+    custom_data_keys = ["raw_data", "id"]
     with st.expander("Embedding Selection", expanded=False):
         cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
             reduced,
             labels,
             raw_data=df[raw_data_key].tolist(),
             ids=df[id_key].apply(str).tolist(),
+            custom_data_keys=custom_data_keys,
             keep_mask=df.index.tolist(),  # TODO: change to ID
         )
-        selection_flag, indices, selection = create_embedding_data_filters(
-            df, cluster_fig, cluster_to_trace
+        selection_flag, selected_ids, selection = create_embedding_data_filters(
+            df, cluster_fig, cluster_to_trace, custom_data_keys
         )
         st.write("**Selection Controls**")
         st.write("Double click to clear selection")
-        if st.button("Summarize Selection (todo)"):
-            st.write(f"selected {len(selection['points'])} points")
-            st.write(f"ex: {selection['points'][:5]}")
+        if st.button("Summarize Selection"):
+            raw_data_idx = custom_data_keys.index("raw_data")
+            cluster_to_data = defaultdict(list)
+            for p in selection["points"]:
+                if p["curve_number"] not in cluster_to_trace.get("centroids", []):
+                    cluster_to_data[p["curve_number"]].append(
+                        p["customdata"][raw_data_idx]
+                    )
+            st.write(
+                f"selected {sum(len(v) for v in cluster_to_data.values())} points in {len(cluster_to_data)} clusters"
+            )
+            st.write(f"send to llm:")
+            for k, v in cluster_to_data.items():
+                st.write(
+                    f"Cluster {k} ex: {np.random.choice(v, min(5, len(v)), replace=False)}"
+                )
 
-    n_pts = len(indices)
-    clusters = labels[indices] if n_pts > 0 else []
-    n_clusters = len(np.unique(clusters))
-    filtered_df = df.loc[indices]
+    filtered_df = df[df.id.astype(str).isin(map(str, selected_ids))]
     return filtered_df, cluster_fig, selection, selection_flag
 
 

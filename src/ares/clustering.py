@@ -61,8 +61,9 @@ def visualize_clusters(
     cluster_labels: np.ndarray,
     raw_data: list,
     ids: Optional[list] = None,
+    custom_data_keys: Optional[list] = None,
     keep_mask: Optional[list] = None,
-) -> Tuple[go.Figure, pd.DataFrame, dict[str, int]]:
+) -> Tuple[go.Figure, pd.DataFrame, dict[str, int | list[int]]]:
     """
     Create an interactive 2D visualization of the clustered embeddings.
     Returns figure and dataframe for selection tracking.
@@ -76,7 +77,8 @@ def visualize_clusters(
     """
     # Initialize trace counter and mapping at the start
     current_trace = 0
-    trace_mapping = {}
+    trace_mapping: dict[str, int | list[int]] = {}
+    custom_data_keys = custom_data_keys or ["raw_data", "id"]
 
     n_clusters = len(np.unique(cluster_labels))
     colors = (
@@ -123,6 +125,7 @@ def visualize_clusters(
             hoverinfo="skip",
             selectedpoints=None,
         )
+        current_trace += 1  # Increment for masked points trace
 
         # Plot unmasked points
         unmasked_df = df[~df["masked"]].copy()
@@ -133,7 +136,7 @@ def visualize_clusters(
             y="y",
             color="cluster",
             color_discrete_sequence=colors,
-            custom_data=["original_index", "raw_data", "id", "point_index"],
+            custom_data=custom_data_keys,
             hover_data={
                 "x": False,
                 "y": False,
@@ -142,14 +145,17 @@ def visualize_clusters(
                 "point_index": True,
                 "raw_data": True,
             },
-            hover_name="cluster",
+            # hover_name="cluster",
         ).data
 
-        # Update selection properties for each trace
+        # Update selection properties and track traces
         for trace in cluster_traces:
             trace.selected = dict(marker=dict(color="red", size=5))
             trace.unselected = dict(marker=dict(opacity=0.3, size=5, color="lightgray"))
             trace.marker.size = 5
+            # Map cluster name to trace index
+            trace_mapping[trace.name] = current_trace
+            current_trace += 1
 
         fig.add_traces(cluster_traces)
     else:
@@ -161,7 +167,7 @@ def visualize_clusters(
             color="cluster",
             color_discrete_sequence=colors,
             template="plotly_white",
-            custom_data=["point_index", "raw_data", "id"],
+            custom_data=custom_data,
             hover_data={
                 "x": False,
                 "y": False,
@@ -173,11 +179,14 @@ def visualize_clusters(
             # hover_name="cluster",
         )
 
-        # Update selection properties for each trace
+        # Update selection properties and track traces
         for trace in fig.data:
             trace.selected = dict(marker=dict(color="red", size=5))
             trace.unselected = dict(marker=dict(opacity=0.3, size=5, color="lightgray"))
             trace.marker.size = 5
+            # Map cluster name to trace index
+            trace_mapping[trace.name] = current_trace
+            current_trace += 1
 
     fig.update_layout(
         xaxis_title="UMAP 1",
@@ -237,6 +246,7 @@ def visualize_clusters(
         ).data
 
         # Update centroid traces
+        centroid_trace_indices = []  # Create list to store centroid trace indices
         for trace in centroid_traces:
             cluster_num = trace.name
             if cluster_num in df["cluster"].unique():
@@ -249,8 +259,10 @@ def visualize_clusters(
                 trace.opacity = 0.5
                 trace.selected = dict(marker=dict(color="red"))
                 trace.unselected = dict(marker=dict(opacity=0.15))
+                centroid_trace_indices.append(current_trace)  # Store the trace index
+                current_trace += 1
 
         fig.add_traces(centroid_traces)
-        trace_mapping["centroids"] = current_trace
+        trace_mapping["centroids"] = centroid_trace_indices  # Store list of indices
 
     return fig, df, trace_mapping
