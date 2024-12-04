@@ -261,12 +261,12 @@ def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
 
     # Option 2: Select by ID
     with col2:
-        id_options = df.id.unique().tolist()
-        selected_id = int(
+        id_options = df.id.apply(str).tolist()
+        selected_id = str(
             st.selectbox("Select by ID", options=id_options, key="id_select")
         )
         if st.button("Select by ID"):
-            row = df[df.id == selected_id].iloc[0]
+            row = df[df.id.apply(str) == selected_id].iloc[0]
 
     # Option 3: Select by Path
     with col3:

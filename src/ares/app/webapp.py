@@ -120,7 +120,6 @@ def main() -> None:
                 keep_mask=kept_ids,
             )
         )
-        # breakpoint()
 
         if filtered_df.empty:
             st.warning(
@@ -135,53 +134,53 @@ def main() -> None:
         show_dataframe(
             filtered_df.sample(min(5, len(filtered_df))), title="Data Sample"
         )
-    # st.divider()
+    st.divider()
 
-    # section_display = "data distributions"
-    # with filter_error_context(section_display), timer_context(section_display):
-    #     # Create overview of all data
-    #     st.header("Distribution Analytics")
-    #     general_visualizations = generate_automatic_visualizations(
-    #         filtered_df, time_column="ingestion_time"
-    #     )
-    #     create_tabbed_visualizations(
-    #         general_visualizations, [viz["title"] for viz in general_visualizations]
-    #     )
+    section_display = "data distributions"
+    with filter_error_context(section_display), timer_context(section_display):
+        # Create overview of all data
+        st.header("Distribution Analytics")
+        general_visualizations = generate_automatic_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            general_visualizations, [viz["title"] for viz in general_visualizations]
+        )
 
-    #     st.header("Success Rate Analytics")
-    #     success_visualizations = generate_success_rate_visualizations(filtered_df)
-    #     create_tabbed_visualizations(
-    #         success_visualizations, [viz["title"] for viz in success_visualizations]
-    #     )
+        st.header("Success Rate Analytics")
+        success_visualizations = generate_success_rate_visualizations(filtered_df)
+        create_tabbed_visualizations(
+            success_visualizations, [viz["title"] for viz in success_visualizations]
+        )
 
-    #     st.header("Time Series Trends")
-    #     time_series_visualizations = generate_time_series_visualizations(
-    #         filtered_df, time_column="ingestion_time"
-    #     )
-    #     create_tabbed_visualizations(
-    #         time_series_visualizations,
-    #         [viz["title"] for viz in time_series_visualizations],
-    #     )
+        st.header("Time Series Trends")
+        time_series_visualizations = generate_time_series_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            time_series_visualizations,
+            [viz["title"] for viz in time_series_visualizations],
+        )
 
-    #     # show video cards of first 5 rows in a horizontal layout
-    #     display_video_grid(filtered_df)
-    # st.divider()
+        # show video cards of first 5 rows in a horizontal layout
+        display_video_grid(filtered_df)
+    st.divider()
 
-    # section_plot_hero = "plot hero display"
-    # with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
-    #     st.header("Rollout Display")
+    section_plot_hero = "plot hero display"
+    with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
+        st.header("Rollout Display")
 
-    #     # Let user select a row from the dataframe using helper function
-    #     row = select_row_from_df_user(df)
-    #     st.write(f"Selected row ID: {row.id}")
-    #     hero_visualizations = show_hero_display(
-    #         df,
-    #         row.name,
-    #         st.session_state.all_vecs,
-    #         show_n=100,
-    #         index_manager=st.session_state.INDEX_MANAGER,
-    #     )
-    # st.divider()
+        # Let user select a row from the dataframe using helper function
+        row = select_row_from_df_user(df)
+        st.write(f"Selected row ID: {row.id}")
+        hero_visualizations = show_hero_display(
+            df,
+            row.name,
+            st.session_state.all_vecs,
+            show_n=100,
+            index_manager=st.session_state.INDEX_MANAGER,
+        )
+    st.divider()
 
     # section_plot_robots = "plot robot arrays"
     # with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
@@ -208,12 +207,12 @@ def main() -> None:
     #     ]
     #     export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
 
-    # # Print timing report at the end
-    # print("\n=== Timing Report ===")
-    # print(f"Total time: {sum(section_times.values()):.2f} seconds")
-    # for section, elapsed_time in section_times.items():
-    #     print(f"{section}: {elapsed_time:.2f} seconds")
-    # print("==================\n")
+    # Print timing report at the end
+    print("\n=== Timing Report ===")
+    print(f"Total time: {sum(section_times.values()):.2f} seconds")
+    for section, elapsed_time in section_times.items():
+        print(f"{section}: {elapsed_time:.2f} seconds")
+    print("==================\n")
 
 
 if __name__ == "__main__":
