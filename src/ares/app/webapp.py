@@ -99,10 +99,10 @@ def main() -> None:
         # Structured data filters
         st.header(f"Data Filters")
         value_filtered_df = structured_data_filters_display(df)
+        kept_ids = value_filtered_df["id"].apply(str).tolist()
         st.write(
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
-        breakpoint()
 
         # Embedding data filters
         state_key = "description"
@@ -112,21 +112,15 @@ def main() -> None:
         # TODO: present SEVERAL embedding filter options
         filtered_df, cluster_fig, selection, selection_flag = (
             embedding_data_filters_display(
-                df=value_filtered_df,
+                df=df,
                 reduced=st.session_state[f"{state_key}_reduced"],
                 labels=st.session_state[f"{state_key}_labels"],
                 raw_data_key=raw_data_key,
                 id_key="id",
+                keep_mask=kept_ids,
             )
         )
-        st.write(
-            f"Selection found! Using '{'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'}' as bounds"
-            if selection_flag
-            else "No selection found, using all points"
-        )
-        st.write(
-            f"Selected {len(filtered_df)} rows out of {len(value_filtered_df)} available via embedding filters"
-        )
+        # breakpoint()
 
         if filtered_df.empty:
             st.warning(

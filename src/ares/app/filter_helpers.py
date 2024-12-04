@@ -183,9 +183,12 @@ def embedding_data_filters_display(
     labels: np.ndarray,
     raw_data_key: str,
     id_key: str = "id",
+    keep_mask: list[str] | None = None,
 ) -> tuple[pd.DataFrame, go.Figure, dict, bool]:
     st.subheader(f"Embedding Filters")
     custom_data_keys = ["raw_data", "id"]
+    if keep_mask is None:
+        keep_mask = df[id_key].apply(str).tolist()
     with st.expander("Embedding Selection", expanded=False):
         cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
             reduced,
@@ -193,11 +196,15 @@ def embedding_data_filters_display(
             raw_data=df[raw_data_key].tolist(),
             ids=df[id_key].apply(str).tolist(),
             custom_data_keys=custom_data_keys,
-            keep_mask=df.index.tolist(),  # TODO: change to ID
+            keep_mask=keep_mask,
         )
         selection_flag, selected_ids, selection = create_embedding_data_filters(
             df, cluster_fig, cluster_to_trace, custom_data_keys
         )
+
+        # need to only include IDs in selection that are in KEPT
+        selected_ids = [x for x in selected_ids if str(x) in keep_mask]
+
         st.write("**Selection Controls**")
         st.write("Double click to clear selection")
         if st.button("Summarize Selection"):
@@ -220,6 +227,15 @@ def embedding_data_filters_display(
                 )
 
     filtered_df = df[df.id.astype(str).isin(map(str, selected_ids))]
+
+    st.write(
+        f"Selection found! Using '{'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'}' as bounds"
+        if selection_flag
+        else "No selection found, using all points"
+    )
+    st.write(
+        f"Selected {len(filtered_df)} rows out of {len(keep_mask)} available via embedding filters"
+    )
     return filtered_df, cluster_fig, selection, selection_flag
 
 

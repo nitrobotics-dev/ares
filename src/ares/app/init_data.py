@@ -89,7 +89,13 @@ def initialize_data(tmp_dump_dir: str) -> None:
         base_dir=TEST_EMBEDDING_DB_PATH, index_class=FaissIndex
     )
     st.session_state.INDEX_MANAGER = index_manager
-    st.session_state.all_vecs = index_manager.get_all_matrices()
+
+    # Get all vectors and their IDs
+    all_data = index_manager.get_all_matrices()
+    st.session_state.all_vecs = {
+        name: data["arrays"] for name, data in all_data.items()
+    }
+    st.session_state.all_ids = {name: data["ids"] for name, data in all_data.items()}
 
     # Create tmp directory if it doesn't exist
     os.makedirs(tmp_dump_dir, exist_ok=True)
@@ -97,6 +103,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
     # Process each index type
     for index_name in ["task", "description"]:
         stored_embeddings = index_manager.indices[index_name].get_all_vectors()
+        stored_ids = index_manager.indices[index_name].get_all_ids()  # Get IDs
 
         # Try loading from cache first
         cached_data = load_cached_embeddings(

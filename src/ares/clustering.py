@@ -57,7 +57,7 @@ def visualize_clusters(
     raw_data: list,
     ids: Optional[list] = None,
     custom_data_keys: Optional[list] = None,
-    keep_mask: Optional[list] = None,
+    keep_mask: Optional[list[str]] = None,
 ) -> Tuple[go.Figure, pd.DataFrame, dict[str, int | list[int]]]:
     """
     Create an interactive 2D visualization of the clustered embeddings.
@@ -106,7 +106,8 @@ def visualize_clusters(
     # If mask is provided, update the masked column
     if keep_mask is not None:
         mask_array = np.zeros(len(df), dtype=bool)
-        mask_array[keep_mask] = True
+        # Convert IDs to boolean mask
+        mask_array = df["id"].isin(keep_mask)
         df["masked"] = ~mask_array
 
     # If mask is provided, create two separate dataframes
@@ -244,9 +245,13 @@ def visualize_clusters(
         for trace in centroid_traces:
             cluster_num = trace.name
             if cluster_num in df["cluster"].unique():
-                cluster_color = [
+
+                cluster_color_pts = [
                     t.marker.color for t in fig.data if t.name == cluster_num
-                ][0]
+                ]
+                if not cluster_color_pts:
+                    continue
+                cluster_color = cluster_color_pts[0]
                 trace.marker.color = cluster_color
                 trace.marker.line = dict(color="black", width=2)
                 trace.showlegend = False

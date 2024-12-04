@@ -100,6 +100,11 @@ class Index(ABC):
         """Get all vectors in the index"""
         pass
 
+    @abstractmethod
+    def get_all_ids(self) -> List[str]:
+        """Get all string IDs in the index, in the same order as get_all_vectors()"""
+        pass
+
     def set_normalization(self, means: np.ndarray, stds: np.ndarray) -> None:
         """Set normalization constants for each channel"""
         if means.shape[0] != self.feature_dim or stds.shape[0] != self.feature_dim:
@@ -121,7 +126,6 @@ class Index(ABC):
         """Reverse normalization if constants are set"""
         if self.norm_means is None or self.norm_stds is None:
             return matrix
-
         # Broadcasting will automatically align the dimensions
         return (matrix * self.norm_stds) + self.norm_means
 
@@ -154,6 +158,10 @@ class FaissIndex(Index):
             ]
         )
         return distances, string_ids, vectors
+
+    def get_all_ids(self) -> List[str]:
+        """Get all string IDs in the index, in the same order as get_all_vectors()"""
+        return [self.id_map[i] for i in range(self.index.ntotal)]
 
     def save(self, path: Path) -> None:
         faiss.write_index(self.index, str(path))
@@ -369,8 +377,17 @@ class IndexManager:
 
     def get_all_matrices(
         self, name: str | list[str] | None = None
-    ) -> Dict[str, np.ndarray | None]:
-        """Get all vectors the manager, reshaping them to matrices. Pass a name or list of names to get a single index's vectors."""
+    ) -> Dict[str, Dict[str, np.ndarray | List[str] | None]]:
+        """Get all vectors and their IDs from the manager, reshaping vectors to matrices.
+
+        Args:
+            name: Index name or list of names to retrieve. None for all indices.
+
+        Returns:
+            Dictionary mapping index names to dictionaries containing:
+            - 'matrices': (n_entries, time_steps, feature_dim) array or None if empty
+            - 'ids': list of string IDs or None if empty
+        """
         if isinstance(name, str):
             name = [name]
         elif name is None:
@@ -378,9 +395,14 @@ class IndexManager:
 
         return {
             n: (
-                index.get_all_vectors().reshape(-1, index.time_steps, index.feature_dim)
+                {
+                    "arrays": index.get_all_vectors().reshape(
+                        -1, index.time_steps, index.feature_dim
+                    ),
+                    "ids": index.get_all_ids(),
+                }
                 if index.n_entries > 0
-                else None
+                else {"arrays": None, "ids": None}
             )
             for n, index in self.indices.items()
             if n in name
