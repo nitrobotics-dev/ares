@@ -173,7 +173,7 @@ def export_options(
         cluster_fig: Optional plotly figure for cluster visualization
     """
     st.header("Export Options")
-    st.write(f"TODO: actual html exports of plots")
+    # st.write(f"TODO: actual html exports of plots")
     export_col1, export_col2, export_col3, _ = st.columns([1, 1, 1, 1])
 
     with export_col1:

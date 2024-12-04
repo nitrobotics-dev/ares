@@ -220,6 +220,7 @@ def show_hero_display(
         )
 
     # Row 3: n tabs covering most similar based on state, action, text
+    st.write(f"**Similarity Search**")
     st.write(f"Most similar examples to {row['id']}, based on:")
     tab_names = ["State", "Action", "Text"]
 

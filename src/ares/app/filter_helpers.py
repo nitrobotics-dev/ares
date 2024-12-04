@@ -9,8 +9,6 @@ from ares.app.data_analysis import infer_visualization_type
 from ares.clustering import visualize_clusters
 from ares.models.llm import summarize
 
-# TODO: use form filter button! https://discuss.streamlit.io/t/faq-how-to-prevent-app-reruns/63916
-
 
 def create_structured_data_filters(
     df: pd.DataFrame, max_options: int = 9
