@@ -129,6 +129,14 @@ class Index(ABC):
         # Broadcasting will automatically align the dimensions
         return (matrix * self.norm_stds) + self.norm_means
 
+    @abstractmethod
+    def get_vector_by_id(self, entry_id: str) -> Optional[np.ndarray]:
+        """Get a vector by its string ID
+        Returns:
+            - vector: The vector if found, None otherwise
+        """
+        pass
+
 
 class FaissIndex(Index):
     def __init__(self, feature_dim: int, time_steps: int):
@@ -201,6 +209,20 @@ class FaissIndex(Index):
     def get_all_vectors(self) -> np.ndarray:
         return np.vstack([self.index.reconstruct(i) for i in range(self.index.ntotal)])
 
+    def get_vector_by_id(self, entry_id: str) -> Optional[np.ndarray]:
+        """Get a vector by its string ID"""
+        # Find the internal ID corresponding to the string ID
+        internal_id = None
+        for idx, str_id in self.id_map.items():
+            if str_id == entry_id:
+                internal_id = idx
+                break
+
+        if internal_id is None:
+            return None
+
+        return self.index.reconstruct(internal_id)
+
 
 class IndexManager:
     def __init__(self, base_dir: str, index_class: Type[Index], max_backups: int = 1):
@@ -221,6 +243,7 @@ class IndexManager:
         time_steps: int,
         norm_means: Optional[np.ndarray] = None,
         norm_stds: Optional[np.ndarray] = None,
+        extra_metadata: Optional[dict] = None,
     ) -> None:
         """Initialize a new index with specified dimensions and optional normalization"""
         if name in self.indices:
@@ -236,6 +259,7 @@ class IndexManager:
             feature_dim=feature_dim,
             time_steps=time_steps,
             has_normalization=norm_means is not None,
+            **(extra_metadata or {}),
         )
 
     def _interpolate_matrix(
@@ -364,7 +388,6 @@ class IndexManager:
             matrix = v.reshape(index.time_steps, index.feature_dim)
             denormalized = index.denormalize_matrix(matrix)
             matrices.append(denormalized)
-
         return distances, np.array(ids), np.array(matrices)
 
     def set_normalization(self, name: str, means: np.ndarray, stds: np.ndarray) -> None:
@@ -407,3 +430,26 @@ class IndexManager:
             for n, index in self.indices.items()
             if n in name
         }
+
+    def get_matrix_by_id(self, name: str, entry_id: str) -> Optional[np.ndarray]:
+        """Get a matrix by its ID, handling denormalization
+
+        Args:
+            name: Index name
+            entry_id: String ID of the entry
+
+        Returns:
+            Matrix if found, None otherwise
+        """
+        if name not in self.indices:
+            raise ValueError(f"Index {name} does not exist")
+
+        index = self.indices[name]
+        vector = index.get_vector_by_id(entry_id)
+
+        if vector is None:
+            return None
+
+        # Reshape and denormalize
+        matrix = vector.reshape(index.time_steps, index.feature_dim)
+        return index.denormalize_matrix(matrix)

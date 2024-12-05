@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -125,6 +126,74 @@ def structured_data_filters_display(df: pd.DataFrame) -> pd.DataFrame:
     return value_filtered_df
 
 
+def _handle_selection(
+    df: pd.DataFrame, selected_value: str | int | None, selector_fn: Callable
+) -> pd.Series:
+    """Helper function to handle row selection with default fallback.
+
+    Args:
+        df: DataFrame to select from
+        selected_value: The selected value from the dropdown
+        selector_fn: Function that returns the row given the selected value
+    """
+    if selected_value == "Choose an option" or selected_value is None:
+        st.warning("No selection made, defaulting to first row")
+        return df.iloc[0]
+    return selector_fn(selected_value)
+
+
+def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
+    col1, col2, col3, col4 = st.columns(4)
+    row = None
+
+    # Option 1: Select by index
+    with col1:
+        idx_options = df.index.tolist()
+        idx: int | None = st.selectbox(
+            "Select by index",
+            options=["Choose an option"] + idx_options,
+            key="idx_select",
+        )
+        if st.button("Select by Index"):
+            row = _handle_selection(df, idx, lambda x: df.iloc[int(x)])
+
+    # Option 2: Select by ID
+    with col2:
+        id_options = df.id.apply(str).tolist()
+        selected_id = st.selectbox(
+            "Select by ID",
+            options=["Choose an option"] + id_options,
+            key="id_select",
+        )
+        if st.button("Select by ID"):
+            row = _handle_selection(
+                df, selected_id, lambda x: df[df.id.apply(str) == x].iloc[0]
+            )
+
+    # Option 3: Select by Path
+    with col3:
+        path_options = df.path.unique().tolist()
+        selected_path = st.selectbox(
+            "Select by Path",
+            options=["Choose an option"] + path_options,
+            key="path_select",
+        )
+        if st.button("Select by Path"):
+            row = _handle_selection(
+                df, selected_path, lambda x: df[df.path == x].iloc[0]
+            )
+
+    with col4:
+        if st.button("Select Random"):
+            row = df.sample(1).iloc[0]
+
+    if row is None:
+        st.warning("No row selected, defaulting to first row")
+        row = df.iloc[0]
+
+    return row
+
+
 def handle_selection(
     value_filtered_df: pd.DataFrame,
     selection: dict,
@@ -237,52 +306,3 @@ def embedding_data_filters_display(
         f"Selected {len(filtered_df)} rows out of {len(keep_mask)} available via embedding filters"
     )
     return filtered_df, cluster_fig, selection, selection_flag
-
-
-def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
-    # Create columns for row selection options
-    col1, col2, col3, col4 = st.columns(4)
-    row = None
-
-    # Option 1: Select by index
-    with col1:
-        idx_options = df.index.tolist()
-        idx: int | str = st.selectbox(
-            "Select by index",
-            options=["Choose an option"] + idx_options,
-            key="idx_select",
-        )
-        if st.button("Select by Index"):
-            if idx == "Choose an option":
-                st.warning("No index selected, defaulting to first row")
-                row = df.iloc[0]
-            else:
-                row = df.iloc[int(idx)]
-
-    # Option 2: Select by ID
-    with col2:
-        id_options = df.id.apply(str).tolist()
-        selected_id = str(
-            st.selectbox("Select by ID", options=id_options, key="id_select")
-        )
-        if st.button("Select by ID"):
-            row = df[df.id.apply(str) == selected_id].iloc[0]
-
-    # Option 3: Select by Path
-    with col3:
-        path_options = df.path.unique().tolist()
-        selected_path = st.selectbox(
-            "Select by Path", options=path_options, key="path_select"
-        )
-        if st.button("Select by Path"):
-            row = df[df.path == selected_path].iloc[0]
-
-    with col4:
-        if st.button("Select Random"):
-            row = df.sample(1).iloc[0]
-
-    if row is None:
-        st.warning("No row selected, defaulting to first row")
-        row = df.iloc[0]
-
-    return row

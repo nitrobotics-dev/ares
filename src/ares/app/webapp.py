@@ -94,77 +94,77 @@ def main() -> None:
         total_statistics(df)
         st.divider()
 
-    section_filters = "data filters"
-    with filter_error_context(section_filters), timer_context(section_filters):
-        # Structured data filters
-        st.header(f"Data Filters")
-        value_filtered_df = structured_data_filters_display(df)
-        kept_ids = value_filtered_df["id"].apply(str).tolist()
-        st.write(
-            f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
-        )
+    # section_filters = "data filters"
+    # with filter_error_context(section_filters), timer_context(section_filters):
+    #     # Structured data filters
+    #     st.header(f"Data Filters")
+    #     value_filtered_df = structured_data_filters_display(df)
+    #     kept_ids = value_filtered_df["id"].apply(str).tolist()
+    #     st.write(
+    #         f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
+    #     )
 
-        # Embedding data filters
-        state_key = "description"
-        raw_data_key = "task_language_instruction"
-        # state_key = "task"
-        # raw_data_key = "task_success_criteria"
-        # TODO: present SEVERAL embedding filter options
-        filtered_df, cluster_fig, selection, selection_flag = (
-            embedding_data_filters_display(
-                df=df,
-                reduced=st.session_state[f"{state_key}_reduced"],
-                labels=st.session_state[f"{state_key}_labels"],
-                raw_data_key=raw_data_key,
-                id_key="id",
-                keep_mask=kept_ids,
-            )
-        )
+    #     # Embedding data filters
+    #     state_key = "description"
+    #     raw_data_key = "task_language_instruction"
+    #     # state_key = "task"
+    #     # raw_data_key = "task_success_criteria"
+    #     # TODO: present SEVERAL embedding filter options
+    #     filtered_df, cluster_fig, selection, selection_flag = (
+    #         embedding_data_filters_display(
+    #             df=df,
+    #             reduced=st.session_state[f"{state_key}_reduced"],
+    #             labels=st.session_state[f"{state_key}_labels"],
+    #             raw_data_key=raw_data_key,
+    #             id_key="id",
+    #             keep_mask=kept_ids,
+    #         )
+    #     )
 
-        if filtered_df.empty:
-            st.warning(
-                "No data available for the selected points! Try adjusting your selection to receive analytics."
-            )
-            return
+    #     if filtered_df.empty:
+    #         st.warning(
+    #             "No data available for the selected points! Try adjusting your selection to receive analytics."
+    #         )
+    #         return
 
-        # Add a button to refresh the sample
-        st.button(
-            "Get New Random Sample"
-        )  # Button press triggers streamlit rerun, triggers new random sample
-        show_dataframe(
-            filtered_df.sample(min(5, len(filtered_df))), title="Data Sample"
-        )
-    st.divider()
+    #     # Add a button to refresh the sample
+    #     st.button(
+    #         "Get New Random Sample"
+    #     )  # Button press triggers streamlit rerun, triggers new random sample
+    #     show_dataframe(
+    #         filtered_df.sample(min(5, len(filtered_df))), title="Data Sample"
+    #     )
+    # st.divider()
 
-    section_display = "data distributions"
-    with filter_error_context(section_display), timer_context(section_display):
-        # Create overview of all data
-        st.header("Distribution Analytics")
-        general_visualizations = generate_automatic_visualizations(
-            filtered_df, time_column="ingestion_time"
-        )
-        create_tabbed_visualizations(
-            general_visualizations, [viz["title"] for viz in general_visualizations]
-        )
+    # section_display = "data distributions"
+    # with filter_error_context(section_display), timer_context(section_display):
+    #     # Create overview of all data
+    #     st.header("Distribution Analytics")
+    #     general_visualizations = generate_automatic_visualizations(
+    #         filtered_df, time_column="ingestion_time"
+    #     )
+    #     create_tabbed_visualizations(
+    #         general_visualizations, [viz["title"] for viz in general_visualizations]
+    #     )
 
-        st.header("Success Rate Analytics")
-        success_visualizations = generate_success_rate_visualizations(filtered_df)
-        create_tabbed_visualizations(
-            success_visualizations, [viz["title"] for viz in success_visualizations]
-        )
+    #     st.header("Success Rate Analytics")
+    #     success_visualizations = generate_success_rate_visualizations(filtered_df)
+    #     create_tabbed_visualizations(
+    #         success_visualizations, [viz["title"] for viz in success_visualizations]
+    #     )
 
-        st.header("Time Series Trends")
-        time_series_visualizations = generate_time_series_visualizations(
-            filtered_df, time_column="ingestion_time"
-        )
-        create_tabbed_visualizations(
-            time_series_visualizations,
-            [viz["title"] for viz in time_series_visualizations],
-        )
+    #     st.header("Time Series Trends")
+    #     time_series_visualizations = generate_time_series_visualizations(
+    #         filtered_df, time_column="ingestion_time"
+    #     )
+    #     create_tabbed_visualizations(
+    #         time_series_visualizations,
+    #         [viz["title"] for viz in time_series_visualizations],
+    #     )
 
-        # show video cards of first 5 rows in a horizontal layout
-        display_video_grid(filtered_df)
-    st.divider()
+    #     # show video cards of first 5 rows in a horizontal layout
+    #     display_video_grid(filtered_df)
+    # st.divider()
 
     section_plot_hero = "plot hero display"
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
@@ -172,6 +172,9 @@ def main() -> None:
 
         # Let user select a row from the dataframe using helper function
         row = select_row_from_df_user(df)
+
+        show_dataframe(pd.DataFrame([row]), title="Selected Row")
+
         st.write(f"Selected row ID: {row.id}")
         hero_visualizations = show_hero_display(
             df,
