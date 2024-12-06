@@ -22,6 +22,7 @@ from ares.databases.structured_database import (
     add_rollout,
     setup_database,
 )
+from ares.image_utils import ARES_DATASET_VIDEO_PATH, save_video
 from ares.models.extractor import RandomInformationExtractor
 
 
@@ -47,103 +48,117 @@ def get_df_from_db(
 if __name__ == "__main__":
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
-    # dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
-    # dataset_name = "cmu_play_fusion"
-    # dataset_name = "cmu_franka_exploration_dataset_converted_externally_to_rlds"
-    # # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
-    # dataset_name = "asu_table_top_converted_externally_to_rlds"
-    # dataset_name = "berkeley_fanuc_manipulation"
-    # dataset_name = "cmu_stretch"
+    for dataset_name in [
+        "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        # dataset_name = "cmu_play_fusion"
+        # "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+        # # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
+        # "asu_table_top_converted_externally_to_rlds",
+        # "berkeley_fanuc_manipulation",
+        # "cmu_stretch",
+    ]:
 
-    # ones that failed
-    # dataset_name = "jaco_play"
-    # dataset_name = "nyu_rot_dataset_converted_externally_to_rlds"
-    # dataset_name = "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
-    # dataset_name = "dlr_edan_shared_control_converted_externally_to_rlds"
-    # dataset_name = "imperialcollege_sawyer_wrist_cam"
-    # dataset_name = "tokyo_u_lsmo_converted_externally_to_rlds"
-    # dataset_name = "conq_hose_manipulation"
-    # dataset_name = "tidybot"
-    # dataset_name = "plex_robosuite"
+        # ones that failed
+        # dataset_name = "jaco_play"
+        # dataset_name = "nyu_rot_dataset_converted_externally_to_rlds"
+        # dataset_name = "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
+        # dataset_name = "dlr_edan_shared_control_converted_externally_to_rlds"
+        # dataset_name = "imperialcollege_sawyer_wrist_cam"
+        # dataset_name = "tokyo_u_lsmo_converted_externally_to_rlds"
+        # dataset_name = "conq_hose_manipulation"
+        # dataset_name = "tidybot"
+        # dataset_name = "plex_robosuite"
 
-    data_dir = "/workspaces/ares/data"
+        # going to try oxe-downloader?
+        # oxe-download --dataset "name"
 
-    builder, dataset_dict = build_dataset(dataset_name, data_dir)
-    # dataset_info = builder.info
-    ds = dataset_dict["train"]
-    dataset_info = get_dataset_information(dataset_name)
+        data_dir = "/workspaces/ares/data"
 
-    random_extractor = RandomInformationExtractor()
+        builder, dataset_dict = build_dataset(dataset_name, data_dir)
+        # dataset_info = builder.info
+        ds = dataset_dict["train"]
+        dataset_info = get_dataset_information(dataset_name)
 
-    # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
-    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+        random_extractor = RandomInformationExtractor()
 
-    # rollouts: list[Rollout] = []
-    # all_times = []
-    # tic = time.time()
-    # for i, ep in tqdm(enumerate(ds)):
-    #     episode = OpenXEmbodimentEpisode(**ep)
-    #     rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
-    #     rollouts.append(rollout)
-    #     # just track this
-    #     start_time = time.time()
-    #     add_rollout(engine, rollout, RolloutSQLModel)
-    #     all_times.append(time.time() - start_time)
+        # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
+        # engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
-    # print(f"Total rollouts: {len(rollouts)}")
-    # print(f"Total time: {time.time() - tic}")
-    # print(f"Mean time: {np.mean(all_times)}")
+        # rollouts: list[Rollout] = []
+        # all_times = []
+        # tic = time.time()
+        for i, ep in tqdm(enumerate(ds)):
+            episode = OpenXEmbodimentEpisode(**ep)
+            video = [step.observation.image for step in episode.steps]
+            fname = os.path.splitext(episode.episode_metadata.file_path)[0]
+            # check if the file exists
+            if os.path.exists(
+                os.path.join(ARES_DATASET_VIDEO_PATH, dataset_name, fname + ".mp4")
+            ):
+                continue
+            out = save_video(video, dataset_name, fname)
 
-    # sess = Session(engine)
-    # # get a df.head() basically
-    # # Get first few rows from RolloutSQLModel table
-    # first_rows = sess.query(RolloutSQLModel).limit(5).all()
-    # last_rows = (
-    #     sess.query(RolloutSQLModel).order_by(RolloutSQLModel.id.desc()).limit(5).all()
-    # )
-    # rows = first_rows + last_rows
-    # # breakpoint()
-    # # row = rows[0]
-    # # rollout = recreate_model(rows[0], Rollout)
-    # breakpoint()
-    # # Print sample rows
-    # # for row in rows:
-    # #     print(f"\nRollout {row.id}:")
-    # #     print(f"Path: {row.path}")
-    # #     print(f"Task Success: {row.task_success}")
-    # #     print(f"Language Instruction: {row.task_language_instruction}")
-    # #     breakpoint()
+            # rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
+        #     rollouts.append(rollout)
+        #     # just track this
+        #     start_time = time.time()
+        #     add_rollout(engine, rollout, RolloutSQLModel)
+        #     all_times.append(time.time() - start_time)
 
-    # row_count = sess.execute(
-    #     select(func.count()).select_from(RolloutSQLModel)
-    # ).scalar_one()
-    # print(f"row count: {row_count}")
-    # # res = (
-    # #     sess.query(RolloutSQLModel)
-    # #     .filter(RolloutSQLModel.task_success > 0.5)
-    # #     .all()
-    # # )
-    # # print(f"mean wins: {len(res) / row_count}")
-    # res = sess.scalars(sess.query(RolloutSQLModel.task_language_instruction)).all()
-    # res = sess.scalars(sess.query(RolloutSQLModel.trajectory_is_last)).all()
+        # print(f"Total rollouts: {len(rollouts)}")
+        # print(f"Total time: {time.time() - tic}")
+        # print(f"Mean time: {np.mean(all_times)}")
 
-    # # get unique dataset_name
-    # res = sess.scalars(sess.query(RolloutSQLModel.dataset_name)).unique()
-    # print(f"unique dataset_name: {list(res)}")
-    # # comparison df
-    # comparison_df = pd.read_sql(
-    #     select(
-    #         RolloutSQLModel.trajectory_is_last,
-    #         RolloutSQLModel.trajectory_is_terminal,
-    #     ),
-    #     engine,
-    # )
+        # sess = Session(engine)
+        # # get a df.head() basically
+        # # Get first few rows from RolloutSQLModel table
+        # first_rows = sess.query(RolloutSQLModel).limit(5).all()
+        # last_rows = (
+        #     sess.query(RolloutSQLModel).order_by(RolloutSQLModel.id.desc()).limit(5).all()
+        # )
+        # rows = first_rows + last_rows
+        # # breakpoint()
+        # # row = rows[0]
+        # # rollout = recreate_model(rows[0], Rollout)
+        # breakpoint()
+        # # Print sample rows
+        # # for row in rows:
+        # #     print(f"\nRollout {row.id}:")
+        # #     print(f"Path: {row.path}")
+        # #     print(f"Task Success: {row.task_success}")
+        # #     print(f"Language Instruction: {row.task_language_instruction}")
+        # #     breakpoint()
 
-    # # Print summary statistics
-    # print(
-    #     (
-    #         comparison_df.trajectory_is_last == comparison_df.trajectory_is_terminal
-    #     ).mean()
-    # )
+        # row_count = sess.execute(
+        #     select(func.count()).select_from(RolloutSQLModel)
+        # ).scalar_one()
+        # print(f"row count: {row_count}")
+        # # res = (
+        # #     sess.query(RolloutSQLModel)
+        # #     .filter(RolloutSQLModel.task_success > 0.5)
+        # #     .all()
+        # # )
+        # # print(f"mean wins: {len(res) / row_count}")
+        # res = sess.scalars(sess.query(RolloutSQLModel.task_language_instruction)).all()
+        # res = sess.scalars(sess.query(RolloutSQLModel.trajectory_is_last)).all()
+
+        # # get unique dataset_name
+        # res = sess.scalars(sess.query(RolloutSQLModel.dataset_name)).unique()
+        # print(f"unique dataset_name: {list(res)}")
+        # # comparison df
+        # comparison_df = pd.read_sql(
+        #     select(
+        #         RolloutSQLModel.trajectory_is_last,
+        #         RolloutSQLModel.trajectory_is_terminal,
+        #     ),
+        #     engine,
+        # )
+
+        # # Print summary statistics
+        # print(
+        #     (
+        #         comparison_df.trajectory_is_last == comparison_df.trajectory_is_terminal
+        #     ).mean()
+        # )
 
     breakpoint()

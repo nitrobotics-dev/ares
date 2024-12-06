@@ -21,10 +21,9 @@ from ares.app.plot_primitives import (
     create_line_plot,
     create_robot_array_plot,
     display_video_card,
-    get_video,
 )
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
-from ares.task_utils import PI_DEMO_PATH  # hack
+from ares.image_utils import get_video_mp4
 
 
 def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
@@ -208,11 +207,14 @@ def show_hero_display(
         List of visualization figures to be included in export
     """
     row = df.iloc[idx]
-
     # video card
     col1, col2 = st.columns(2)
     with col1:
-        st.video(get_video(row["path"]))
+        dataset, fname = (
+            row["dataset_name"].lower().replace(" ", "_"),
+            os.path.splitext(row["path"])[0],
+        )
+        st.video(get_video_mp4(dataset, fname))
     with col2:
         with st.expander("Row Details", expanded=False):
             for col, val in row.items():
@@ -230,10 +232,10 @@ def show_hero_display(
     text_distance_fn = "Levenshtein"
     text_data_key = "task_language_instruction"
     tab_names = [
-        "State",
-        "Action",
         f"Text - {text_distance_fn}",
         f"Text - Embedding",
+        "State",
+        "Action",
     ]
 
     # Get the similarity data
@@ -265,10 +267,10 @@ def show_hero_display(
     )
 
     similarity_viz = [
-        state_viz_data,
-        action_viz_data,
         text_viz_data,
         text_embedding_viz_data,
+        state_viz_data,
+        action_viz_data,
     ]
 
     # Create the tabs with the data

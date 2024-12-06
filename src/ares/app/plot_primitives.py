@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from ares.task_utils import PI_DEMO_PATH
+from ares.image_utils import get_video_mp4
 
 
 def create_line_plot(
@@ -111,19 +111,22 @@ def create_robot_array_plot(
         sampled_indices = np.random.choice(
             indices, min(show_n, len(indices), 1000), replace=False
         )
+
         if highlight_idx is not None:
+            # have to include and adjust highlight_idx to match new sampled indices
             sampled_indices = np.unique(np.append(sampled_indices, highlight_idx))
+            highlight_idx = np.where(sampled_indices == highlight_idx)[0][0]
+
         robot_array = robot_array[sampled_indices]
+        if scores is not None:
+            scores = scores[sampled_indices]
 
     # limit number of timesteps to 100 per trace
     if robot_array.shape[1] > 100:
         step = robot_array.shape[1] // 100
         robot_array = robot_array[:, ::step, :]
-
-    # limit scores to sampled indices
-    if scores is not None:
-        scores = scores[sampled_indices]
-        scores = scores[::step]
+        if scores is not None:
+            scores = scores[::step]
 
     # Create subplots - one for each dimension
     n_dims = robot_array.shape[2]
@@ -209,31 +212,13 @@ def create_robot_array_plot(
     return fig
 
 
-def get_video(data: str) -> str | bytes | io.BytesIO | np.ndarray:
-    if not isinstance(data, (str, bytes, io.BytesIO, np.ndarray)):
-        raise ValueError(f"Invalid video data type: {type(data)}")
-
-    if isinstance(data, str):
-        # determine if remote or local
-        if data.startswith(
-            "http"
-        ):  # TODO: add more checks for remote data + local cache
-            return data
-        else:
-            # hack for now --> replace with PI demo vids
-            valid_files = [
-                f
-                for f in os.listdir(PI_DEMO_PATH)
-                if not f.startswith(".") and "ds_store" not in f.lower()
-            ]
-            return os.path.join(PI_DEMO_PATH, random.choice(valid_files))
-    else:
-        return data
-
-
 def display_video_card(row: pd.Series) -> None:
     if not pd.isna(row["path"]):
-        st.video(get_video(row["path"]))
+        dataset, fname = (
+            row["dataset_name"].lower().replace(" ", "_"),
+            os.path.splitext(row["path"])[0],
+        )
+        st.video(get_video_mp4(dataset, fname))
         st.write(f"**{row['id']}**")
         st.write(f"Task: {row['task_language_instruction']}")
         st.write(f"Upload Date: {row['ingestion_time'].strftime('%Y-%m-%d')}")
@@ -244,8 +229,8 @@ def display_video_card(row: pd.Series) -> None:
 def show_dataframe(
     df: pd.DataFrame,
     title: str,
-    show_columns: list[str] = None,
-    hide_columns: list[str] = None,
+    show_columns: list[str] | None = None,
+    hide_columns: list[str] | None = None,
 ) -> None:
     """Helper function to display DataFrames with consistent styling.
 

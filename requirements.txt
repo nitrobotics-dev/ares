@@ -20,6 +20,7 @@ einops
 # datasets and utilities
 datasets
 tensorflow-datasets==4.9.3
+moviepy==1.0.3
 
 # llm providers
 vertexai
