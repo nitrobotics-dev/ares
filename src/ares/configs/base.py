@@ -43,12 +43,12 @@ class Environment(BaseConfig):
 class Task(BaseConfig):
     language_instruction: str
     language_instruction_type: str
-    success_criteria: str | None
-    success: float | None
+    success_criteria: str | None = None
+    success: float | None = None
 
     @model_validator(mode="after")
     def check_success(self) -> "Task":
-        if not 0 <= self.success <= 1:
+        if self.success is not None and not 0 <= self.success <= 1:
             raise ValueError("Success must be between 0 and 1, inclusive")
         return self
 

@@ -94,15 +94,19 @@ def main() -> None:
         total_statistics(df)
         st.divider()
 
-    # section_filters = "data filters"
-    # with filter_error_context(section_filters), timer_context(section_filters):
-    #     # Structured data filters
-    #     st.header(f"Data Filters")
-    #     value_filtered_df = structured_data_filters_display(df)
-    #     kept_ids = value_filtered_df["id"].apply(str).tolist()
-    #     st.write(
-    #         f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
-    #     )
+    section_filters = "data filters"
+    with filter_error_context(section_filters), timer_context(section_filters):
+        # Structured data filters
+        st.header(f"Data Filters")
+        value_filtered_df = structured_data_filters_display(df)
+        kept_ids = value_filtered_df["id"].apply(str).tolist()
+        st.write(
+            f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
+        )
+        filtered_df = value_filtered_df
+        # print(kept_ids[:10])
+        if len(kept_ids) == 0:
+            breakpoint()
 
     #     # Embedding data filters
     #     state_key = "description"
@@ -136,16 +140,16 @@ def main() -> None:
     #     )
     # st.divider()
 
-    # section_display = "data distributions"
-    # with filter_error_context(section_display), timer_context(section_display):
-    #     # Create overview of all data
-    #     st.header("Distribution Analytics")
-    #     general_visualizations = generate_automatic_visualizations(
-    #         filtered_df, time_column="ingestion_time"
-    #     )
-    #     create_tabbed_visualizations(
-    #         general_visualizations, [viz["title"] for viz in general_visualizations]
-    #     )
+    section_display = "data distributions"
+    with filter_error_context(section_display), timer_context(section_display):
+        # Create overview of all data
+        st.header("Distribution Analytics")
+        general_visualizations = generate_automatic_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            general_visualizations, [viz["title"] for viz in general_visualizations]
+        )
 
     #     st.header("Success Rate Analytics")
     #     success_visualizations = generate_success_rate_visualizations(filtered_df)

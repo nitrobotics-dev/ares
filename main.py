@@ -1,5 +1,6 @@
 import os
 import time
+import traceback
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ from ares.configs.open_x_embodiment_configs import (
     get_dataset_information,
 )
 from ares.configs.pydantic_sql_helpers import recreate_model
+from ares.databases.embedding_database import IndexManager
 from ares.databases.structured_database import (
     SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
@@ -50,17 +52,15 @@ if __name__ == "__main__":
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
     for dataset_name in [
-        "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        # "ucsd_kitchen_dataset_converted_externally_to_rlds",
         # dataset_name = "cmu_play_fusion"
         # "cmu_franka_exploration_dataset_converted_externally_to_rlds",
         # # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
         # "asu_table_top_converted_externally_to_rlds",
         # "berkeley_fanuc_manipulation",
         # "cmu_stretch",
-    ]:
-
         # ones that failed
-        dataset_name = "jaco_play"
+        # "jaco_play",
         # dataset_name = "nyu_rot_dataset_converted_externally_to_rlds"
         # dataset_name = "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
         # dataset_name = "dlr_edan_shared_control_converted_externally_to_rlds"
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         # dataset_name = "conq_hose_manipulation"
         # dataset_name = "tidybot"
         # dataset_name = "plex_robosuite"
-
+    ]:
         # going to try oxe-downloader?
         # oxe-download --dataset "name"
 
@@ -83,38 +83,54 @@ if __name__ == "__main__":
         random_extractor = RandomInformationExtractor()
 
         # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
-        # engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+        engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+        # index_manager = IndexManager(TEST_ROBOT_DB_PATH)
+        # index_manager.init_index()
 
-        # rollouts: list[Rollout] = []
-        # all_times = []
-        # tic = time.time()
+        rollouts: list[Rollout] = []
+        all_times = []
+        tic = time.time()
         for i, ep in tqdm(enumerate(ds)):
-            steps = list(ep["steps"])
-            episode = OpenXEmbodimentEpisode(**ep)
-            if episode.episode_metadata is None:
-                # construct our own metadata
-                episode.episode_metadata = OpenXEmbodimentEpisodeMetadata(
-                    file_path=f"episode_{i}.npy",  # to mock extension
+            try:
+                steps = list(ep["steps"])
+                episode = OpenXEmbodimentEpisode(**ep)
+                breakpoint()
+                if episode.episode_metadata is None:
+                    # construct our own metadata
+                    episode.episode_metadata = OpenXEmbodimentEpisodeMetadata(
+                        file_path=f"episode_{i}.npy",  # to mock extension
+                    )
+
+                video = [step.observation.image for step in episode.steps]
+                fname = os.path.splitext(episode.episode_metadata.file_path)[0]
+                # check if the file exists
+                if os.path.exists(
+                    os.path.join(
+                        ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
+                    )
+                ):
+                    continue
+                out = save_video(video, dataset_name, fname)
+
+                rollout = random_extractor.extract(
+                    episode=episode, dataset_info=dataset_info
                 )
-            video = [step.observation.image for step in episode.steps]
-            fname = os.path.splitext(episode.episode_metadata.file_path)[0]
-            # check if the file exists
-            if os.path.exists(
-                os.path.join(ARES_DATASET_VIDEO_PATH, dataset_name, fname + ".mp4")
-            ):
-                continue
-            out = save_video(video, dataset_name, fname)
+                rollouts.append(rollout)
+                # just track this
+                start_time = time.time()
+                add_rollout(engine, rollout, RolloutSQLModel)
+                all_times.append(time.time() - start_time)
 
-            # rollout = random_extractor.extract(episode=episode, dataset_info=dataset_info)
-        #     rollouts.append(rollout)
-        #     # just track this
-        #     start_time = time.time()
-        #     add_rollout(engine, rollout, RolloutSQLModel)
-        #     all_times.append(time.time() - start_time)
+            except Exception as e:
+                print(f"Error processing episode {i}: {e}")
+                print(traceback.format_exc())
+                breakpoint()
 
-        # print(f"Total rollouts: {len(rollouts)}")
-        # print(f"Total time: {time.time() - tic}")
-        # print(f"Mean time: {np.mean(all_times)}")
+        print(f"Total rollouts: {len(rollouts)}")
+        print(f"Total time: {time.time() - tic}")
+        print(f"Mean time: {np.mean(all_times)}")
+
+        print(f"TODO: RUN EMBEDDINGS!!!")
 
         # sess = Session(engine)
         # # get a df.head() basically

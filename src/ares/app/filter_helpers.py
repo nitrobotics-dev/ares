@@ -18,6 +18,16 @@ def create_structured_data_filters(
     filtered_df = df.copy()
     skipped_cols = []
 
+    # Debug prints for initial state
+    print("Initial df shape:", df.shape)
+    print("Initial temp filters:", st.session_state.get("temp_filter_values", {}))
+    print("Initial active filters:", st.session_state.get("active_filter_values", {}))
+
+    # Add debug print to see actual values in the DataFrame
+    print("\nActual unique values in key columns:")
+    for col in ["robot_embodiment", "robot_rgb_cams"]:
+        print(f"{col} unique values:", filtered_df[col].unique())
+
     # Initialize temporary filter values if not exists
     if "temp_filter_values" not in st.session_state:
         st.session_state.temp_filter_values = {}
@@ -36,8 +46,25 @@ def create_structured_data_filters(
                 pd.api.types.is_numeric_dtype(df[col])
                 and viz_info["nunique"] > max_options
             ):
-                min_val = float(df[col].min())
-                max_val = float(df[col].max())
+                min_val = float(df[col].dropna().min())
+                max_val = float(df[col].dropna().max())
+
+                # Add checkbox for including None values
+                if f"{col}_include_none" not in st.session_state.temp_filter_values:
+                    st.session_state.temp_filter_values[f"{col}_include_none"] = (
+                        st.session_state.active_filter_values.get(
+                            f"{col}_include_none", True
+                        )
+                    )
+
+                include_none = st.checkbox(
+                    f"Include None values for {col}",
+                    value=st.session_state.temp_filter_values[f"{col}_include_none"],
+                    key=f"{col}_none_checkbox",
+                )
+                st.session_state.temp_filter_values[f"{col}_include_none"] = (
+                    include_none
+                )
 
                 # Initialize with current active values or defaults
                 if f"{col}_range" not in st.session_state.temp_filter_values:
@@ -56,18 +83,53 @@ def create_structured_data_filters(
                 )
                 st.session_state.temp_filter_values[f"{col}_range"] = values
 
+                # Debug prints for numeric filters
+                print(f"\nNumeric filter for {col}:")
+                print(
+                    f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_range')}"
+                )
+                print(
+                    f"Active value: {st.session_state.active_filter_values.get(f'{col}_range')}"
+                )
+                print(
+                    f"Include None - Temp: {st.session_state.temp_filter_values.get(f'{col}_include_none')}"
+                )
+                print(
+                    f"Include None - Active: {st.session_state.active_filter_values.get(f'{col}_include_none')}"
+                )
+
                 # Only apply active filters
                 active_values = st.session_state.active_filter_values.get(
                     f"{col}_range"
                 )
+                active_include_none = st.session_state.active_filter_values.get(
+                    f"{col}_include_none"
+                )
+
                 if active_values:
-                    filtered_df = filtered_df[
+                    old_shape = filtered_df.shape[0]
+                    mask = (
                         (filtered_df[col] >= active_values[0])
                         & (filtered_df[col] <= active_values[1])
-                    ]
+                    ) | (filtered_df[col].isna() if active_include_none else False)
+                    filtered_df = filtered_df[mask]
+                    print(
+                        f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
+                    )
 
             elif viz_info["viz_type"] == "bar":
-                options = sorted(df[col].unique().tolist())
+                # Add debug print before filtering
+                if col in ["robot_rgb_cams"]:
+                    print(f"\nDEBUG {col} before filtering:")
+                    print(f"Unique values in df: {filtered_df[col].unique()}")
+                    print(f"Type of values in df: {filtered_df[col].dtype}")
+
+                # Convert None to "(None)" for display, but keep other values as is
+                options = [
+                    str(x) if x is not None else "(None)" for x in df[col].unique()
+                ]
+                options = sorted(options)
+
                 # bad ux for > 9 options
                 if len(options) > max_options:
                     skipped_cols.append(col)
@@ -89,13 +151,56 @@ def create_structured_data_filters(
                 )
                 st.session_state.temp_filter_values[f"{col}_select"] = selected
 
+                # Debug prints for categorical filters
+                print(f"\nCategory filter for {col}:")
+                print(
+                    f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_select')}"
+                )
+                print(
+                    f"Active value: {st.session_state.active_filter_values.get(f'{col}_select')}"
+                )
+
                 # Only apply active filters
                 active_selected = st.session_state.active_filter_values.get(
                     f"{col}_select"
                 )
                 if active_selected:
-                    filtered_df = filtered_df[filtered_df[col].isin(active_selected)]
+                    old_shape = filtered_df.shape[0]
+                    # Convert values based on column type
+                    if pd.api.types.is_bool_dtype(df[col]):
+                        active_values = [
+                            x == "True" if x != "(None)" else None
+                            for x in active_selected
+                        ]
+                    elif pd.api.types.is_numeric_dtype(df[col]):
+                        active_values = [
+                            float(x) if x != "(None)" else None for x in active_selected
+                        ]
+                        # Convert to int if the original column was integer
+                        if pd.api.types.is_integer_dtype(df[col]):
+                            active_values = [
+                                int(x) if x is not None else None for x in active_values
+                            ]
+                    else:
+                        active_values = [
+                            (None if x == "(None)" else x) for x in active_selected
+                        ]
 
+                    # Debug prints for problematic filters
+                    print(f"\nFiltering {col}:")
+                    print(f"Column dtype: {df[col].dtype}")
+                    print(f"Active values: {active_values}")
+                    print(f"Types of active values: {[type(x) for x in active_values]}")
+
+                    filtered_df = filtered_df[filtered_df[col].isin(active_values)]
+                    print(
+                        f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
+                    )
+
+    print("\nFinal df shape:", filtered_df.shape)
+    # check if len(filtered_df) == 0
+    if len(filtered_df) == 0:
+        breakpoint()
     return filtered_df, skipped_cols
 
 

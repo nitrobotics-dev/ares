@@ -78,7 +78,7 @@ def save_video(
 
     # Save MP4 using moviepy
     clip = ImageSequenceClip(frames, fps=30)
-    clip.write_videofile(mp4_path, codec="libx264")
+    clip.write_videofile(mp4_path, codec="libx264", logger=None)
 
     # Save individual frames
     for i, frame in enumerate(frames):
