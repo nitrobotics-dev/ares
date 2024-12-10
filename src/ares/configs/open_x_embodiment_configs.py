@@ -60,18 +60,45 @@ class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
 
 class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
     action: np.ndarray
-    discount: float
+    discount: float | None = None
     is_first: bool
     is_last: bool
     is_terminal: bool
-    language_embedding: np.ndarray
-    language_instruction: str
+    language_embedding: np.ndarray | None = None
+    language_instruction: str | None = None
     observation: OpenXEmbodimentStepObservation
     reward: float
 
+    # TODO: hack to remap fields between datasets
+    @model_validator(mode="before")
+    @classmethod
+    def remap_fields(cls, data: dict) -> dict:
+        # Handle observation field remapping
+        if "observation" in data and isinstance(data["observation"], dict):
+            obs = data["observation"]
+
+            # Move natural_language_instruction if it exists in observation
+            if "natural_language_instruction" in obs:
+                data["language_instruction"] = obs.pop("natural_language_instruction")
+            if "natural_language_embedding" in obs:
+                data["language_embedding"] = obs.pop("natural_language_embedding")
+
+            # Add more field remapping here as needed
+            action = data["action"]
+            if isinstance(action, dict):
+                if "gripper_closedness_action" in action:  # jaco_play
+                    data["action"] = np.concatenate(
+                        [
+                            action["world_vector"],
+                            action["gripper_closedness_action"],
+                            action["terminate_episode"],
+                        ]
+                    )
+        return data
+
 
 class OpenXEmbodimentEpisode(TensorConverterMixin, BaseModel):
-    episode_metadata: OpenXEmbodimentEpisodeMetadata
+    episode_metadata: OpenXEmbodimentEpisodeMetadata | None = None
     steps: list[OpenXEmbodimentStep]
 
 

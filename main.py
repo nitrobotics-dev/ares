@@ -12,6 +12,7 @@ from tqdm import tqdm
 from ares.configs.base import Rollout
 from ares.configs.open_x_embodiment_configs import (
     OpenXEmbodimentEpisode,
+    OpenXEmbodimentEpisodeMetadata,
     get_dataset_information,
 )
 from ares.configs.pydantic_sql_helpers import recreate_model
@@ -59,12 +60,13 @@ if __name__ == "__main__":
     ]:
 
         # ones that failed
-        # dataset_name = "jaco_play"
+        dataset_name = "jaco_play"
         # dataset_name = "nyu_rot_dataset_converted_externally_to_rlds"
         # dataset_name = "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
         # dataset_name = "dlr_edan_shared_control_converted_externally_to_rlds"
         # dataset_name = "imperialcollege_sawyer_wrist_cam"
         # dataset_name = "tokyo_u_lsmo_converted_externally_to_rlds"
+        # ---> below not found by new oxe-downloader script
         # dataset_name = "conq_hose_manipulation"
         # dataset_name = "tidybot"
         # dataset_name = "plex_robosuite"
@@ -72,8 +74,7 @@ if __name__ == "__main__":
         # going to try oxe-downloader?
         # oxe-download --dataset "name"
 
-        data_dir = "/workspaces/ares/data"
-
+        data_dir = "/workspaces/ares/data/oxe/"
         builder, dataset_dict = build_dataset(dataset_name, data_dir)
         # dataset_info = builder.info
         ds = dataset_dict["train"]
@@ -88,7 +89,13 @@ if __name__ == "__main__":
         # all_times = []
         # tic = time.time()
         for i, ep in tqdm(enumerate(ds)):
+            steps = list(ep["steps"])
             episode = OpenXEmbodimentEpisode(**ep)
+            if episode.episode_metadata is None:
+                # construct our own metadata
+                episode.episode_metadata = OpenXEmbodimentEpisodeMetadata(
+                    file_path=f"episode_{i}.npy",  # to mock extension
+                )
             video = [step.observation.image for step in episode.steps]
             fname = os.path.splitext(episode.episode_metadata.file_path)[0]
             # check if the file exists
