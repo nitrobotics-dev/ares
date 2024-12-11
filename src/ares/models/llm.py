@@ -211,7 +211,10 @@ def get_nomic_embedder():
     )
 
 
-# gemini_15_flash = LLM(provider="gemini", llm_name="gemini-1.5-flash")
+def get_gemini_15_flash():
+    return LLM(provider="gemini", llm_name="gemini-1.5-flash")
+
+
 def get_4o_mini():
     return LLM(provider="openai", llm_name="gpt-4o-mini")
 

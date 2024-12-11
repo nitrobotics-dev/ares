@@ -218,6 +218,23 @@ class LLMInformationExtractor(InformationExtractor):
     def __init__(self, llm: LLM):
         self.llm = llm
 
+    def finish_llm_object(
+        self,
+        object: t.Type[BaseConfig],
+        hardcoded_info: dict,
+        structured_info: dict,
+        extra_kwargs: dict,
+    ) -> BaseConfig:
+        # Merge all sources of information for this object
+        merged_info = merge_several_dicts(
+            [
+                hardcoded_info.get(object.__name__.lower(), {}),
+                structured_info.get(object.__name__.lower(), {}),
+                extra_kwargs,
+            ]
+        )
+        return object(**merged_info)
+
     def extract(
         self,
         episode: OpenXEmbodimentEpisode,
@@ -228,16 +245,18 @@ class LLMInformationExtractor(InformationExtractor):
         task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         llm_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
+        # Initialize kwargs
         robot_kwargs = robot_kwargs or {}
         environment_kwargs = environment_kwargs or {}
         task_kwargs = task_kwargs or {}
         llm_kwargs = llm_kwargs or {}
-        dataset_info_dict = hard_coded_dataset_info_extraction(dataset_info)
+
+        # Get hardcoded information
+        dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
         episode_info_dict = hard_coded_episode_info_extraction(episode)
         hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
 
-        # with our hardcoded extraction
-        # we need to tell the LLM which fields NOT to extract
+        # Get LLM-extracted information
         images = [step.observation.image for step in episode.steps]
         info = {
             "task": episode.steps[0].language_instruction,
@@ -253,41 +272,25 @@ class LLMInformationExtractor(InformationExtractor):
             **llm_kwargs, images=images, info=info
         )
 
-        # get all the robot stuff
-        robot_info = merge_several_dicts(
-            [hardcoded_info["robot"], structured_info["robot"], robot_kwargs]
-        )
-        # get all the environment stuff
-        environment_info = merge_several_dicts(
-            [
-                hardcoded_info["environment"],
-                structured_info["environment"],
-                environment_kwargs,
-            ]
-        )
-        # get all the task stuff
-        task_info = merge_several_dicts(
-            [hardcoded_info["task"], structured_info["task"], task_kwargs]
-        )
-        # get all the trajectory stuff
-        trajectory_info = merge_several_dicts(
-            [hardcoded_info["trajectory"], structured_info["trajectory"]]
-        )
+        # Create component objects in a loop
+        components = {
+            "robot": (Robot, robot_kwargs),
+            "environment": (Environment, environment_kwargs),
+            "task": (Task, task_kwargs),
+            "trajectory": (Trajectory, {}),
+        }
 
-        # instantiate all the objects
-        robot = Robot(**robot_info)
-        environment = Environment(**environment_info)
-        task = Task(**task_info)
-        trajectory = Trajectory(**trajectory_info)
+        objects = {
+            name: self.finish_llm_object(cls, hardcoded_info, structured_info, kwargs)
+            for name, (cls, kwargs) in components.items()
+        }
 
+        # Create final rollout with all components
         return Rollout(
             creation_time=dataset_info_dict.get("creation_time", datetime.now()),
             ingestion_time=datetime.now(),
             path=episode_info_dict["path"],
             dataset_name=dataset_info_dict["dataset_name"],
             length=len(episode.steps),
-            robot=robot,
-            environment=environment,
-            task=task,
-            trajectory=trajectory,
+            **objects,
         )
