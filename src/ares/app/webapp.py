@@ -19,7 +19,7 @@ from ares.app.filter_helpers import (
     select_row_from_df_user,
     structured_data_filters_display,
 )
-from ares.app.init_data import initialize_data
+from ares.app.init_data import display_state_info, initialize_data
 from ares.app.plot_primitives import show_dataframe
 from ares.app.viz_helpers import (
     create_tabbed_visualizations,
@@ -91,6 +91,7 @@ def main() -> None:
         st.title(title)
         df = load_data()
 
+        display_state_info()
         total_statistics(df)
         st.divider()
 

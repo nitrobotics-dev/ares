@@ -18,6 +18,7 @@ from ares.configs.open_x_embodiment_configs import (
 )
 from ares.configs.pydantic_sql_helpers import recreate_model
 from ares.databases.embedding_database import (
+    TEST_EMBEDDING_DB_PATH,
     FaissIndex,
     IndexManager,
     rollout_to_embedding_pack,
@@ -59,7 +60,8 @@ if __name__ == "__main__":
 
     from ares.models.llm import NOMIC_EMBEDDER as EMBEDDER
 
-    index_manager = IndexManager(TEST_ROBOT_DB_PATH, index_class=FaissIndex)
+    index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
+
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
     for dataset_name in [
@@ -144,7 +146,16 @@ if __name__ == "__main__":
                     index_manager.add_vector(name, embedding, str(rollout.id))
 
                 embedding_pack = rollout_to_embedding_pack(rollout)
+
                 for index_name, matrix in embedding_pack.items():
+                    if index_name not in index_manager.indices.keys():
+                        index_manager.init_index(
+                            index_name,
+                            matrix.shape[1],
+                            TEST_TIME_STEPS,
+                            norm_means=None,
+                            norm_stds=None,
+                        )
                     if not (
                         matrix is None
                         or (isinstance(matrix, list) and all(x is None for x in matrix))
@@ -160,6 +171,9 @@ if __name__ == "__main__":
         print(f"Total rollouts: {len(rollouts)}")
         print(f"Total time: {time.time() - tic}")
         print(f"Mean time: {np.mean(all_times)}")
+
+        print(index_manager.metadata)
+        index_manager.save()
 
         # sess = Session(engine)
         # # get a df.head() basically

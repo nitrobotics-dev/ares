@@ -57,6 +57,21 @@ class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
             self.image = self.highres_image
         return self
 
+    @model_validator(mode="before")
+    def concat_state(cls, data: dict) -> dict:
+        if "state" not in data:
+            data["state"] = np.concatenate(
+                [
+                    data[k]
+                    for k in [
+                        "end_effector_cartesian_pos",
+                        "end_effector_cartesian_velocity",
+                        "joint_pos",
+                    ]
+                ]
+            )
+        return data
+
 
 class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
     action: np.ndarray

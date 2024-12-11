@@ -34,9 +34,7 @@ def load_cached_embeddings(
         len(loaded_embeddings) == len(stored_embeddings)
         and np.allclose(loaded_embeddings, stored_embeddings)
     ):
-        import pdb
-
-        pdb.set_trace()  # Break if cached data doesn't match
+        # this means we have new embeddings
         return None
 
     # Valid cached data found - load everything
@@ -118,3 +116,60 @@ def initialize_data(tmp_dump_dir: str) -> None:
 
         # Store in session state
         store_in_session(index_name, embeddings, reduced, labels)
+
+
+def display_state_info():
+    # all in a dropdown
+    with st.expander("Session State Data Overview"):
+        """Display information about data stored in streamlit session state."""
+        st.header("Session State Data Overview")
+
+        # Database Info
+        st.subheader("Database Connections")
+        st.write(
+            "- ENGINE:",
+            "Connected" if "ENGINE" in st.session_state else "Not Connected",
+        )
+        st.write(
+            "- SESSION:",
+            "Connected" if "SESSION" in st.session_state else "Not Connected",
+        )
+
+        # Index Manager Info
+        st.subheader("Index Manager")
+        if "INDEX_MANAGER" in st.session_state:
+            index_manager = st.session_state.INDEX_MANAGER
+            st.write("Available indices:", list(index_manager.indices.keys()))
+            for name, index in index_manager.indices.items():
+                st.write(f"\n**{name} Index:**")
+                st.write(f"- Feature dimension: {index.feature_dim}")
+                st.write(f"- Time steps: {index.time_steps}")
+                st.write(f"- Total entries: {index.n_entries}")
+
+        # Vectors and IDs
+        st.subheader("Stored Vectors and IDs")
+        if "all_vecs" in st.session_state:
+            for name, vecs in st.session_state.all_vecs.items():
+                if vecs is not None:
+                    st.write(f"\n**{name}:**")
+                    st.write(f"- Vector shape: {vecs.shape}")
+                    st.write(f"- Number of IDs: {len(st.session_state.all_ids[name])}")
+
+        # Embeddings Info
+        st.subheader("Embedding Data")
+        for index_name in ["task", "description"]:
+            st.write(f"\n**{index_name}:**")
+
+            emb_key = f"{index_name}_embeddings"
+            red_key = f"{index_name}_reduced"
+            lab_key = f"{index_name}_labels"
+
+            if emb_key in st.session_state:
+                embeddings = st.session_state[emb_key]
+                reduced = st.session_state[red_key]
+                labels = st.session_state[lab_key]
+
+                st.write(f"- Original embeddings shape: {embeddings.shape}")
+                st.write(f"- Reduced embeddings shape: {reduced.shape}")
+                st.write(f"- Number of labels: {len(labels)}")
+                st.write(f"- Unique clusters: {len(np.unique(labels))}")
