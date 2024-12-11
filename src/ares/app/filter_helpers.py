@@ -247,20 +247,31 @@ def _handle_selection(
     return selector_fn(selected_value)
 
 
-def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
+def select_row_from_df_user(df: pd.DataFrame) -> tuple[pd.Series, int]:
+    """Select a row from DataFrame with user input.
+
+    Args:
+        df: DataFrame to select from
+
+    Returns:
+        tuple[pd.Series, int]: Selected row and its position in the filtered DataFrame
+    """
     col1, col2, col3, col4 = st.columns(4)
     row = None
+    row_idx = 0  # Default index in filtered DataFrame
 
     # Option 1: Select by index
     with col1:
-        idx_options = df.index.tolist()
+        idx_options = list(range(len(df)))  # Use position instead of index
         idx: int | None = st.selectbox(
-            "Select by index",
+            "Select by position",
             options=["Choose an option"] + idx_options,
             key="idx_select",
         )
-        if st.button("Select by Index"):
-            row = _handle_selection(df, idx, lambda x: df.iloc[int(x)])
+        if st.button("Select by Position"):
+            if idx != "Choose an option":
+                row = df.iloc[int(idx)]
+                row_idx = int(idx)
 
     # Option 2: Select by ID
     with col2:
@@ -271,9 +282,10 @@ def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
             key="id_select",
         )
         if st.button("Select by ID"):
-            row = _handle_selection(
-                df, selected_id, lambda x: df[df.id.apply(str) == x].iloc[0]
-            )
+            if selected_id != "Choose an option":
+                mask = df.id.apply(str) == selected_id
+                row = df[mask].iloc[0]
+                row_idx = df[mask].index.get_indexer([row.name])[0]
 
     # Option 3: Select by Path
     with col3:
@@ -284,19 +296,22 @@ def select_row_from_df_user(df: pd.DataFrame) -> pd.Series:
             key="path_select",
         )
         if st.button("Select by Path"):
-            row = _handle_selection(
-                df, selected_path, lambda x: df[df.path == x].iloc[0]
-            )
+            if selected_path != "Choose an option":
+                mask = df.path == selected_path
+                row = df[mask].iloc[0]
+                row_idx = df[mask].index.get_indexer([row.name])[0]
 
     with col4:
         if st.button("Select Random"):
-            row = df.sample(1).iloc[0]
+            row_idx = np.random.randint(len(df))
+            row = df.iloc[row_idx]
 
     if row is None:
         st.warning("No row selected, defaulting to first row")
         row = df.iloc[0]
+        row_idx = 0
 
-    return row
+    return row, row_idx
 
 
 def handle_selection(

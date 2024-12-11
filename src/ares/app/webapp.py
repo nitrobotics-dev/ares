@@ -175,14 +175,14 @@ def main() -> None:
         st.header("Rollout Display")
 
         # Let user select a row from the dataframe using helper function
-        row = select_row_from_df_user(df)
+        selected_row, row_idx = select_row_from_df_user(filtered_df)
 
-        show_dataframe(pd.DataFrame([row]), title="Selected Row")
+        show_dataframe(pd.DataFrame([selected_row]), title="Selected Row")
 
-        st.write(f"Selected row ID: {row.id}")
+        st.write(f"Selected row ID: {selected_row.id}")
         hero_visualizations = show_hero_display(
-            df,
-            row.name,
+            filtered_df,
+            row_idx,
             st.session_state.all_vecs,
             show_n=100,
             index_manager=st.session_state.INDEX_MANAGER,

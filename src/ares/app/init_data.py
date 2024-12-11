@@ -96,7 +96,6 @@ def initialize_data(tmp_dump_dir: str) -> None:
         name: data["arrays"] for name, data in all_data.items()
     }
     st.session_state.all_ids = {name: data["ids"] for name, data in all_data.items()}
-
     # Create tmp directory if it doesn't exist
     os.makedirs(tmp_dump_dir, exist_ok=True)
 
