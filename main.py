@@ -73,11 +73,11 @@ if __name__ == "__main__":
         # "berkeley_fanuc_manipulation",
         # "cmu_stretch",
         # ones that failed
-        "jaco_play",
-        # dataset_name = "nyu_rot_dataset_converted_externally_to_rlds"
-        # dataset_name = "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
-        # dataset_name = "dlr_edan_shared_control_converted_externally_to_rlds"
-        # dataset_name = "imperialcollege_sawyer_wrist_cam"
+        # "jaco_play",
+        # "nyu_rot_dataset_converted_externally_to_rlds",
+        # "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
+        # "dlr_edan_shared_control_converted_externally_to_rlds"
+        "imperialcollege_sawyer_wrist_cam"
         # dataset_name = "tokyo_u_lsmo_converted_externally_to_rlds"
         # ---> below not found by new oxe-downloader script
         # dataset_name = "conq_hose_manipulation"
@@ -90,48 +90,54 @@ if __name__ == "__main__":
         data_dir = "/workspaces/ares/data/oxe/"
         builder, dataset_dict = build_dataset(dataset_name, data_dir)
         # dataset_info = builder.info
+        print(f"working on {dataset_name}")
         ds = dataset_dict["train"]
+        print(f"working on 'train' out of {list(dataset_dict.keys())}")
         dataset_info = get_dataset_information(dataset_name)
+
+        print(len(ds))
 
         random_extractor = RandomInformationExtractor()
 
         # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
-        # engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+        engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
         rollouts: list[Rollout] = []
         all_times = []
         tic = time.time()
         for i, ep in tqdm(enumerate(ds)):
             try:
-                # steps = list(ep["steps"])
+                steps = list(ep["steps"])
+                if i == 0:
+                    print(steps[0]["observation"].keys())
                 episode = OpenXEmbodimentEpisode(**ep)
 
-                # breakpoint()
                 if episode.episode_metadata is None:
                     # construct our own metadata
                     episode.episode_metadata = OpenXEmbodimentEpisodeMetadata(
                         file_path=f"episode_{i}.npy",  # to mock extension
                     )
 
-                # video = [step.observation.image for step in episode.steps]
-                # fname = os.path.splitext(episode.episode_metadata.file_path)[0]
-                # # check if the file exists
-                # if os.path.exists(
-                #     os.path.join(
-                #         ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
-                #     )
-                # ):
-                #     continue
-                # out = save_video(video, dataset_name, fname)
-
                 rollout = random_extractor.extract(
                     episode=episode, dataset_info=dataset_info
                 )
-                # rollouts.append(rollout)
-                # # just track this
-                # start_time = time.time()
-                # add_rollout(engine, rollout, RolloutSQLModel)
-                # all_times.append(time.time() - start_time)
+
+                video = [step.observation.image for step in episode.steps]
+                fname = os.path.splitext(episode.episode_metadata.file_path)[0]
+                # check if the file exists
+                if os.path.exists(
+                    os.path.join(
+                        ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
+                    )
+                ):
+                    continue
+                out = save_video(video, dataset_name, fname)
+
+                rollouts.append(rollout)
+                # just track this
+                start_time = time.time()
+                add_rollout(engine, rollout, RolloutSQLModel)
+                all_times.append(time.time() - start_time)
 
                 # add the non-robot specific embeddings
                 for name in ["task", "description"]:

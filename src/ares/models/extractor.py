@@ -4,6 +4,7 @@ import typing as t
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 from tensorflow_datasets.core import DatasetInfo
 
 from ares.configs.base import (
@@ -39,11 +40,10 @@ def merge_several_dicts(dicts: list[dict]) -> dict:
 
 def hard_coded_dataset_info_extraction_spreadsheet(dataset_info: dict) -> dict:
     year = None
-    if "Citation" in dataset_info:
+    if "Citation" in dataset_info and not pd.isna(dataset_info["Citation"]):
         match = re.search(r"year\s*=\s*\{(\d{4})\}", dataset_info["Citation"])
         if match:
             year = int(match.group(1))
-
     return {
         "rollout": {"dataset_name": dataset_info["Dataset"], "creation_time": year},
         "robot": {
