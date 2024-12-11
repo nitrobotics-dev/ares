@@ -205,16 +205,19 @@ class SentenceTransformerEmbedder:
         return np.array(self.model.encode(prefix + inp))
 
 
-NOMIC_EMBEDDER = SentenceTransformerEmbedder(
-    provider="nomic-ai", llm_name="nomic-embed-text-v1"
-)
+def get_nomic_embedder():
+    return SentenceTransformerEmbedder(
+        provider="nomic-ai", llm_name="nomic-embed-text-v1"
+    )
+
 
 # gemini_15_flash = LLM(provider="gemini", llm_name="gemini-1.5-flash")
-openai_4o_mini = LLM(provider="openai", llm_name="gpt-4o-mini")
+def get_4o_mini():
+    return LLM(provider="openai", llm_name="gpt-4o-mini")
 
 
-def summarize(data: list[str], description: str) -> str:
-    messages, response = openai_4o_mini.ask(
+def summarize(llm: LLM, data: list[str], description: str) -> str:
+    messages, response = llm.ask(
         "summarizing.jinja2",
         {"data": "\n".join(data), "description": description},
     )

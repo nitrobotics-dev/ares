@@ -20,7 +20,7 @@ from ares.databases.structured_database import (
     RolloutSQLModel,
     setup_database,
 )
-from ares.models.llm import NOMIC_EMBEDDER as EMBEDDER
+from ares.models.llm import get_nomic_embedder
 
 TEST_TIME_STEPS = 100
 LIMIT = 2**31 - 1  # Maximum 32-bit signed integer
@@ -30,6 +30,7 @@ sess = Session(engine)
 rows = sess.query(RolloutSQLModel).limit(LIMIT).all()
 rollouts = [recreate_model(r, Rollout) for r in rows]
 
+EMBEDDER = get_nomic_embedder()
 index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, FaissIndex)
 unique_dataset_robots_list = list({r.robot.embodiment: r for r in rollouts}.values())
 

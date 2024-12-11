@@ -58,7 +58,9 @@ TEST_TIME_STEPS = 100
 
 if __name__ == "__main__":
 
-    from ares.models.llm import NOMIC_EMBEDDER as EMBEDDER
+    from ares.models.llm import get_nomic_embedder
+
+    EMBEDDER = get_nomic_embedder()
 
     index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
 
@@ -77,8 +79,8 @@ if __name__ == "__main__":
         # "nyu_rot_dataset_converted_externally_to_rlds",
         # "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
         # "dlr_edan_shared_control_converted_externally_to_rlds"
-        "imperialcollege_sawyer_wrist_cam"
-        # dataset_name = "tokyo_u_lsmo_converted_externally_to_rlds"
+        # "imperialcollege_sawyer_wrist_cam"
+        # "tokyo_u_lsmo_converted_externally_to_rlds"
         # ---> below not found by new oxe-downloader script
         # dataset_name = "conq_hose_manipulation"
         # dataset_name = "tidybot"

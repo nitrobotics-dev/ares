@@ -412,7 +412,7 @@ def embedding_data_filters_display(
                 st.write(f"**Cluster {k}**")
                 st.write(f"Ex: {'; '.join(v_sample[:5])}")
                 st.write(
-                    f"Summary: {summarize(v_sample, description='a cluster of points describing robot tasks.')}"
+                    f"Summary: {summarize(st.session_state['models']['summarizer'], v_sample, description='a cluster of points describing robot tasks.')}"
                 )
 
     filtered_df = df[df.id.astype(str).isin(map(str, selected_ids))]
