@@ -1,3 +1,4 @@
+import json
 import re
 import string
 import typing as t
@@ -258,19 +259,40 @@ class LLMInformationExtractor(InformationExtractor):
 
         # Get LLM-extracted information
         images = [step.observation.image for step in episode.steps]
+        # HACK
+        if len(images) > 10:
+            # select 10 evenly spaced images
+            images = images[:: len(images) // 10]
+
         info = {
             "task": episode.steps[0].language_instruction,
-            "field_instructions": pydantic_to_field_instructions(
-                Rollout, exclude_fields=hardcoded_info
+            "field_instructions": (
+                "Please provide the following required information:\n"
+                + "\n".join(
+                    pydantic_to_field_instructions(
+                        Rollout, exclude_fields=hardcoded_info, required_only=True
+                    )
+                )
             ),
-            "response_format": "",
-            "example_response_format": pydantic_to_example_dict(
-                Rollout, exclude_fields=hardcoded_info
-            ),
+            "example_response_format": {
+                "required_fields": pydantic_to_example_dict(
+                    Rollout, exclude_fields=hardcoded_info, required_only=True
+                )
+            },
         }
-        structured_info: t.Dict[str, t.Any] = self.llm.ask(
-            **llm_kwargs, images=images, info=info
+        breakpoint()
+        print(info["field_instructions"])
+        messages, response = self.llm.ask(
+            prompt_filename=llm_kwargs.get("prompt_filename", "test_prompt.jinja2"),
+            images=images,
+            info=info,
         )
+        # Parse the response content as JSON if it's a string
+        content = response.choices[0].message.content
+        # Remove markdown code block formatting
+        content = content.strip().removeprefix("```json").removesuffix("```").strip()
+        breakpoint()
+        structured_info = json.loads(content) if isinstance(content, str) else content
 
         # Create component objects in a loop
         components = {

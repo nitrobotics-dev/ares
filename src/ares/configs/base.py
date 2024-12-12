@@ -100,60 +100,81 @@ class Rollout(BaseConfig):
 
 
 def pydantic_to_field_instructions(
-    model_cls: type[BaseModel], exclude_fields: t.Dict = {}, prefix: str = ""
+    model_cls: type[BaseModel],
+    exclude_fields: t.Dict = {},
+    prefix: str = "",
+    required_only: bool = False,
 ) -> list[str]:
     field_instructions = []
-    for field_name, field in model_cls.model_fields.items():
-        # Get the nested exclude_fields dict if it exists
-        nested_exclude = (
-            exclude_fields.get(field_name, {})
-            if isinstance(exclude_fields, dict)
-            else {}
-        )
 
-        # Skip if this field is excluded (has a non-dict value in exclude_fields)
-        if field_name in exclude_fields and not isinstance(
-            exclude_fields[field_name], dict
-        ):
+    # Skip known auto-generated fields and optional fields
+    skip_fields = {"id", "ingestion_time", "creation_time"}
+
+    for field_name, field in model_cls.model_fields.items():
+        # Skip auto-generated and optional fields
+        if field_name in skip_fields:
+            continue
+
+        # Skip optional fields if required_only is True
+        if required_only and (not field.is_required or field.default is None):
+            continue
+
+        # Check if field exists in exclude_fields (both nested and top-level)
+        obj_name = model_cls.__name__.lower()
+        if obj_name in exclude_fields and field_name in exclude_fields[obj_name]:
             continue
 
         # Handle nested models recursively
         if hasattr(field.annotation, "model_fields"):
-            nested_instructions = pydantic_to_field_instructions(
-                field.annotation, nested_exclude, prefix=f"{prefix}{field_name}."
-            )
-            field_instructions.extend(nested_instructions)
+            nested_exclude = exclude_fields.get(field_name.lower(), {})
+            if isinstance(nested_exclude, dict):
+                nested_instructions = pydantic_to_field_instructions(
+                    field.annotation,
+                    exclude_fields,
+                    prefix=f"{prefix}{field_name}.",
+                    required_only=required_only,
+                )
+                field_instructions.extend(nested_instructions)
         else:
-            field_instructions.append(f"    - {prefix}{field_name}: {str(field)}")
+            field_instructions.append(
+                f"    - {prefix}{field_name}: {str(field.annotation)}"
+            )
+
     return field_instructions
 
 
 def pydantic_to_example_dict(
-    model_cls: type[BaseModel], exclude_fields: t.Dict = {}
+    model_cls: type[BaseModel], exclude_fields: t.Dict = {}, required_only: bool = False
 ) -> dict:
     example_dict = {}
-    for field_name, field in model_cls.model_fields.items():
-        # Get the nested exclude_fields dict if it exists
-        nested_exclude = (
-            exclude_fields.get(field_name, {})
-            if isinstance(exclude_fields, dict)
-            else {}
-        )
 
-        # Skip if this field is excluded (has a non-dict value in exclude_fields)
-        if field_name in exclude_fields and not isinstance(
-            exclude_fields[field_name], dict
-        ):
+    # Skip known auto-generated fields and optional fields
+    skip_fields = {"id", "ingestion_time", "creation_time"}
+
+    for field_name, field in model_cls.model_fields.items():
+        # Skip auto-generated and optional fields
+        if field_name in skip_fields:
+            continue
+
+        # Skip optional fields if required_only is True
+        if required_only and (not field.is_required or field.default is None):
+            continue
+
+        # Check if field exists in exclude_fields (both nested and top-level)
+        obj_name = model_cls.__name__.lower()
+        if obj_name in exclude_fields and field_name in exclude_fields[obj_name]:
             continue
 
         # Handle nested models recursively
         if hasattr(field.annotation, "model_fields"):
-            nested_dict = pydantic_to_example_dict(field.annotation, nested_exclude)
-            if nested_dict:  # Only add if not empty
-                example_dict[field_name] = nested_dict
+            nested_exclude = exclude_fields.get(field_name.lower(), {})
+            if isinstance(nested_exclude, dict):
+                nested_dict = pydantic_to_example_dict(
+                    field.annotation, nested_exclude, required_only=required_only
+                )
+                if nested_dict:  # Only add if not empty
+                    example_dict[field_name] = nested_dict
         else:
-            if hasattr(field.annotation, "__args__"):  # For Literal types
-                example_dict[field_name] = field.annotation.__args__[0]
-            else:
-                example_dict[field_name] = "..."
+            example_dict[field_name] = "..."
+
     return example_dict
