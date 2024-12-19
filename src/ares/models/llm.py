@@ -205,17 +205,21 @@ class SentenceTransformerEmbedder:
         return np.array(self.model.encode(prefix + inp))
 
 
-def get_nomic_embedder():
+def get_nomic_embedder() -> SentenceTransformerEmbedder:
     return SentenceTransformerEmbedder(
         provider="nomic-ai", llm_name="nomic-embed-text-v1"
     )
 
 
-def get_gemini_15_flash():
+def get_gemini_15_flash() -> LLM:
     return LLM(provider="gemini", llm_name="gemini-1.5-flash")
 
 
-def get_4o_mini():
+def get_gemini_2_flash() -> LLM:
+    return LLM(provider="gemini", llm_name="gemini-2.0-flash-exp")
+
+
+def get_4o_mini() -> LLM:
     return LLM(provider="openai", llm_name="gpt-4o-mini")
 
 

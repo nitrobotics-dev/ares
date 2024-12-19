@@ -46,7 +46,11 @@ def hard_coded_dataset_info_extraction_spreadsheet(dataset_info: dict) -> dict:
         if match:
             year = int(match.group(1))
     return {
-        "rollout": {"dataset_name": dataset_info["Dataset"], "creation_time": year},
+        "rollout": {
+            "dataset_name": dataset_info["Dataset"],
+            "creation_time": year,
+            "ingestion_time": datetime.now(),
+        },
         "robot": {
             "embodiment": dataset_info["Robot"],
             "gripper": dataset_info["Gripper"],
@@ -201,7 +205,6 @@ class RandomInformationExtractor(InformationExtractor):
             "task": Task,
             "trajectory": Trajectory,
         }
-
         objects = {
             name: self.finish_random_object(cls, hardcoded_info[name])
             for name, cls in components.items()
@@ -261,7 +264,7 @@ class LLMInformationExtractor(InformationExtractor):
         images = [step.observation.image for step in episode.steps]
         # HACK
         if len(images) > 10:
-            # select 10 evenly spaced images
+            # select 10 evenly spaced images --> update with FPS sampling
             images = images[:: len(images) // 10]
 
         info = {
@@ -274,14 +277,10 @@ class LLMInformationExtractor(InformationExtractor):
                     )
                 )
             ),
-            "example_response_format": {
-                "required_fields": pydantic_to_example_dict(
-                    Rollout, exclude_fields=hardcoded_info, required_only=True
-                )
-            },
+            "example_response_format": pydantic_to_example_dict(
+                Rollout, exclude_fields=hardcoded_info, required_only=True
+            ),
         }
-        breakpoint()
-        print(info["field_instructions"])
         messages, response = self.llm.ask(
             prompt_filename=llm_kwargs.get("prompt_filename", "test_prompt.jinja2"),
             images=images,
@@ -291,9 +290,7 @@ class LLMInformationExtractor(InformationExtractor):
         content = response.choices[0].message.content
         # Remove markdown code block formatting
         content = content.strip().removeprefix("```json").removesuffix("```").strip()
-        breakpoint()
         structured_info = json.loads(content) if isinstance(content, str) else content
-
         # Create component objects in a loop
         components = {
             "robot": (Robot, robot_kwargs),
@@ -301,18 +298,11 @@ class LLMInformationExtractor(InformationExtractor):
             "task": (Task, task_kwargs),
             "trajectory": (Trajectory, {}),
         }
-
+        breakpoint()
         objects = {
             name: self.finish_llm_object(cls, hardcoded_info, structured_info, kwargs)
             for name, (cls, kwargs) in components.items()
         }
 
         # Create final rollout with all components
-        return Rollout(
-            creation_time=dataset_info_dict.get("creation_time", datetime.now()),
-            ingestion_time=datetime.now(),
-            path=episode_info_dict["path"],
-            dataset_name=dataset_info_dict["dataset_name"],
-            length=len(episode.steps),
-            **objects,
-        )
+        return Rollout(**hardcoded_info["rollout"], **objects)

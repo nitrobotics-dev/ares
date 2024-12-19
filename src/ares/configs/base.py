@@ -91,7 +91,7 @@ class Rollout(BaseConfig):
     ingestion_time: datetime
     path: str
     dataset_name: str
-    # description: str | None
+    description: str
     length: int
     robot: Robot
     environment: Environment
