@@ -23,7 +23,7 @@ from ares.app.plot_primitives import (
     display_video_card,
 )
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
-from ares.image_utils import get_video_mp4
+from ares.image_utils import get_video_frames, get_video_mp4
 
 
 def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
@@ -113,7 +113,9 @@ def create_tabbed_visualizations(
             st.plotly_chart(viz["figure"], use_container_width=True)
 
 
-def display_video_grid(filtered_df: pd.DataFrame, max_videos: int = 5) -> None:
+def display_video_grid(
+    filtered_df: pd.DataFrame, max_videos: int = 5, lazy_load: bool = False
+) -> None:
     """Display a grid of video cards for the first N rows of the dataframe.
 
     Args:
@@ -126,7 +128,7 @@ def display_video_grid(filtered_df: pd.DataFrame, max_videos: int = 5) -> None:
 
     for i, (_, row) in enumerate(filtered_df.head(n_videos).iterrows()):
         with video_cols[i]:
-            display_video_card(dict(row))
+            display_video_card(dict(row), lazy_load=lazy_load, key=f"video_card_{i}")
 
 
 def create_embedding_similarity_visualization(
@@ -185,7 +187,11 @@ def create_similarity_tabs(
                     if len(found_rows) == 0:
                         st.write(f"No row found for id: {id_str}")
                     else:
-                        display_video_card(found_rows.iloc[0])
+                        display_video_card(
+                            found_rows.iloc[0],
+                            lazy_load=True,
+                            key=f"video_card_{i}_tab_{tab}",
+                        )
 
 
 def show_hero_display(
@@ -195,6 +201,7 @@ def show_hero_display(
     show_n: int,
     index_manager: IndexManager,
     n_most_similar: int = 5,
+    lazy_load: bool = False,
 ) -> list[dict]:
     """
     Row 1: text
@@ -212,7 +219,13 @@ def show_hero_display(
             row["dataset_name"].lower().replace(" ", "_"),
             os.path.splitext(row["path"])[0],
         )
-        st.video(get_video_mp4(dataset, fname))
+        if lazy_load:
+            frame = get_video_frames(dataset, fname, n_frames=1)[0]
+            st.image(frame)
+            if st.button("Load Video"):
+                st.video(get_video_mp4(dataset, fname))
+        else:
+            st.video(get_video_mp4(dataset, fname))
     with col2:
         with st.expander("Row Details", expanded=False):
             for col, val in row.items():

@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from ares.image_utils import get_video_mp4
+from ares.image_utils import get_video_frames, get_video_mp4
 
 
 def create_line_plot(
@@ -212,13 +212,21 @@ def create_robot_array_plot(
     return fig
 
 
-def display_video_card(row: pd.Series) -> None:
+def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -> None:
     if not pd.isna(row["path"]):
         dataset, fname = (
             row["dataset_name"].lower().replace(" ", "_"),
             os.path.splitext(row["path"])[0],
         )
-        st.video(get_video_mp4(dataset, fname))
+        if not lazy_load:
+            st.video(get_video_mp4(dataset, fname))
+        else:
+            # show placeholder image (along the same path), then button to load and play video
+            frame = get_video_frames(dataset, fname, n_frames=1)[0]
+            st.image(frame)
+            if st.button("Load Video", key=f"video_button_{row['id']} + {key}"):
+                st.video(get_video_mp4(dataset, fname))
+
         st.write(f"**{row['id']}**")
         st.write(f"Task: {row['task_language_instruction']}")
         st.write(f"Upload Date: {row['ingestion_time'].strftime('%Y-%m-%d')}")
