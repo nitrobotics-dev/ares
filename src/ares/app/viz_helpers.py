@@ -232,9 +232,12 @@ def show_hero_display(
                 if len(str(val)) > 1000:
                     continue
                 st.write(f"{col}: {val}")
-        array_figs = generate_robot_array_plot_visualizations(
-            row, all_vecs, show_n, highlight_idx=idx
-        )
+        if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
+            array_figs = generate_robot_array_plot_visualizations(
+                row, all_vecs, show_n, highlight_idx=idx
+            )
+        else:
+            array_figs = []
 
     # Row 3: n tabs covering most similar based on state, action, text
     st.write(f"**Similarity Search**")

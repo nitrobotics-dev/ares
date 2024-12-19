@@ -98,6 +98,7 @@ def main() -> None:
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
         filtered_df = value_filtered_df
+        cluster_fig = None
         # print(kept_ids[:10])
         if len(kept_ids) == 0:
             breakpoint()
@@ -180,18 +181,23 @@ def main() -> None:
             st.session_state.all_vecs,
             show_n=100,
             index_manager=st.session_state.INDEX_MANAGER,
+            lazy_load=False,
         )
     st.divider()
 
     section_plot_robots = "plot robot arrays"
     with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
-        st.header("Robot Array Display")
-        # Number of trajectories to display in plots
-        robot_array_visualizations = generate_robot_array_plot_visualizations(
-            selected_row,  # need row to select dataset/robot embodiment of trajectories
-            st.session_state.all_vecs,
-            show_n=1000,
-        )
+        if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
+            st.header("Robot Array Display")
+            # Number of trajectories to display in plots
+            robot_array_visualizations = generate_robot_array_plot_visualizations(
+                selected_row,  # need row to select dataset/robot embodiment of trajectories
+                st.session_state.all_vecs,
+                show_n=1000,
+            )
+        else:
+            st.write("No robot array plots generated")
+            robot_array_visualizations = []
     st.divider()
 
     section_export = "exporting data"
