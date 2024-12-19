@@ -103,6 +103,7 @@ class LLM:
         messages = self._construct_messages(
             prompt_filename, info, images, double_prompt
         )
+        print(f"submitting request to {self.llm_name}")
         return messages, completion(
             model=self.llm_name, messages=messages, **llm_kwargs
         )

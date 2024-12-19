@@ -1,7 +1,9 @@
 import typing as t
+import uuid
+from datetime import datetime
 
 import pandas as pd
-from sqlalchemy import Engine, text
+from sqlalchemy import Column, Engine, MetaData, inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
 from ares.configs.base import Rollout
@@ -16,8 +18,63 @@ RolloutSQLModel = create_flattened_model(Rollout)
 
 def setup_database(RolloutSQLModel: SQLModel, path: str = BASE_ROBOT_DB_PATH) -> Engine:
     engine = create_engine(path)
-    RolloutSQLModel.metadata.create_all(engine)
+    inspector = inspect(engine)
+
+    if not inspector.has_table("rollout"):
+        # If table doesn't exist, create it with all columns
+        RolloutSQLModel.metadata.create_all(engine)
+    else:
+        # Get existing columns
+        existing_columns = {col["name"] for col in inspector.get_columns("rollout")}
+
+        # Get new columns from the model
+        model_columns = set(RolloutSQLModel.model_fields.keys())
+
+        # Find columns to add
+        columns_to_add = model_columns - existing_columns
+
+        if columns_to_add:
+            # Create MetaData instance
+            metadata = MetaData()
+            metadata.reflect(bind=engine)
+
+            # Get the table
+            table = metadata.tables["rollout"]
+
+            # Add new columns
+            with engine.begin() as conn:
+                for col_name in columns_to_add:
+                    # Get column definition from model
+                    col_type = RolloutSQLModel.model_fields[col_name].annotation
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE rollout ADD COLUMN {col_name} {get_sql_type(col_type)} NULL"
+                        )
+                    )
+                print(f"Added new columns: {columns_to_add}")
+
     return engine
+
+
+def get_sql_type(python_type: type) -> str:
+    """Convert Python/Pydantic types to SQLite types."""
+    type_map = {
+        str: "TEXT",
+        int: "INTEGER",
+        float: "REAL",
+        bool: "BOOLEAN",
+        datetime: "TIMESTAMP",
+        uuid.UUID: "TEXT",
+        # Add more type mappings as needed
+    }
+    # Handle Optional types
+    origin = t.get_origin(python_type)
+    if origin is t.Union:
+        args = t.get_args(python_type)
+        # Get the non-None type
+        python_type = next(arg for arg in args if arg is not type(None))
+
+    return type_map.get(python_type, "TEXT")
 
 
 def add_rollout(engine: Engine, rollout: Rollout, RolloutSQLModel: SQLModel) -> None:
@@ -44,10 +101,18 @@ def get_rollouts(engine: Engine) -> pd.DataFrame:
             SELECT *
             FROM rollout
             ORDER BY id
-        """
+            """
         )
         df = pd.read_sql(query, session.connection())
-    return df
+
+        # Get expected columns from current model
+        expected_columns = set(RolloutSQLModel.model_fields.keys())
+
+        # Add missing columns with NaN values
+        for col in expected_columns - set(df.columns):
+            df[col] = pd.NA
+
+        return df
 
 
 if __name__ == "__main__":

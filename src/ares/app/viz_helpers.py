@@ -139,8 +139,6 @@ def create_embedding_similarity_visualization(
     # get the query matrix
     query_matrix = index_manager.get_matrix_by_id(name, str(row.id))
     if query_matrix is None:
-        print(f"No matrix found for id: {row.id}")
-        breakpoint()
         raise ValueError(f"No matrix found for id: {row.id}")
     distances, ids, matrices = index_manager.search_matrix(
         name,

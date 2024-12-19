@@ -12,7 +12,7 @@ from ares.models.llm import summarize
 
 
 def create_structured_data_filters(
-    df: pd.DataFrame, max_options: int = 9
+    df: pd.DataFrame, max_options: int = 25
 ) -> tuple[pd.DataFrame, list]:
     """Create filter controls for dataframe columns based on their types."""
     filtered_df = df.copy()

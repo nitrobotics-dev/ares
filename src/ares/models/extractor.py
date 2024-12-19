@@ -281,6 +281,7 @@ class LLMInformationExtractor(InformationExtractor):
                 Rollout, exclude_fields=hardcoded_info, required_only=True
             ),
         }
+        breakpoint()
         messages, response = self.llm.ask(
             prompt_filename=llm_kwargs.get("prompt_filename", "test_prompt.jinja2"),
             images=images,
@@ -298,11 +299,17 @@ class LLMInformationExtractor(InformationExtractor):
             "task": (Task, task_kwargs),
             "trajectory": (Trajectory, {}),
         }
-        breakpoint()
         objects = {
             name: self.finish_llm_object(cls, hardcoded_info, structured_info, kwargs)
             for name, (cls, kwargs) in components.items()
         }
 
         # Create final rollout with all components
-        return Rollout(**hardcoded_info["rollout"], **objects)
+        # Include both hardcoded rollout info and top-level fields from structured_info
+        rollout_kwargs = {
+            **hardcoded_info["rollout"],
+            **{k: v for k, v in structured_info.items() if not isinstance(v, dict)},
+            **objects,
+        }
+        breakpoint()
+        return Rollout(**rollout_kwargs)

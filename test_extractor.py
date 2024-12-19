@@ -12,7 +12,8 @@ from main import build_dataset
 dataset_name = "jaco_play"
 data_dir = "/workspaces/ares/data/oxe/"
 builder, dataset_dict = build_dataset(dataset_name, data_dir)
-extractor = LLMInformationExtractor(get_gemini_2_flash())
+# extractor = LLMInformationExtractor(get_gemini_2_flash())
+extractor = LLMInformationExtractor(get_gemini_15_flash())
 ds = dataset_dict["train"]
 print(f"working on 'train' out of {list(dataset_dict.keys())}")
 dataset_info = get_dataset_information(dataset_name)
