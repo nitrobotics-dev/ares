@@ -12,7 +12,7 @@ from ares.models.llm import summarize
 
 
 def create_structured_data_filters(
-    df: pd.DataFrame, max_options: int = 25
+    df: pd.DataFrame, max_options: int = 25, n_cols: int = 3
 ) -> tuple[pd.DataFrame, list]:
     """Create filter controls for dataframe columns based on their types."""
     filtered_df = df.copy()
@@ -34,14 +34,14 @@ def create_structured_data_filters(
     if "active_filter_values" not in st.session_state:
         st.session_state.active_filter_values = {}
 
-    filter_cols = st.columns(3)
+    filter_cols = st.columns(n_cols)
 
     for idx, col in enumerate(df.columns):
         viz_info = infer_visualization_type(col, df)
         if viz_info["viz_type"] is None:
             skipped_cols.append(col)
             continue
-        with filter_cols[idx % 3]:
+        with filter_cols[idx % n_cols]:
             if (
                 pd.api.types.is_numeric_dtype(df[col])
                 and viz_info["nunique"] > max_options

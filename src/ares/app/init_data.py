@@ -75,13 +75,26 @@ def store_in_session(
 
 
 def initialize_data(tmp_dump_dir: str) -> None:
-    """Initialize database connection and load/create embeddings"""
-    # Initialize database and session if needed
-    if "ENGINE" not in st.session_state or "SESSION" not in st.session_state:
-        engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-        sess = Session(engine)
-        st.session_state.ENGINE = engine
-        st.session_state.SESSION = sess
+    """Initialize database connection, load data and create embeddings with caching."""
+    # Skip if already initialized
+    if all(
+        key in st.session_state for key in ["ENGINE", "SESSION", "df", "INDEX_MANAGER"]
+    ):
+        print("Data already initialized")
+        return
+
+    # Initialize database and session
+    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+    sess = Session(engine)
+    st.session_state.ENGINE = engine
+    st.session_state.SESSION = sess
+
+    # Load dataframe
+    query = select(RolloutSQLModel)
+    df = pd.read_sql(query, engine)
+    # Filter out unnamed columns
+    df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
+    st.session_state.df = df
 
     # Initialize index manager
     index_manager = IndexManager(
@@ -95,6 +108,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
         name: data["arrays"] for name, data in all_data.items()
     }
     st.session_state.all_ids = {name: data["ids"] for name, data in all_data.items()}
+
     # Create tmp directory if it doesn't exist
     os.makedirs(tmp_dump_dir, exist_ok=True)
 
@@ -123,7 +137,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
     )
 
 
-def display_state_info():
+def display_state_info() -> None:
     # all in a dropdown
     with st.expander("Session State Data Overview"):
         """Display information about data stored in streamlit session state."""

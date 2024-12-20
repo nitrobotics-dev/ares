@@ -66,12 +66,9 @@ def timer_context(section_name: str) -> Any:
 
 
 def load_data() -> pd.DataFrame:
-    # Initialize mock data at the start of the app
+    """Load data from session state or initialize if needed."""
     initialize_data(tmp_dump_dir)
-    # Initial dataframe
-    df = pd.read_sql(select(RolloutSQLModel), st.session_state.ENGINE)
-    df = df[[c for c in df.columns if "unnamed" not in c.lower()]]
-    return df
+    return st.session_state.df
 
 
 # Streamlit app
@@ -84,6 +81,8 @@ def main() -> None:
         st.title(title)
         df = load_data()
 
+    section_state_info = "state info"
+    with filter_error_context(section_state_info), timer_context(section_state_info):
         display_state_info()
         total_statistics(df)
         st.divider()
@@ -146,12 +145,20 @@ def main() -> None:
             general_visualizations, [viz["title"] for viz in general_visualizations]
         )
 
+    section_success_rate = "success rate analytics"
+    with (
+        filter_error_context(section_success_rate),
+        timer_context(section_success_rate),
+    ):
         st.header("Success Rate Analytics")
         success_visualizations = generate_success_rate_visualizations(filtered_df)
         create_tabbed_visualizations(
             success_visualizations, [viz["title"] for viz in success_visualizations]
         )
+    st.divider()
 
+    section_time_series = "time series trends"
+    with filter_error_context(section_time_series), timer_context(section_time_series):
         st.header("Time Series Trends")
         time_series_visualizations = generate_time_series_visualizations(
             filtered_df, time_column="ingestion_time"
@@ -161,6 +168,8 @@ def main() -> None:
             [viz["title"] for viz in time_series_visualizations],
         )
 
+    section_video_grid = "video grid"
+    with filter_error_context(section_video_grid), timer_context(section_video_grid):
         # show video cards of first 5 rows in a horizontal layout
         display_video_grid(filtered_df, lazy_load=True)
     st.divider()

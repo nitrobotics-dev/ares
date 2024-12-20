@@ -38,15 +38,12 @@ def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
     )
 
     for col in categorical_cols:
-        # Create new DataFrame with success rates by category
-        success_rates = pd.DataFrame(
-            {
-                col: df[col].unique(),
-                "success_rate": [
-                    df[df[col] == val]["task_success"].mean()
-                    for val in df[col].unique()
-                ],
-            }
+        # Use groupby and rename the column to match the expected name
+        success_rates = (
+            df.groupby(col)["task_success"]
+            .mean()
+            .reset_index()
+            .rename(columns={"task_success": "success_rate"})
         )
 
         col_title = col.replace("_", " ").replace("-", " ").title()
@@ -72,12 +69,15 @@ def generate_time_series_visualizations(
     df: pd.DataFrame, time_column: str = "creation_time"
 ) -> list[dict]:
     """Generate time series visualizations for numeric columns."""
-    visualizations: list[dict] = []
-    numeric_cols = sorted(df.select_dtypes(include=["int64", "float64"]).columns)
+    # Pre-filter numeric columns and cache the result
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    viz_types = {
+        col: infer_visualization_type(col, df)["viz_type"] for col in numeric_cols
+    }
 
-    for col in numeric_cols:
-        viz_info = infer_visualization_type(col, df)
-        if col == time_column or viz_info["viz_type"] is None:
+    visualizations = []
+    for col in sorted(numeric_cols):
+        if col == time_column or viz_types[col] is None:
             continue
 
         col_title = col.replace("_", " ").replace("-", " ").title()

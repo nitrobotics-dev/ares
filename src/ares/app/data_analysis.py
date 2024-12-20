@@ -10,31 +10,45 @@ def generate_automatic_visualizations(
     df: pd.DataFrame, time_column: str = "creation_time"
 ) -> list[dict]:
     visualizations = []
-    columns = sorted(df.columns)
 
-    for col in columns:
-        viz_info = infer_visualization_type(col, df)
-        if col == time_column or viz_info["viz_type"] is None:
-            continue
+    # Pre-calculate visualization types for all columns at once
+    viz_infos = {
+        col: infer_visualization_type(col, df)
+        for col in sorted(df.columns)
+        if col != time_column
+    }
 
+    # Group columns by visualization type
+    histogram_cols = []
+    bar_cols = []
+    for col, info in viz_infos.items():
+        if info["viz_type"] == "histogram":
+            histogram_cols.append(col)
+        elif info["viz_type"] == "bar":
+            bar_cols.append(col)
+
+    # Create histogram visualizations
+    for col in histogram_cols:
         col_title = col.replace("_", " ").replace("-", " ").title()
-        viz_type = viz_info["viz_type"]
+        visualizations.append(
+            {
+                "figure": create_histogram(
+                    df,
+                    x=col,
+                    color="#1f77b4",
+                    title=f"Distribution of {col_title}",
+                    labels={col: col_title, "count": "Count"},
+                ),
+                "title": f"{col_title} Distribution",
+            }
+        )
 
-        if viz_type == "histogram":
-            visualizations.append(
-                {
-                    "figure": create_histogram(
-                        df,
-                        x=col,
-                        color="#1f77b4",
-                        title=f"Distribution of {col_title}",
-                        labels={col: col_title, "count": "Count"},
-                    ),
-                    "title": f"{col_title} Distribution",
-                }
-            )
-        elif viz_type == "bar":
-            agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
+    # Create bar visualizations - do aggregation in one pass
+    if bar_cols:
+        agg_data = df.groupby(bar_cols).agg({time_column: "count"}).reset_index()
+
+        for col in bar_cols:
+            col_title = col.replace("_", " ").replace("-", " ").title()
             visualizations.append(
                 {
                     "figure": create_bar_plot(
