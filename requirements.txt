@@ -15,6 +15,7 @@ opencv-python
 python-Levenshtein
 sentencepiece
 einops
+pycocotools
 
 
 # datasets and utilities
