@@ -8,36 +8,32 @@ import typing as t
 import cv2
 import numpy as np
 import pandas as pd
+import requests
 from moviepy.editor import ImageSequenceClip
 from PIL import Image
 
 ARES_DATASET_VIDEO_PATH = "/workspaces/ares/data/videos"
 
 
+def get_image_from_path(path: str) -> Image.Image:
+    if path.startswith(("http")):
+        return Image.open(requests.get(path, stream=True).raw)
+    else:
+        return Image.open(path)
+
+
 def get_video_from_path(
     dataset: str, path: str
 ) -> str | bytes | io.BytesIO | np.ndarray:
+    # TODO: implement
     return os.path.join(ARES_DATASET_VIDEO_PATH, dataset, path)
 
 
 def get_video_from_cloud(
     dataset: str, path: str
 ) -> str | bytes | io.BytesIO | np.ndarray:
+    # TODO: implement
     raise NotImplementedError("Not implemented")
-
-
-# def get_video(inp: t.Any) -> str | bytes | io.BytesIO | np.ndarray:
-#     if isinstance(inp, pd.Series):
-#         return get_video_from_path(inp["dataset"], inp["path"])
-#     elif isinstance(inp, str):
-#         if ARES_DATASET_VIDEO_PATH in inp:
-#             return inp
-#         else:
-#             raise ValueError(f"Invalid video path: {inp}")
-#     elif isinstance(inp, (np.ndarray, io.BytesIO)):
-#         return inp
-#     else:
-#         raise ValueError(f"Invalid video input type: {type(inp)}")
 
 
 def save_video(
@@ -112,12 +108,6 @@ def get_video_mp4(dataset: str, filename: str) -> str:
     mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, filename)
 
     if not os.path.exists(mp4_path):
-        # choose random file from dir
-        # mp4_path = "/workspaces/ares/data/videos/cmu_play_fusion/data/train/"
-        # mp4_path = mp4_path + random.choice(
-        #     [x for x in os.listdir(mp4_path) if x.endswith(".mp4")]
-        # )
-
         raise FileNotFoundError(f"MP4 file not found: {mp4_path}")
     return mp4_path
 
@@ -194,3 +184,23 @@ def choose_and_preprocess_frames(
     if resize:
         frames = [cv2.resize(frame, resize) for frame in frames]
     return frames
+
+
+def get_frame_indices_for_fps(video_path: str, target_fps: int = 1) -> list[int]:
+    """Calculate frame indices to sample a video at a target FPS rate.
+
+    Args:
+        video_path: Path to the video file
+        target_fps: Desired frames per second to sample (default: 1)
+
+    Returns:
+        List of frame indices to sample
+    """
+    cap = cv2.VideoCapture(video_path)
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+
+    # Calculate frame indices to sample at desired fps_rate
+    sample_interval = int(video_fps / target_fps)
+    return list(range(0, total_frames, sample_interval))
