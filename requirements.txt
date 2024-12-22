@@ -16,6 +16,7 @@ python-Levenshtein
 sentencepiece
 einops
 pycocotools
+sentence-transformers
 
 
 # datasets and utilities

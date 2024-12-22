@@ -1,9 +1,9 @@
 import os
 import tempfile
+from typing import List, Tuple
 
 import cv2
 import numpy as np
-import requests
 import torch
 from PIL import Image
 from transformers import (
@@ -16,88 +16,10 @@ from ares.configs.annotations import Annotation, binary_mask_to_rle
 from ares.image_utils import (
     choose_and_preprocess_frames,
     get_frame_indices_for_fps,
-    get_image_from_path,
-    get_video_frames,
     get_video_from_path,
     split_video_to_frames,
 )
 from ares.models.shortcuts import get_gemini_2_flash
-
-
-def run_detector(
-    processor: AutoProcessor,
-    model: AutoModelForZeroShotObjectDetection,
-    image: Image.Image,
-    labels_str: str,
-    device: str,
-) -> list[list[Annotation]]:
-    inputs = processor(images=image, text=labels_str, return_tensors="pt").to(device)
-    with torch.no_grad():
-        outputs = model(**inputs)
-
-    results = processor.post_process_grounded_object_detection(
-        outputs,
-        inputs.input_ids,
-        box_threshold=0.4,
-        text_threshold=0.3,
-        target_sizes=[image.size[::-1]],
-    )
-    output_annotations = []
-    for image, annotations in zip([image], results):
-        these_annotations = []
-        if "boxes" in annotations:
-            for i in range(len(annotations["boxes"])):
-                ann_dict = {
-                    "bbox": annotations["boxes"][i].tolist(),
-                    "category_name": annotations["labels"][i],
-                    "score": annotations["scores"][i].item(),
-                }
-                these_annotations.append(Annotation(**ann_dict))
-        output_annotations.append(these_annotations)
-    return output_annotations
-
-
-def run_segmenter(
-    processor: AutoProcessor,
-    model: AutoModelForZeroShotObjectDetection,
-    image: Image.Image,
-    device: str,
-    annotations: list[list[Annotation]],
-) -> list[list[Annotation]]:
-    boxes = [
-        [ann.bbox_xyxy for ann in frame_annotations]
-        for frame_annotations in annotations
-    ]
-
-    # Reshape input points to match expected format - Fix the dimensionality
-    input_points = [
-        [
-            (box[0] + box[2]) / 2,
-            (box[1] + box[3]) / 2,
-        ]  # Use center point of each box
-        for box in boxes[0]
-    ]
-
-    input_labels = [1] * len(boxes[0])  # Simplified labels format
-
-    inputs = processor(
-        images=image,
-        input_points=[input_points],  # Wrap in list for batch dimension
-        input_labels=[input_labels],  # Wrap in list for batch dimension
-        return_tensors="pt",
-    ).to(device)
-    with torch.no_grad():
-        outputs = model(**inputs)
-    masks = processor.post_process_masks(
-        masks=outputs.pred_masks,
-        original_sizes=inputs.original_sizes,
-        reshaped_input_sizes=inputs.reshaped_input_sizes,
-    )
-    # add to annotations
-    for i, frame_masks in enumerate(masks):
-        for j, mask in enumerate(frame_masks.squeeze(0)):
-            annotations[i][j].segmentation = binary_mask_to_rle(mask.numpy())
-    return annotations
 
 
 class GroundingAnnotator:
@@ -108,107 +30,188 @@ class GroundingAnnotator:
         device: str = "cpu",
     ):
         self.device = device
-        (
-            self.detector_processor,
-            self.detector_model,
-            self.segmentor_processor,
-            self.segmentator_model,
-        ) = self.setup_models_for_grounding(detector_id, segmenter_id, device)
+        self.detector_processor, self.detector_model = self.setup_detector(detector_id)
+        self.segmentor_processor, self.segmentator_model = self.setup_segmenter(
+            segmenter_id
+        )
         print(f"Loaded models for {detector_id} and {segmenter_id} on device {device}")
 
-    def setup_models_for_grounding(
+    def setup_detector(
+        self, model_id: str
+    ) -> Tuple[AutoProcessor, AutoModelForZeroShotObjectDetection]:
+        processor = AutoProcessor.from_pretrained(model_id)
+        model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id).to(
+            self.device
+        )
+        return processor, model
+
+    def setup_segmenter(
+        self, model_id: str
+    ) -> Tuple[AutoProcessor, AutoModelForMaskGeneration]:
+        processor = AutoProcessor.from_pretrained(model_id)
+        model = AutoModelForMaskGeneration.from_pretrained(
+            model_id, token=os.environ.get("HUGGINGFACE_API_KEY")
+        ).to(self.device)
+        return processor, model
+
+    def run_detector(
         self,
-        detector_id: str,
-        segmenter_id: str,
-        device: str,
-    ) -> tuple[
-        AutoProcessor,
-        AutoModelForZeroShotObjectDetection,
-        AutoProcessor,
-        AutoModelForMaskGeneration,
-    ]:
-        detector_processor = AutoProcessor.from_pretrained(detector_id)
-        detector_model = AutoModelForZeroShotObjectDetection.from_pretrained(
-            detector_id
-        ).to(device)
+        images: List[Image.Image],
+        labels_str: str,
+        box_threshold: float = 0.2,
+        text_threshold: float = 0.2,
+    ) -> List[List[Annotation]]:
+        # Process all images in a single batch
+        inputs = self.detector_processor(
+            images=images, text=[labels_str] * len(images), return_tensors="pt"
+        ).to(self.device)
 
-        segmentor_processor = AutoProcessor.from_pretrained(segmenter_id)
-        segmentator_model = AutoModelForMaskGeneration.from_pretrained(
-            segmenter_id, token=os.environ.get("HUGGINGFACE_API_KEY")
-        ).to(device)
-        return (
-            detector_processor,
-            detector_model,
-            segmentor_processor,
-            segmentator_model,
+        with torch.no_grad():
+            outputs = self.detector_model(**inputs)
+
+        target_sizes = [[img.size[1], img.size[0]] for img in images]  # [height, width]
+
+        results = self.detector_processor.post_process_grounded_object_detection(
+            outputs,
+            inputs.input_ids,
+            box_threshold=box_threshold,
+            text_threshold=text_threshold,
+            target_sizes=target_sizes,
         )
 
-    def annotate(self, image_url: str, labels_str: str) -> list[list[Annotation]]:
-        image = get_image_from_path(image_url)
-        box_annotations = run_detector(
-            self.detector_processor, self.detector_model, image, labels_str, self.device
+        all_annotations = []
+        for image_idx, result in enumerate(results):
+            frame_annotations = []
+            if "boxes" in result:
+                for box_idx in range(len(result["boxes"])):
+                    ann_dict = {
+                        "bbox": result["boxes"][box_idx].tolist(),
+                        "category_name": result["labels"][box_idx],
+                        "score": result["scores"][box_idx].item(),
+                    }
+                    frame_annotations.append(Annotation(**ann_dict))
+            all_annotations.append(frame_annotations)
+
+        return all_annotations
+
+    def run_segmenter(
+        self,
+        images: List[Image.Image],
+        annotations: List[List[Annotation]],
+    ) -> List[List[Annotation]]:
+        # Process each image's annotations
+        all_points = []
+        all_labels = []
+        max_points = max(len(frame_anns) for frame_anns in annotations)
+
+        for frame_anns in annotations:
+            frame_points = [
+                [
+                    (box.bbox_xyxy[0] + box.bbox_xyxy[2]) / 2,
+                    (box.bbox_xyxy[1] + box.bbox_xyxy[3]) / 2,
+                ]
+                for box in frame_anns
+            ]
+            # Pad points and labels to ensure consistent shape
+            while len(frame_points) < max_points:
+                frame_points.append([0.0, 0.0])  # Add dummy points
+
+            frame_labels = [1] * len(frame_anns)
+            frame_labels.extend([0] * (max_points - len(frame_anns)))  # Pad with zeros
+
+            all_points.append(frame_points)
+            all_labels.append(frame_labels)
+
+        if not any(all_points):  # Handle case with no detections
+            return annotations
+
+        inputs = self.segmentor_processor(
+            images=images,
+            input_points=all_points,
+            input_labels=all_labels,
+            return_tensors="pt",
+        ).to(self.device)
+
+        with torch.no_grad():
+            outputs = self.segmentator_model(**inputs)
+
+        scores = outputs["iou_scores"]
+        masks = self.segmentor_processor.post_process_masks(
+            masks=outputs.pred_masks,
+            original_sizes=inputs.original_sizes,
+            reshaped_input_sizes=inputs.reshaped_input_sizes,
         )
-        segment_annotations = run_segmenter(
-            self.segmentor_processor,
-            self.segmentator_model,
-            image,
-            self.device,
-            box_annotations,
-        )
+
+        # Process results for each frame
+        for frame_idx, (frame_masks, frame_scores, frame_anns) in enumerate(
+            zip(masks, scores, annotations)
+        ):
+            for obj_idx, (mask, score, ann) in enumerate(
+                zip(frame_masks, frame_scores, frame_anns)
+            ):
+                best_mask = mask[score.argmax()]
+                ann.segmentation = binary_mask_to_rle(best_mask.numpy())
+
+        return annotations
+
+    def process_batch(
+        self,
+        images: List[Image.Image],
+        labels_str: str,
+    ) -> List[List[Annotation]]:
+        """Process a batch of images with detection and segmentation."""
+        box_annotations = self.run_detector(images, labels_str)
+        if not any(box_annotations):
+            print("No detections found in any frame")
+            return box_annotations
+
+        segment_annotations = self.run_segmenter(images, box_annotations)
         return segment_annotations
 
     def annotate_video(
-        self, frames: list[np.ndarray], labels_str: str
-    ) -> list[list[Annotation]]:
-        """Annotate provided video frames.
-
-        Args:
-            frames: List of frames to annotate
-            labels_str: text prompt for object detection
-
-        Returns:
-            List of annotations for each frame
-        """
+        self,
+        frames: List[np.ndarray],
+        labels_str: str,
+        batch_size: int = 4,
+    ) -> List[List[Annotation]]:
+        """Annotate video frames in batches."""
         all_annotations = []
-        for frame in frames:
-            # Save frame temporarily and get its path
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-                cv2.imwrite(tmp.name, frame)
-                # Use existing annotate method
-                frame_annotations = self.annotate(tmp.name, labels_str)
-                all_annotations.extend(frame_annotations)
-                os.unlink(tmp.name)  # Clean up temp file
+
+        # Convert frames to PIL Images
+        pil_frames = [
+            Image.fromarray(cv2.cvtColor(f, cv2.COLOR_BGR2RGB)) for f in frames
+        ]
+
+        # Process in batches
+        for i in range(0, len(pil_frames), batch_size):
+            batch_frames = pil_frames[i : i + batch_size]
+            batch_annotations = self.process_batch(batch_frames, labels_str)
+            all_annotations.extend(batch_annotations)
 
         return all_annotations
 
 
 if __name__ == "__main__":
-    # Example with single image
-    # image_url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-    # text = "a cat. a remote control."
-    # annotations = annotator.annotate(image_url, text)
-
+    # Your existing video loading code remains the same
     dataset_name = "berkeley_fanuc_manipulation"
     fname = "data/train/episode_30.mp4"
 
     vlm = get_gemini_2_flash()
     prompt_filename = "grounding_description.jinja2"
 
-    # Example with video
     video_path = get_video_from_path(dataset_name, fname)
     frame_indices = get_frame_indices_for_fps(video_path, target_fps=1)
     all_frames = split_video_to_frames(video_path)
     frames_to_process = choose_and_preprocess_frames(
         all_frames, specified_frames=frame_indices
     )
-    breakpoint()
 
-    label_str = vlm.ask(
+    messages, response = vlm.ask(
         info=dict(), prompt_filename=prompt_filename, images=frames_to_process
     )
+    label_str: str = response.choices[0].message.content
 
-    breakpoint()
+    # Initialize and run the annotator
     annotator = GroundingAnnotator()
     video_annotations = annotator.annotate_video(frames_to_process, label_str)
-
     breakpoint()
