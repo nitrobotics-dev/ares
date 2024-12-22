@@ -4,8 +4,21 @@ from typing import Any, Dict, Optional, Union
 
 import cv2
 import numpy as np
+from PIL import Image
 from pycocotools import mask as mask_utils
 from pydantic import BaseModel, Field
+
+
+def rle_to_binary_mask(rle: dict) -> np.ndarray:
+    """Convert RLE format to binary mask."""
+    rle = {"counts": rle["counts"].encode("utf-8"), "size": rle["size"]}
+    return mask_utils.decode(rle)
+
+
+def binary_mask_to_rle(mask: np.ndarray) -> dict:
+    """Convert binary mask to RLE format."""
+    rle = mask_utils.encode(np.asfortranarray(mask.astype(np.uint8)))
+    return {"counts": rle["counts"].decode("utf-8"), "size": rle["size"]}
 
 
 class Annotation(BaseModel):
@@ -55,7 +68,7 @@ class Annotation(BaseModel):
             return None
 
         if isinstance(self.segmentation, dict):  # RLE format
-            return mask_utils.decode(self.segmentation)
+            return rle_to_binary_mask(self.segmentation)
         else:  # Polygon format
             mask = np.zeros(
                 (
@@ -77,19 +90,14 @@ class Annotation(BaseModel):
         category_name: str,
         score: float,
         **kwargs,
-    ):
+    ) -> "Annotation":
         """Create annotation from binary mask."""
-        # Convert mask to RLE
-        rle = mask_utils.encode(np.asfortranarray(mask.astype(np.uint8)))
-        # Convert RLE to dictionary format
-        rle_dict = {"counts": rle["counts"].decode("utf-8"), "size": rle["size"]}
-
         return cls(
             bbox=bbox,
             category_id=category_id,
             category_name=category_name,
             score=score,
-            segmentation=rle_dict,
+            segmentation=binary_mask_to_rle(mask),
             **kwargs,
         )
 
@@ -172,9 +180,16 @@ class Annotation(BaseModel):
         )
 
     def visualize(
-        self, image: np.ndarray, color: tuple = (0, 255, 0), thickness: int = 2
+        self,
+        image: Union[np.ndarray, Image.Image],
+        color: tuple = (0, 255, 0),
+        thickness: int = 2,
     ) -> np.ndarray:
         """Visualize the annotation on an image."""
+        # Convert PIL Image to numpy array if needed
+        if isinstance(image, Image.Image):
+            image = np.array(image)
+
         vis_image = image.copy()
 
         # Draw bbox
@@ -204,37 +219,69 @@ class Annotation(BaseModel):
 
         return vis_image
 
+    @staticmethod
+    def visualize_all(
+        image: Union[np.ndarray, Image.Image],
+        annotations: list["Annotation"],
+        colors: Optional[list[tuple]] = None,
+        thickness: int = 2,
+    ) -> np.ndarray:
+        """Draw all annotations on a single image."""
+        # Convert PIL Image to numpy array if needed
+        if isinstance(image, Image.Image):
+            image = np.array(image)
+
+        vis_image = image.copy()
+
+        # Generate colors if not provided
+        if colors is None:
+            colors = [
+                (
+                    np.random.randint(0, 255),
+                    np.random.randint(0, 255),
+                    np.random.randint(0, 255),
+                )
+                for _ in range(len(annotations))
+            ]
+
+        # Draw each annotation
+        for ann, color in zip(annotations, colors):
+            x1, y1, x2, y2 = [int(c) for c in ann.bbox]
+
+            # Draw mask if available
+            if ann.mask is not None:
+                mask_overlay = vis_image.copy()
+                mask_overlay[ann.mask > 0] = color
+                vis_image = cv2.addWeighted(vis_image, 0.7, mask_overlay, 0.3, 0)
+
+            # Draw bbox
+            cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, thickness)
+
+            # Add text
+            text = f"{ann.category_name}: {ann.score:.2f}"
+            if ann.track_id is not None:
+                text += f" ID: {ann.track_id}"
+
+            cv2.putText(
+                vis_image,
+                text,
+                (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                thickness,
+            )
+
+        return vis_image
+
     def to_dict(self) -> dict:
         """Convert annotation to dictionary format suitable for JSON serialization."""
         base_dict = self.model_dump(exclude_none=True)
-
-        # Handle RLE encoding if present
-        if isinstance(self.segmentation, dict):
-            if "counts" in self.segmentation and isinstance(
-                self.segmentation["counts"], bytes
-            ):
-                base_dict["segmentation"] = {
-                    "counts": self.segmentation["counts"].decode("utf-8"),
-                    "size": self.segmentation["size"],
-                }
-
         return base_dict
 
     @classmethod
     def from_dict(cls, data: dict) -> "Annotation":
         """Create annotation from dictionary."""
-        # Handle RLE encoding if present
-        if "segmentation" in data and isinstance(data["segmentation"], dict):
-            if "counts" in data["segmentation"]:
-                data["segmentation"] = {
-                    "counts": (
-                        data["segmentation"]["counts"].encode("utf-8")
-                        if isinstance(data["segmentation"]["counts"], str)
-                        else data["segmentation"]["counts"]
-                    ),
-                    "size": data["segmentation"]["size"],
-                }
-
         return cls(**data)
 
     def save_json(self, filepath: str) -> None:
@@ -303,7 +350,24 @@ if __name__ == "__main__":
             [ann.bbox_xyxy for ann in frame_annotations]
             for frame_annotations in annotations
         ]
-        inputs = processor(images=image, boxes=boxes, return_tensors="pt").to(device)
+
+        # Reshape input points to match expected format - Fix the dimensionality
+        input_points = [
+            [
+                (box[0] + box[2]) / 2,
+                (box[1] + box[3]) / 2,
+            ]  # Use center point of each box
+            for box in boxes[0]
+        ]
+
+        input_labels = [1] * len(boxes[0])  # Simplified labels format
+
+        inputs = processor(
+            images=image,
+            input_points=[input_points],  # Wrap in list for batch dimension
+            input_labels=[input_labels],  # Wrap in list for batch dimension
+            return_tensors="pt",
+        ).to(device)
         with torch.no_grad():
             outputs = model(**inputs)
         masks = processor.post_process_masks(
@@ -311,11 +375,10 @@ if __name__ == "__main__":
             original_sizes=inputs.original_sizes,
             reshaped_input_sizes=inputs.reshaped_input_sizes,
         )
-        breakpoint()
         # add to annotations
         for i, frame_masks in enumerate(masks):
-            for j, mask in enumerate(frame_masks):
-                annotations[i][j].segmentation = mask
+            for j, mask in enumerate(frame_masks.squeeze(0)):
+                annotations[i][j].segmentation = binary_mask_to_rle(mask.numpy())
         return annotations
 
     detector_id = None
@@ -333,7 +396,7 @@ if __name__ == "__main__":
 
     segmentor_processor = AutoProcessor.from_pretrained(segmenter_id)
     segmentator_model = AutoModelForMaskGeneration.from_pretrained(
-        segmenter_id, use_auth_token=os.environ.get("HUGGINGFACE_API_KEY")
+        segmenter_id, token=os.environ.get("HUGGINGFACE_API_KEY")
     ).to(device)
 
     image_url = "http://images.cocodataset.org/val2017/000000039769.jpg"
@@ -348,4 +411,26 @@ if __name__ == "__main__":
         segmentor_processor, segmentator_model, image, device, box_annotations
     )
 
+    # code to visualize
+    for i, frame_annotations in enumerate(segment_annotations):
+        # Visualize all annotations in the frame at once
+        # vis_image = Annotation.visualize_all(image, frame_annotations)
+        # # Instead of cv2.imshow, save to file
+        # cv2.imwrite(
+        #     f"/tmp/viz_frame_{i}.png", cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR)
+        # )
+
+        # instead, do each annotation separately and save to file
+        for j, ann in enumerate(frame_annotations):
+            vis_image = ann.visualize(image)
+            cv2.imwrite(
+                f"/tmp/viz_frame_{i}_ann_{j}.png",
+                cv2.cvtColor(vis_image, cv2.COLOR_RGB2BGR),
+            )
+    # breakpoint()
+    # test saving to file and reloading
+    ann.save_json("/tmp/test.json")
+    ann2 = Annotation.load_json("/tmp/test.json")
+    print(ann.segmentation["counts"][:5])
+    print(ann2.segmentation["counts"][:5])
     breakpoint()
