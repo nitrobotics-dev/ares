@@ -12,7 +12,7 @@ from transformers import (
     AutoProcessor,
 )
 
-from ares.databases.annotations import Annotation, binary_mask_to_rle
+from ares.configs.annotations import Annotation, binary_mask_to_rle
 from ares.image_utils import (
     choose_and_preprocess_frames,
     get_frame_indices_for_fps,
@@ -21,16 +21,17 @@ from ares.image_utils import (
     get_video_from_path,
     split_video_to_frames,
 )
+from ares.models.shortcuts import get_gemini_2_flash
 
 
 def run_detector(
     processor: AutoProcessor,
     model: AutoModelForZeroShotObjectDetection,
     image: Image.Image,
-    text: str,
+    labels_str: str,
     device: str,
 ) -> list[list[Annotation]]:
-    inputs = processor(images=image, text=text, return_tensors="pt").to(device)
+    inputs = processor(images=image, text=labels_str, return_tensors="pt").to(device)
     with torch.no_grad():
         outputs = model(**inputs)
 
@@ -99,42 +100,53 @@ def run_segmenter(
     return annotations
 
 
-def setup_models_for_grounding(
-    detector_id: str = "IDEA-Research/grounding-dino-tiny",
-    segmenter_id: str = "facebook/sam-vit-base",
-    device: str = "cpu",
-) -> tuple[
-    AutoProcessor,
-    AutoModelForZeroShotObjectDetection,
-    AutoProcessor,
-    AutoModelForMaskGeneration,
-]:
-    detector_processor = AutoProcessor.from_pretrained(detector_id)
-    detector_model = AutoModelForZeroShotObjectDetection.from_pretrained(
-        detector_id
-    ).to(device)
-
-    segmentor_processor = AutoProcessor.from_pretrained(segmenter_id)
-    segmentator_model = AutoModelForMaskGeneration.from_pretrained(
-        segmenter_id, token=os.environ.get("HUGGINGFACE_API_KEY")
-    ).to(device)
-    return detector_processor, detector_model, segmentor_processor, segmentator_model
-
-
 class GroundingAnnotator:
-    def __init__(self, detector_id: str, segmenter_id: str, device: str = "cpu"):
+    def __init__(
+        self,
+        detector_id: str = "IDEA-Research/grounding-dino-tiny",
+        segmenter_id: str = "facebook/sam-vit-base",
+        device: str = "cpu",
+    ):
         self.device = device
         (
             self.detector_processor,
             self.detector_model,
             self.segmentor_processor,
             self.segmentator_model,
-        ) = setup_models_for_grounding(detector_id, segmenter_id, device)
+        ) = self.setup_models_for_grounding(detector_id, segmenter_id, device)
+        print(f"Loaded models for {detector_id} and {segmenter_id} on device {device}")
 
-    def annotate(self, image_url: str, text: str) -> list[list[Annotation]]:
+    def setup_models_for_grounding(
+        self,
+        detector_id: str,
+        segmenter_id: str,
+        device: str,
+    ) -> tuple[
+        AutoProcessor,
+        AutoModelForZeroShotObjectDetection,
+        AutoProcessor,
+        AutoModelForMaskGeneration,
+    ]:
+        detector_processor = AutoProcessor.from_pretrained(detector_id)
+        detector_model = AutoModelForZeroShotObjectDetection.from_pretrained(
+            detector_id
+        ).to(device)
+
+        segmentor_processor = AutoProcessor.from_pretrained(segmenter_id)
+        segmentator_model = AutoModelForMaskGeneration.from_pretrained(
+            segmenter_id, token=os.environ.get("HUGGINGFACE_API_KEY")
+        ).to(device)
+        return (
+            detector_processor,
+            detector_model,
+            segmentor_processor,
+            segmentator_model,
+        )
+
+    def annotate(self, image_url: str, labels_str: str) -> list[list[Annotation]]:
         image = get_image_from_path(image_url)
         box_annotations = run_detector(
-            self.detector_processor, self.detector_model, image, text, self.device
+            self.detector_processor, self.detector_model, image, labels_str, self.device
         )
         segment_annotations = run_segmenter(
             self.segmentor_processor,
@@ -146,13 +158,13 @@ class GroundingAnnotator:
         return segment_annotations
 
     def annotate_video(
-        self, frames: list[np.ndarray], text: str
+        self, frames: list[np.ndarray], labels_str: str
     ) -> list[list[Annotation]]:
         """Annotate provided video frames.
 
         Args:
             frames: List of frames to annotate
-            text: Text prompt for object detection
+            labels_str: text prompt for object detection
 
         Returns:
             List of annotations for each frame
@@ -163,7 +175,7 @@ class GroundingAnnotator:
             with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
                 cv2.imwrite(tmp.name, frame)
                 # Use existing annotate method
-                frame_annotations = self.annotate(tmp.name, text)
+                frame_annotations = self.annotate(tmp.name, labels_str)
                 all_annotations.extend(frame_annotations)
                 os.unlink(tmp.name)  # Clean up temp file
 
@@ -172,16 +184,31 @@ class GroundingAnnotator:
 
 if __name__ == "__main__":
     # Example with single image
-    image_url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-    text = "a cat. a remote control."
-    annotator = GroundingAnnotator()
-    annotations = annotator.annotate(image_url, text)
+    # image_url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+    # text = "a cat. a remote control."
+    # annotations = annotator.annotate(image_url, text)
+
+    dataset_name = "berkeley_fanuc_manipulation"
+    fname = "data/train/episode_30.mp4"
+
+    vlm = get_gemini_2_flash()
+    prompt_filename = "grounding_description.jinja2"
 
     # Example with video
-    video_path = get_video_from_path("dataset_name", "video.mp4")
+    video_path = get_video_from_path(dataset_name, fname)
     frame_indices = get_frame_indices_for_fps(video_path, target_fps=1)
     all_frames = split_video_to_frames(video_path)
     frames_to_process = choose_and_preprocess_frames(
         all_frames, specified_frames=frame_indices
     )
-    video_annotations = annotator.annotate_video(frames_to_process, text)
+    breakpoint()
+
+    label_str = vlm.ask(
+        info=dict(), prompt_filename=prompt_filename, images=frames_to_process
+    )
+
+    breakpoint()
+    annotator = GroundingAnnotator()
+    video_annotations = annotator.annotate_video(frames_to_process, label_str)
+
+    breakpoint()

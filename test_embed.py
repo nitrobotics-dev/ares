@@ -20,7 +20,7 @@ from ares.databases.structured_database import (
     RolloutSQLModel,
     setup_database,
 )
-from ares.models.llm import get_nomic_embedder
+from ares.models.shortcuts import get_nomic_embedder
 
 TEST_TIME_STEPS = 100
 LIMIT = 2**31 - 1  # Maximum 32-bit signed integer

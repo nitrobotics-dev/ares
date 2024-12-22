@@ -17,7 +17,7 @@ from ares.databases.structured_database import (
     RolloutSQLModel,
     setup_database,
 )
-from ares.models.llm import LLM
+from ares.models.base import VLM
 
 
 def load_cached_embeddings(
@@ -132,9 +132,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
         # Store in session state
         store_in_session(index_name, embeddings, reduced, labels)
     st.session_state.models = dict()
-    st.session_state.models["summarizer"] = LLM(
-        provider="openai", llm_name="gpt-4o-mini"
-    )
+    st.session_state.models["summarizer"] = VLM(provider="openai", name="gpt-4o-mini")
 
 
 def display_state_info() -> None:

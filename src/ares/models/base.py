@@ -34,17 +34,17 @@ def structure_image_messages(
     }
 
 
-class LLM:
-    def __init__(self, provider: str, llm_name: str):
+class VLM:
+    def __init__(self, provider: str, name: str):
         self.provider = provider
-        self.llm_name = llm_name
+        self.name = name
         self.check_valid_key()
 
     def check_valid_key(self) -> bool:
-        # note: don't use litellm util here, it uses 10 tokens!
+        # note: don't use litellm util here, it uses 10 tokens! roll our own check with 1
         try:
             res = completion(
-                model=self.llm_name,
+                model=self.name,
                 messages=[{"role": "user", "content": "!"}],
                 max_tokens=1,
             )
@@ -64,13 +64,16 @@ class LLM:
 
     def _construct_messages(
         self,
-        prompt_filename: str,
         info: dict,
+        prompt_filename: str | None = None,
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         double_prompt: bool = False,
     ) -> list[dict[str, t.Any]]:
         content: list[dict[str, t.Any]] = []
-        prompt = self._get_prompt(prompt_filename, info)
+        if "prompt" not in info and prompt_filename is not None:
+            prompt = self._get_prompt(prompt_filename, info)
+        else:
+            prompt = info["prompt"]
         content.append({"type": "text", "text": prompt})
         if images:
             image_contents = []
@@ -91,31 +94,29 @@ class LLM:
 
     def ask(
         self,
-        prompt_filename: str,
         info: dict,
+        prompt_filename: str | None = None,
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-        llm_kwargs: t.Dict = dict(),
+        model_kwargs: t.Dict = dict(),
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
         if video_path:
-            raise NotImplementedError("Video path not implemented for this LLM")
+            raise NotImplementedError("Video path not implemented for this VLM")
         messages = self._construct_messages(
-            prompt_filename, info, images, double_prompt
+            info, prompt_filename, images, double_prompt
         )
-        print(f"submitting request to {self.llm_name}")
-        return messages, completion(
-            model=self.llm_name, messages=messages, **llm_kwargs
-        )
+        print(f"submitting request to {self.name}")
+        return messages, completion(model=self.name, messages=messages, **model_kwargs)
 
 
-class GeminiVideoLLM(LLM):
-    def __init__(self, provider: str, llm_name: str):
-        super().__init__(provider, llm_name)
+class GeminiVideoVLM(VLM):
+    def __init__(self, provider: str, name: str):
+        super().__init__(provider, name)
         vertexai.init(
             project=os.environ["VERTEX_PROJECT"], location=os.environ["VERTEX_LOCATION"]
         )
-        self.model = GenerativeModel(llm_name)
+        self.model = GenerativeModel(name)
         self.generation_config = {
             "max_output_tokens": 8192,
             "temperature": 1,
@@ -124,12 +125,12 @@ class GeminiVideoLLM(LLM):
 
     def ask(
         self,
-        prompt_filename: str,
         info: dict,
+        prompt_filename: str | None = None,
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-        llm_kwargs: t.Dict = dict(),
+        model_kwargs: t.Dict = dict(),
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
         prompt = self._get_prompt(prompt_filename, info)
         if video_path:
@@ -156,14 +157,14 @@ class GeminiVideoLLM(LLM):
 
 
 class Embedder:
-    def __init__(self, provider: str, llm_name: str):
+    def __init__(self, provider: str, name: str):
         self.provider = provider
-        self.llm_name = llm_name
+        self.name = name
         self._setup_model()
 
     def _setup_model(self) -> None:
         """Initialize model and processor. Should be implemented by child classes."""
-        name = f"{self.provider}/{self.llm_name}"
+        name = f"{self.provider}/{self.name}"
         self.processor = AutoProcessor.from_pretrained(name)
         self.model = AutoModel.from_pretrained(name)
 
@@ -193,40 +194,9 @@ class Embedder:
                 return outputs.detach().numpy()[0]
 
 
-SigLIPEmbedder = Embedder(provider="google", llm_name="siglip-base-patch16-224")
-
-
 class SentenceTransformerEmbedder:
-    def __init__(self, provider: str, llm_name: str):
-        self.model = SentenceTransformer(
-            f"{provider}/{llm_name}", trust_remote_code=True
-        )
+    def __init__(self, provider: str, name: str):
+        self.model = SentenceTransformer(f"{provider}/{name}", trust_remote_code=True)
 
     def embed(self, inp: str, prefix: str = "clustering: ") -> np.ndarray:
         return np.array(self.model.encode(prefix + inp))
-
-
-def get_nomic_embedder() -> SentenceTransformerEmbedder:
-    return SentenceTransformerEmbedder(
-        provider="nomic-ai", llm_name="nomic-embed-text-v1"
-    )
-
-
-def get_gemini_15_flash() -> LLM:
-    return LLM(provider="gemini", llm_name="gemini-1.5-flash")
-
-
-def get_gemini_2_flash() -> LLM:
-    return LLM(provider="gemini", llm_name="gemini-2.0-flash-exp")
-
-
-def get_4o_mini() -> LLM:
-    return LLM(provider="openai", llm_name="gpt-4o-mini")
-
-
-def summarize(llm: LLM, data: list[str], description: str) -> str:
-    messages, response = llm.ask(
-        "summarizing.jinja2",
-        {"data": "\n".join(data), "description": description},
-    )
-    return response.choices[0].message.content

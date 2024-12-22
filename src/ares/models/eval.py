@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from ares.configs.base import pydantic_to_field_instructions
 from ares.image_utils import choose_and_preprocess_frames, split_video_to_frames
-from ares.models.llm import LLM
+from ares.models.base import VLM
 from ares.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 
 
@@ -96,17 +96,17 @@ if __name__ == "__main__":
     task = "Paper towel in holder"
 
     # provider = "gemini"
-    # llm_name = f"{provider}/gemini-1.5-flash"
+    # name = f"{provider}/gemini-1.5-flash"
 
     provider = "openai"
-    llm_name = f"{provider}/gpt-4o"
-    # llm_name = f"{provider}/gpt-4o-mini"
-    # llm_name = f"{provider}/gpt-4-turbo"
+    name = f"{provider}/gpt-4o"
+    # name = f"{provider}/gpt-4o-mini"
+    # name = f"{provider}/gpt-4-turbo"
 
     # provider = "anthropic"
-    # llm_name = f"{provider}/claude-3-5-sonnet-20240620"
+    # name = f"{provider}/claude-3-5-sonnet-20240620"
 
-    llm = LLM(provider=provider, llm_name=llm_name)
+    vlm = VLM(provider=provider, name=name)
 
     # n_frames = [1, 5, 10, 20]
     n_frames = [3]
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     prediction_tracker = []
     label_tracker = []
 
-    llm_kwargs = dict(response_format=RolloutDescription, n=5)
+    model_kwargs = dict(response_format=RolloutDescription, n=5)
 
     # for task
     # for provider
@@ -133,12 +133,12 @@ if __name__ == "__main__":
             except OSError:
                 print(f"skipping {n_frame}/{success_flag}/{task}")
                 continue
-            messages, res = llm.ask(
-                "test_prompt.jinja2",
+            messages, res = vlm.ask(
                 info_dict,
+                prompt_filename="test_prompt.jinja2",
                 images=frames,
                 double_prompt=True,
-                llm_kwargs=llm_kwargs,
+                model_kwargs=model_kwargs,
             )
             print(f"got answer; cost {completion_cost(res)}")
             content = res.choices[0].message.content

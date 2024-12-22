@@ -19,7 +19,7 @@ from ares.configs.base import (
     pydantic_to_field_instructions,
 )
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
-from ares.models.llm import LLM
+from ares.models.base import VLM
 
 
 def merge_dicts(dict1: dict, dict2: dict) -> dict:
@@ -121,7 +121,7 @@ class InformationExtractor:
         robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        llm_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
         raise NotImplementedError
 
@@ -187,12 +187,12 @@ class RandomInformationExtractor(InformationExtractor):
         robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        llm_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
         robot_kwargs = robot_kwargs or {}
         environment_kwargs = environment_kwargs or {}
         task_kwargs = task_kwargs or {}
-        llm_kwargs = llm_kwargs or {}
+        model_kwargs = model_kwargs or {}
 
         dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
         episode_info_dict = hard_coded_episode_info_extraction(episode)
@@ -218,11 +218,11 @@ class RandomInformationExtractor(InformationExtractor):
         return rollout
 
 
-class LLMInformationExtractor(InformationExtractor):
-    def __init__(self, llm: LLM):
-        self.llm = llm
+class VLMInformationExtractor(InformationExtractor):
+    def __init__(self, vlm: VLM):
+        self.vlm = vlm
 
-    def finish_llm_object(
+    def finish_vlm_object(
         self,
         object: t.Type[BaseConfig],
         hardcoded_info: dict,
@@ -247,20 +247,20 @@ class LLMInformationExtractor(InformationExtractor):
         robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        llm_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
         # Initialize kwargs
         robot_kwargs = robot_kwargs or {}
         environment_kwargs = environment_kwargs or {}
         task_kwargs = task_kwargs or {}
-        llm_kwargs = llm_kwargs or {}
+        model_kwargs = model_kwargs or {}
 
         # Get hardcoded information
         dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
         episode_info_dict = hard_coded_episode_info_extraction(episode)
         hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
 
-        # Get LLM-extracted information
+        # Get VLM-extracted information
         images = [step.observation.image for step in episode.steps]
         # HACK
         if len(images) > 10:
@@ -282,10 +282,10 @@ class LLMInformationExtractor(InformationExtractor):
             ),
         }
         breakpoint()
-        messages, response = self.llm.ask(
-            prompt_filename=llm_kwargs.get("prompt_filename", "test_prompt.jinja2"),
-            images=images,
+        messages, response = self.vlm.ask(
             info=info,
+            prompt_filename=model_kwargs.get("prompt_filename", "test_prompt.jinja2"),
+            images=images,
         )
         # Parse the response content as JSON if it's a string
         content = response.choices[0].message.content
@@ -300,7 +300,7 @@ class LLMInformationExtractor(InformationExtractor):
             "trajectory": (Trajectory, {}),
         }
         objects = {
-            name: self.finish_llm_object(cls, hardcoded_info, structured_info, kwargs)
+            name: self.finish_vlm_object(cls, hardcoded_info, structured_info, kwargs)
             for name, (cls, kwargs) in components.items()
         }
 

@@ -58,7 +58,7 @@ TEST_TIME_STEPS = 100
 
 if __name__ == "__main__":
 
-    from ares.models.llm import get_nomic_embedder
+    from ares.models.shortcuts import get_nomic_embedder
 
     EMBEDDER = get_nomic_embedder()
 
