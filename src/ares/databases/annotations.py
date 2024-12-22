@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any, Dict, Optional, Union
 
 import cv2
@@ -10,8 +11,8 @@ from pydantic import BaseModel, Field
 class Annotation(BaseModel):
     # Core detection attributes
     bbox: list[float]  # [x1, y1, x2, y2] / LTRBformat
-    category_id: int
-    category_name: str
+    category_id: int | None = None
+    category_name: str | None = None
     # denotes confidence of the detection if float else None if ground truth
     score: float | None = None
 
@@ -282,10 +283,9 @@ if __name__ == "__main__":
             these_annotations = []
             if "boxes" in annotations:
                 for i in range(len(annotations["boxes"])):
-                    breakpoint()
                     ann_dict = {
                         "bbox": annotations["boxes"][i].tolist(),
-                        "category_name": annotations["labels"][i].item(),
+                        "category_name": annotations["labels"][i],
                         "score": annotations["scores"][i].item(),
                     }
                     these_annotations.append(Annotation(**ann_dict))
@@ -323,9 +323,7 @@ if __name__ == "__main__":
         "IDEA-Research/grounding-dino-tiny" if detector_id is None else detector_id
     )
     segmenter_id = None
-    segmenter_id = (
-        "facebook/sam-vit-base-patch16" if segmenter_id is None else segmenter_id
-    )
+    segmenter_id = "facebook/sam-vit-base" if segmenter_id is None else segmenter_id
     device = "cpu"
 
     detector_processor = AutoProcessor.from_pretrained(detector_id)
@@ -334,9 +332,9 @@ if __name__ == "__main__":
     ).to(device)
 
     segmentor_processor = AutoProcessor.from_pretrained(segmenter_id)
-    segmentator_model = AutoModelForMaskGeneration.from_pretrained(segmenter_id).to(
-        device
-    )
+    segmentator_model = AutoModelForMaskGeneration.from_pretrained(
+        segmenter_id, use_auth_token=os.environ.get("HUGGINGFACE_API_KEY")
+    ).to(device)
 
     image_url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     image = Image.open(requests.get(image_url, stream=True).raw)
