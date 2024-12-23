@@ -1,8 +1,11 @@
-The task is to watch the following video and list the important objects in the video which will be used to query bounding boxes. The video will be about a robot performing a task. Pay special attention
-to the robot and the objects it interacts with. Use general purpose words for objects, such as "a cup" or "a bowl"; however, don't overgeneralize to the point that the object is not specific, such as "a object".
+The task is to watch the following video and list the important objects in the video which will be used to query bounding boxes.
+The video will be about a robot performing a task. Pay special attention to the robot and the objects it interacts with. 
+Use general purpose nouns for objects, such as "a cup" or "a bowl"; however, don't overgeneralize to the point that the object is not specific, such as "a object".
 Do not provide background information like "table" or "surface" or "floor"; focus on the objects that are important to the task.
+Do not just say "a red object"; always use the actual name of the object.
+The output format is a simple period-separated list of simple descriptions of objects, such as "a cup. a bowl. a robot."
 
-For example, imagine a video of a robot picking up a red cup and pouring it into a round bowl. The important objects are the robot, the cup, and the bowl.
-The output format is a simple period-separated list of simple descriptions of objects, such as just "a cup. a bowl. a robot."
+For example, imagine a video of a robot picking up a square red cup and pouring it into a round blue bowl. The important objects are the robot, the cup, and the bowl.
+The output should be "a cup. a bowl. a robot."
 
 Watch the following video and list the important objects in the video:

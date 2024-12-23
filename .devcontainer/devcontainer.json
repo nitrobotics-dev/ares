@@ -4,7 +4,8 @@
         "source=${localEnv:HOME}/cert.pem,target=/etc/ssl/certs/ca-certificates.crt,type=bind,readonly,consistency=cached",
         "source=${localEnv:HOME}/.config/gcloud,target=/root/.config/gcloud,type=bind,consistency=cached",
         "source=${localWorkspaceFolder}/data,target=/workspaces/ares/data,type=bind",
-        "source=/tmp,target=/tmp,type=bind"
+        "source=/tmp,target=/tmp,type=bind",
+        "source=${localEnv:HOME}/.cache/huggingface,target=/cache/huggingface,type=bind,consistency=cached"
     ],
     "build": {
         "dockerfile": "../Dockerfile",
@@ -43,7 +44,8 @@
         "VERTEX_PROJECT": "${localEnv:VERTEX_PROJECT}",
         "VERTEX_LOCATION": "${localEnv:VERTEX_LOCATION}",
         "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}",
-        "MONGODB_URI": "mongodb://localhost:27017"
+        "MONGODB_URI": "mongodb://localhost:27017",
+        "TRANSFORMERS_CACHE": "/cache/huggingface"
     },
     "runArgs": ["--network=host"],
     "postCreateCommand": "pip install black pylint jupyter ipykernel mypy isort pymongo --retries 10"

@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pymongo import MongoClient
 
+from ares.configs.annotations import Annotation
+
 TEST_ANNOTATION_DB_PATH = "mongodb://localhost:27017"
 
 
@@ -87,7 +89,7 @@ class AnnotationDatabase:
         return list(self.annotations.find(query))
 
     def add_frame_annotations(
-        self, video_id: str, frame: int, annotations: List["Annotation"]
+        self, video_id: str, frame: int, annotations: List[Annotation]
     ) -> List[str]:
         """Add multiple annotations for a specific frame."""
         annotation_ids = []
@@ -106,9 +108,98 @@ class AnnotationDatabase:
 
     def get_frame_annotations(self, video_id: str, frame: int) -> List["Annotation"]:
         """Get all annotations for a specific frame."""
-        from ares.configs.annotations import Annotation
 
         annotations = self.get_annotations(
             video_id=video_id, annotation_type="detection", frame=frame
         )
         return [Annotation.from_dict(ann["value"]) for ann in annotations]
+
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Get statistics about the current state of the database.
+
+        Returns:
+            Dict containing:
+            - Total number of videos
+            - Total number of annotations
+            - Annotations per type
+            - Number of frame-specific vs video-level annotations
+        """
+        stats = {
+            "total_videos": self.videos.count_documents({}),
+            "total_annotations": self.annotations.count_documents({}),
+            "annotations_by_type": {},
+            "frame_annotations": self.annotations.count_documents(
+                {"frame": {"$ne": None}}
+            ),
+            "video_level_annotations": self.annotations.count_documents(
+                {"frame": None}
+            ),
+        }
+
+        # Get counts per annotation type
+        pipeline = [{"$group": {"_id": "$type", "count": {"$sum": 1}}}]
+        for type_stat in self.annotations.aggregate(pipeline):
+            stats["annotations_by_type"][type_stat["_id"]] = type_stat["count"]
+
+        return stats
+
+    def delete_annotations(
+        self, video_id: str, annotation_type: Optional[str] = None
+    ) -> int:
+        """Delete annotations for a video, optionally filtered by type.
+
+        Returns:
+            Number of annotations deleted
+        """
+        query = {"video_id": video_id}
+        if annotation_type:
+            query["type"] = annotation_type
+        result = self.annotations.delete_many(query)
+        return result.deleted_count
+
+    def delete_video(self, video_id: str, delete_annotations: bool = True) -> bool:
+        """Delete a video and optionally its annotations.
+
+        Args:
+            video_id: ID of the video to delete
+            delete_annotations: If True, also delete all annotations for this video
+
+        Returns:
+            True if video was found and deleted
+        """
+        if delete_annotations:
+            self.delete_annotations(video_id)
+
+        result = self.videos.delete_one({"_id": video_id})
+        return result.deleted_count > 0
+
+
+# make test inputs
+if __name__ == "__main__":
+    db = AnnotationDatabase()
+    # db.add_video("test_video", {"test": "test"})
+    # db.add_annotation("test_video", "test_annotation", "test_value", "test_type", 1)
+    # anns = db.get_annotations("test_video", "test_type", 1)
+    # add more test samples to the database
+    # for i in range(100):
+    #     db.add_annotation(
+    #         "test_video", f"test_annotation_{i}", f"test_value_{i}", "test_type", i
+    #     )
+    # # also add video laevel anns and frame level anns
+    # db.add_annotation("test_video", "test_annotation", "test_value", "test_type", None)
+    # db.add_annotation(
+    #     "test_video", "test_annotation", "test_value", "test_type", [1, 2, 3]
+    # )
+    # stats = db.get_database_stats()
+    # print(stats)
+
+    # # Delete all annotations for "test_video"
+    # deleted_count = db.delete_annotations("test_video")
+    # print(f"Deleted {deleted_count} annotations")
+
+    # # Delete the test video and its annotations
+    # db.delete_video("test_video")
+
+    # stats = db.get_database_stats()
+    # print(stats)
+    # breakpoint()

@@ -66,21 +66,20 @@ def save_video(
         frames = video
     else:
         raise TypeError(
-            "Unsupported video format. Use numpy array or list of numpy arrays."
+            f"Unsupported video format. Use numpy array or list of numpy arrays. Got {type(video)}{'with slices of type ' + str(type(video[0])) if (isinstance(video, list) and video) else ''}"
         )
 
     if not frames:
-        raise ValueError("No frames to save")
+        raise ValueError(f"No frames to save for {filename}; received {frames}")
 
     # Save MP4 using moviepy
-    clip = ImageSequenceClip(frames, fps=30)
-    clip.write_videofile(mp4_path, codec="libx264", logger=None)
+    # clip = ImageSequenceClip(frames, fps=30)
+    # clip.write_videofile(mp4_path, codec="libx264", logger=None)
 
     # Save individual frames
     for i, frame in enumerate(frames):
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.jpg")
         cv2.imwrite(frame_path, frame)
-
     return mp4_path, frames_dir
 
 
@@ -208,3 +207,17 @@ def get_frame_indices_for_fps(video_path: str, target_fps: int = 1) -> list[int]
     # Calculate frame indices to sample at desired fps_rate
     sample_interval = int(video_fps / target_fps)
     return list(range(0, total_frames, sample_interval))
+
+
+def load_video_frames(
+    dataset_name: str, fname: str, target_fps: float = 1
+) -> tuple[t.List[np.ndarray], t.List[int]]:
+    """Load video frames at specified FPS."""
+    video_path = get_video_from_path(dataset_name, fname)
+    frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
+    all_frames = get_video_frames(dataset_name, fname, n_frames=None, just_path=True)
+    frames_to_process = choose_and_preprocess_frames(
+        all_frames, specified_frames=frame_indices
+    )
+    print(f"Loaded {len(frames_to_process)} frames")
+    return frames_to_process, frame_indices

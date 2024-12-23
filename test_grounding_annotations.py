@@ -16,14 +16,8 @@ from transformers import (
 
 from ares.configs.annotations import Annotation, binary_mask_to_rle
 from ares.databases.annotation_database import AnnotationDatabase
-from ares.image_utils import (
-    choose_and_preprocess_frames,
-    get_frame_indices_for_fps,
-    get_video_frames,
-    get_video_from_path,
-    split_video_to_frames,
-)
-from ares.models.shortcuts import get_gemini_2_flash
+from ares.image_utils import load_video_frames
+from ares.models.shortcuts import get_gemini_2_flash, get_gpt_4o
 
 
 class GroundingAnnotator:
@@ -44,6 +38,7 @@ class GroundingAnnotator:
         self, model_id: str
     ) -> Tuple[AutoProcessor, AutoModelForZeroShotObjectDetection]:
         processor = AutoProcessor.from_pretrained(model_id)
+        print(f"Downloading model {model_id}...")
         model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id).to(
             self.device
         )
@@ -53,6 +48,7 @@ class GroundingAnnotator:
         self, model_id: str
     ) -> Tuple[AutoProcessor, AutoModelForMaskGeneration]:
         processor = AutoProcessor.from_pretrained(model_id)
+        print(f"Downloading model {model_id}...")
         model = AutoModelForMaskGeneration.from_pretrained(
             model_id, token=os.environ.get("HUGGINGFACE_API_KEY")
         ).to(self.device)
@@ -187,26 +183,12 @@ class GroundingAnnotator:
         ]
 
         # Process in batches
-        for i in range(0, len(pil_frames), batch_size):
+        for i in tqdm(range(0, len(pil_frames), batch_size)):
             batch_frames = pil_frames[i : i + batch_size]
             batch_annotations = self.process_batch(batch_frames, labels_str)
             all_annotations.extend(batch_annotations)
 
         return all_annotations
-
-
-def load_video_frames(
-    dataset_name: str, fname: str, target_fps: float = 1
-) -> tuple[List[np.ndarray], List[int]]:
-    """Load video frames at specified FPS."""
-    video_path = get_video_from_path(dataset_name, fname)
-    frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
-    all_frames = get_video_frames(dataset_name, fname, n_frames=None, just_path=True)
-    frames_to_process = choose_and_preprocess_frames(
-        all_frames, specified_frames=frame_indices
-    )
-    print(f"Loaded {len(frames_to_process)} frames")
-    return frames_to_process, frame_indices
 
 
 def get_vlm_labels(vlm, frames: List[np.ndarray], prompt_filename: str) -> str:
@@ -279,24 +261,30 @@ def visualize_annotations(
         )
 
 
-def process_video(
-    dataset_name: str,
-    fname: str,
-    annotator: GroundingAnnotator,
-    db: AnnotationDatabase,
-    target_fps: float = 1,
-    visualize: bool = True,
-) -> str:
-    """Process a video through the full pipeline."""
-    # Load frames
+if __name__ == "__main__":
+    # Initialize components
+    db = AnnotationDatabase()
+    annotator = GroundingAnnotator()
+
+    # Process video
+    dataset_name = "cmu_play_fusion"
+    fname = "data/train/episode_208.mp4"
+    target_fps = 1
+
     frames, frame_indices = load_video_frames(dataset_name, fname, target_fps)
 
     # Get labels from VLM
-    vlm = get_gemini_2_flash()
+    # vlm = get_gemini_2_flash()
+    vlm = get_gpt_4o()
     label_str = get_vlm_labels(vlm, frames, "grounding_description.jinja2")
 
     # Run detection and segmentation
     video_annotations = annotator.annotate_video(frames, label_str)
+    import pickle
+
+    pickle.dump(video_annotations, open("video_annotations.pkl", "wb"))
+    # video_annotations = pickle.load(open("video_annotations.pkl", "rb"))
+    breakpoint()
 
     # Store in database
     video_id = db.add_video_with_annotations(
@@ -312,30 +300,10 @@ def process_video(
     )
 
     # Optionally visualize
-    if visualize:
-        visualize_annotations(frames, video_annotations)
-        print(f"\nVisualization results saved to /tmp/output_visualizations/")
+    # if visualize:
+    visualize_annotations(frames, video_annotations)
+    print(f"\nVisualization results saved to /tmp/output_visualizations/")
 
-    return video_id
-
-
-if __name__ == "__main__":
-    # Initialize components
-    db = AnnotationDatabase()
-    annotator = GroundingAnnotator()
-
-    # Process video
-    dataset_name = "cmu_play_fusion"
-    fname = "data/train/episode_208.mp4"
-
-    video_id = process_video(
-        dataset_name=dataset_name,
-        fname=fname,
-        annotator=annotator,
-        db=db,
-        target_fps=1,
-        visualize=True,
-    )
     print(f"Processed video {video_id}")
 
     breakpoint()

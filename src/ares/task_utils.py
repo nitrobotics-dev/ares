@@ -1,4 +1,4 @@
-PI_DEMO_PATH = "/workspaces/ares/data/pi_demos"
+PI_DEMO_PATH = "/workspaces/ares/data/videos/pi_demos"
 PI_DEMO_TASKS = {
     "Eggs in carton": {
         "task": "The robot must place every egg into the carton and then close and secure the lid.",
