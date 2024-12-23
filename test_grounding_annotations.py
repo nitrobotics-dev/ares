@@ -4,8 +4,10 @@ from typing import List, Tuple
 
 import cv2
 import numpy as np
+import pymongo
 import torch
 from PIL import Image
+from tqdm import tqdm
 from transformers import (
     AutoModelForMaskGeneration,
     AutoModelForZeroShotObjectDetection,
@@ -13,9 +15,11 @@ from transformers import (
 )
 
 from ares.configs.annotations import Annotation, binary_mask_to_rle
+from ares.databases.annotation_database import AnnotationDatabase
 from ares.image_utils import (
     choose_and_preprocess_frames,
     get_frame_indices_for_fps,
+    get_video_frames,
     get_video_from_path,
     split_video_to_frames,
 )
@@ -58,8 +62,8 @@ class GroundingAnnotator:
         self,
         images: List[Image.Image],
         labels_str: str,
-        box_threshold: float = 0.2,
-        text_threshold: float = 0.2,
+        box_threshold: float = 0.4,
+        text_threshold: float = 0.3,
     ) -> List[List[Annotation]]:
         # Process all images in a single batch
         inputs = self.detector_processor(
@@ -172,7 +176,7 @@ class GroundingAnnotator:
         self,
         frames: List[np.ndarray],
         labels_str: str,
-        batch_size: int = 4,
+        batch_size: int = 2,
     ) -> List[List[Annotation]]:
         """Annotate video frames in batches."""
         all_annotations = []
@@ -191,27 +195,151 @@ class GroundingAnnotator:
         return all_annotations
 
 
-if __name__ == "__main__":
-    # Your existing video loading code remains the same
-    dataset_name = "berkeley_fanuc_manipulation"
-    fname = "data/train/episode_30.mp4"
-
-    vlm = get_gemini_2_flash()
-    prompt_filename = "grounding_description.jinja2"
-
+def load_video_frames(
+    dataset_name: str, fname: str, target_fps: float = 1
+) -> tuple[List[np.ndarray], List[int]]:
+    """Load video frames at specified FPS."""
     video_path = get_video_from_path(dataset_name, fname)
-    frame_indices = get_frame_indices_for_fps(video_path, target_fps=1)
-    all_frames = split_video_to_frames(video_path)
+    frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
+    all_frames = get_video_frames(dataset_name, fname, n_frames=None, just_path=True)
     frames_to_process = choose_and_preprocess_frames(
         all_frames, specified_frames=frame_indices
     )
+    print(f"Loaded {len(frames_to_process)} frames")
+    return frames_to_process, frame_indices
 
+
+def get_vlm_labels(vlm, frames: List[np.ndarray], prompt_filename: str) -> str:
+    """Get object labels from VLM."""
     messages, response = vlm.ask(
-        info=dict(), prompt_filename=prompt_filename, images=frames_to_process
+        info=dict(), prompt_filename=prompt_filename, images=frames
     )
-    label_str: str = response.choices[0].message.content
+    label_str = response.choices[0].message.content
+    print(f"Label string: {label_str}")
+    return label_str
 
-    # Initialize and run the annotator
+
+def visualize_annotations(
+    frames: List[np.ndarray],
+    annotations: List[List[Annotation]],
+    base_output_dir: str = "/tmp/output_visualizations",
+) -> None:
+    """Visualize and save frame annotations."""
+    os.makedirs(base_output_dir, exist_ok=True)
+
+    for frame_idx, (frame, frame_annotations) in enumerate(zip(frames, annotations)):
+        # Create frame-specific directory
+        frame_dir = os.path.join(base_output_dir, f"frame_{frame_idx:03d}")
+        os.makedirs(frame_dir, exist_ok=True)
+
+        # Convert BGR to RGB for visualization
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        # Save original frame
+        cv2.imwrite(
+            os.path.join(frame_dir, "original.jpg"),
+            cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR),
+        )
+
+        # Save individual annotations
+        print(f"\nFrame {frame_idx} detections:")
+        for ann_idx, ann in enumerate(frame_annotations):
+            color = (
+                np.random.randint(0, 255),
+                np.random.randint(0, 255),
+                np.random.randint(0, 255),
+            )
+            vis_frame = ann.visualize(image=frame_rgb.copy(), color=color, thickness=2)
+
+            # Save visualization
+            output_name = (
+                f"detection_{ann_idx:02d}_{ann.category_name}_{ann.score:.2f}.jpg"
+            )
+            output_path = os.path.join(frame_dir, output_name)
+            cv2.imwrite(output_path, cv2.cvtColor(vis_frame, cv2.COLOR_RGB2BGR))
+
+            # Save mask if available
+            if ann.mask is not None:
+                mask_vis = frame_rgb.copy()
+                mask_vis[ann.mask > 0] = color
+                mask_path = os.path.join(
+                    frame_dir, f"mask_{ann_idx:02d}_{ann.category_name}.jpg"
+                )
+                cv2.imwrite(mask_path, cv2.cvtColor(mask_vis, cv2.COLOR_RGB2BGR))
+
+            print(f"- {ann.category_name}: {ann.score:.2f}")
+
+        # Save combined visualization
+        combined_vis = Annotation.visualize_all(
+            image=frame_rgb, annotations=frame_annotations, thickness=2
+        )
+        cv2.imwrite(
+            os.path.join(frame_dir, "combined.jpg"),
+            cv2.cvtColor(combined_vis, cv2.COLOR_RGB2BGR),
+        )
+
+
+def process_video(
+    dataset_name: str,
+    fname: str,
+    annotator: GroundingAnnotator,
+    db: AnnotationDatabase,
+    target_fps: float = 1,
+    visualize: bool = True,
+) -> str:
+    """Process a video through the full pipeline."""
+    # Load frames
+    frames, frame_indices = load_video_frames(dataset_name, fname, target_fps)
+
+    # Get labels from VLM
+    vlm = get_gemini_2_flash()
+    label_str = get_vlm_labels(vlm, frames, "grounding_description.jinja2")
+
+    # Run detection and segmentation
+    video_annotations = annotator.annotate_video(frames, label_str)
+
+    # Store in database
+    video_id = db.add_video_with_annotations(
+        dataset_name=dataset_name,
+        video_path=fname,
+        frames=frames,
+        frame_indices=frame_indices,
+        annotations=video_annotations,
+        label_str=label_str,
+    )
+    print(
+        f"Added video {video_id} to database with {len(video_annotations)} annotated frames"
+    )
+
+    # Optionally visualize
+    if visualize:
+        visualize_annotations(frames, video_annotations)
+        print(f"\nVisualization results saved to /tmp/output_visualizations/")
+
+    return video_id
+
+
+if __name__ == "__main__":
+    # Initialize components
+    db = AnnotationDatabase()
     annotator = GroundingAnnotator()
-    video_annotations = annotator.annotate_video(frames_to_process, label_str)
+
+    # Process video
+    dataset_name = "cmu_play_fusion"
+    fname = "data/train/episode_208.mp4"
+
+    video_id = process_video(
+        dataset_name=dataset_name,
+        fname=fname,
+        annotator=annotator,
+        db=db,
+        target_fps=1,
+        visualize=True,
+    )
+    print(f"Processed video {video_id}")
+
+    breakpoint()
+
+    # retrieve annotations
+    annotations = db.get_annotations(video_id=video_id)
     breakpoint()

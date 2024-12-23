@@ -85,8 +85,8 @@ def save_video(
 
 
 def get_video_frames(
-    dataset: str, filename: str, n_frames: int | None = None
-) -> list[np.ndarray]:
+    dataset: str, filename: str, n_frames: int | None = None, just_path: bool = False
+) -> list[np.ndarray] | list[str]:
     """Get video as a list of frames from the frames directory."""
     base_filename = filename.replace(".mp4", "")
     frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
@@ -97,7 +97,11 @@ def get_video_frames(
     frame_files = sorted([f for f in os.listdir(frames_dir) if f.startswith("frame_")])
     if n_frames is not None:
         frame_files = frame_files[:n_frames]
-    frames = [cv2.imread(os.path.join(frames_dir, f)) for f in frame_files]
+
+    frame_paths = [os.path.join(frames_dir, f) for f in frame_files]
+    if just_path:
+        return frame_paths
+    frames = [cv2.imread(f) for f in frame_paths]
     return frames
 
 

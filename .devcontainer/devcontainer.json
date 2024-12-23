@@ -19,7 +19,8 @@
                 "ms-toolsai.jupyter",
                 "ms-azuretools.vscode-docker",
                 "ms-python.isort",
-                "matangover.mypy"
+                "matangover.mypy",
+                "mongodb.mongodb-vscode" 
             ],
             "settings": {
                 "[python]": {
@@ -29,7 +30,7 @@
             }
         }
     },
-    "forwardPorts": [],
+    "forwardPorts": [27017],
     "remoteUser": "root",
     "remoteEnv": {
         "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
@@ -41,7 +42,9 @@
         "HUGGINGFACE_API_KEY": "${localEnv:HUGGINGFACE_API_KEY}",
         "VERTEX_PROJECT": "${localEnv:VERTEX_PROJECT}",
         "VERTEX_LOCATION": "${localEnv:VERTEX_LOCATION}",
-        "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}"
+        "GEMINI_API_KEY": "${localEnv:GEMINI_API_KEY}",
+        "MONGODB_URI": "mongodb://localhost:27017"
     },
-    "postCreateCommand": "pip install black pylint jupyter ipykernel mypy isort --retries 10"
+    "runArgs": ["--network=host"],
+    "postCreateCommand": "pip install black pylint jupyter ipykernel mypy isort pymongo --retries 10"
 }
