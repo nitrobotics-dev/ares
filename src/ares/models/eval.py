@@ -3,9 +3,11 @@ import os
 import traceback
 import typing as t
 from collections import defaultdict
+from datetime import datetime
 
 import cv2
 import numpy as np
+import pandas as pd
 from litellm import completion_cost
 from pydantic import BaseModel, Field
 
@@ -35,7 +37,7 @@ def easy_get_frames(task: str, success_flag: str, fps: int) -> list[np.ndarray]:
     fname = f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success_flag}.mp4"
     frames, frame_indices = load_video_frames(dataset_name, fname, target_fps=fps)
 
-    MAX_N_FRAMES = 35
+    MAX_N_FRAMES = 35  # HACK: fix when higher tier TPM limits
     if len(frames) > MAX_N_FRAMES:
         print(f"received {len(frames)} frames; downsampling to 40 frames")
         middle_indices = np.linspace(1, len(frames) - 2, MAX_N_FRAMES - 2, dtype=int)
@@ -108,6 +110,8 @@ if __name__ == "__main__":
         # tasks = PI_DEMO_TASKS.keys()
         # task = "Paper towel in holder"
         # task = "Toast out of toaster"
+        # "Laundry fold (shirts)"
+        "Laundry fold (shorts)"
     ]
 
     from ares.models.shortcuts import (
@@ -131,8 +135,7 @@ if __name__ == "__main__":
     ]
     success_flags = ["success", "fail"]
     # success_flags = ["fail"]
-    prediction_tracker = []
-    label_tracker = []
+
     # for provider
     output_format = """
     - description: str. A thorough description of everything that happens in the video. Focus on the robot's actions and how it performs the task.

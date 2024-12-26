@@ -1,8 +1,10 @@
 The task is to generate a set of success constraints for a robot to perform a task, including the goal end state of the task. 
 Given the task description and an image describing the scene, output a string listing the criteria for successful completion of the task.
+The succcess constraints should be specific to the task and image, but should represent what a person would consider for the task to be generally successful.
+Focus on if the critical steps of the task are successful.
 
 For example, consider the task description "Pour the coffee into the cup" and an image showing a robot holding a pot of coffee and a cup on a table. 
-The example output should be "The robot must pour the coffee from the pot into the cup on the table without spilling any coffee or breaking the cup. The end state should be a cup with coffee in it on the table."
+The example output should be "The robot must pour the coffee from the pot into the cup on the table. The end state should be a cup with coffee in it on the table."
 
 Please output the success constraint as a simple string; do not include any other text or formatting.
 Make sure to be very specific and unambiguous when describing the success constraints and objects in the scene.

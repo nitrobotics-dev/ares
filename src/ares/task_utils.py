@@ -29,11 +29,11 @@ PI_DEMO_TASKS = {
         "filename_prefix": "processed_drawer",
     },
     "Laundry fold (shirts)": {
-        "task": "The robot must neatly fold the shirt.",
+        "task": "The robot must fold the shirt.",
         "filename_prefix": "processed_folding_single_shirt",
     },
     "Laundry fold (shorts)": {
-        "task": "The robot must neatly fold the shorts.",
+        "task": "The robot must fold the shorts.",
         "filename_prefix": "processed_fold_single_shorts",
     },
     "Paper towel in holder": {
