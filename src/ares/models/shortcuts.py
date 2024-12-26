@@ -9,8 +9,19 @@ def get_nomic_embedder() -> SentenceTransformerEmbedder:
     return SentenceTransformerEmbedder(provider="nomic-ai", name="nomic-embed-text-v1")
 
 
+def get_all_embedders() -> dict[str, Embedder]:
+    return {
+        "siglip": get_siglip_embedder(),
+        "nomic": get_nomic_embedder(),
+    }
+
+
 def get_gemini_15_flash() -> VLM:
     return VLM(provider="gemini", name="gemini-1.5-flash")
+
+
+def get_gemini_15_pro() -> VLM:
+    return VLM(provider="gemini", name="gemini-1.5-pro")
 
 
 def get_gemini_2_flash() -> VLM:
@@ -25,8 +36,24 @@ def get_gpt_4o() -> VLM:
     return VLM(provider="openai", name="gpt-4o")
 
 
+def get_gpt_o1_mini() -> VLM:
+    return VLM(provider="openai", name="o1-preview")
+
+
 def get_claude_3_5_sonnet() -> VLM:
     return VLM(provider="anthropic", name="claude-3-5-sonnet-20240620")
+
+
+def get_all_vlms() -> dict[str, VLM]:
+    return {
+        "gemini-1.5-flash": get_gemini_15_flash(),
+        "gemini-1.5-pro": get_gemini_15_pro(),
+        "gemini-2-flash": get_gemini_2_flash(),
+        "gpt-4o-mini": get_gpt_4o_mini(),
+        "gpt-4o": get_gpt_4o(),
+        "gpt-o1-mini": get_gpt_o1_mini(),
+        "claude-3-5-sonnet": get_claude_3_5_sonnet(),
+    }
 
 
 def summarize(vlm: VLM, data: list[str], description: str) -> str:

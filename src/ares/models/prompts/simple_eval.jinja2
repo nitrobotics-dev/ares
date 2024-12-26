@@ -1,14 +1,19 @@
-You will be provided with a video and a task. 
-Your objective is to describe the video and determine the robot's success at the task.
-First, determine the success criteria of the task. 
-Second, describe the video.
-Third, determine the robot's success at the task.
+You will be provided with a task description, a video, and a set of success constraints. 
+Your objective is to describe the video and determine the robot's success at the task according to the success constraints.
+
+First, describe the video. Make sure to include the end state of the video.
+Second, analyze the robot's success at the task according to the success constraints. Make sure to consider the end state of the video!
+Third, determine the float score representing the robot's success at the task according to the success constraints.
 Output the answer as a JSON object with the following fields:
 {{output_format}}
 
 Here is the task:
 {{task}}
 
+Here are the success constraints:
+{{success_constraints}}
+
 Remember, since you are returning a JSON object, you must return a valid JSON object. Begin with ```json and end with ```.
+Throughout your response, reference images by their index which is provided between images.
 
 Video:

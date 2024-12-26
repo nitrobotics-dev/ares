@@ -83,10 +83,6 @@ class VLM:
                     images[i], provider=self.provider
                 )
                 image_contents.extend([text_content, image_content])
-            # image_contents = [
-            #     structure_image_messages(images[i], provider=self.provider)
-            #     for i in range(len(images))
-            # ]
             content.extend(image_contents)
         if double_prompt:
             content.append({"type": "text", "text": prompt})
@@ -99,8 +95,9 @@ class VLM:
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-        model_kwargs: t.Dict = dict(),
+        model_kwargs: t.Dict | None = None,
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
+        model_kwargs = model_kwargs or dict()
         if video_path:
             raise NotImplementedError("Video path not implemented for this VLM")
         messages = self._construct_messages(
@@ -130,8 +127,9 @@ class GeminiVideoVLM(VLM):
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-        model_kwargs: t.Dict = dict(),
+        model_kwargs: t.Dict | None = None,
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
+        model_kwargs = model_kwargs or dict()
         prompt = self._get_prompt(prompt_filename, info)
         if video_path:
             if "https://" in video_path:

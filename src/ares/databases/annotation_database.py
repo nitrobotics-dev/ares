@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 from pymongo import MongoClient
 
 from ares.configs.annotations import Annotation
@@ -173,6 +174,70 @@ class AnnotationDatabase:
         result = self.videos.delete_one({"_id": video_id})
         return result.deleted_count > 0
 
+    def add_video_with_annotations(
+        self,
+        dataset_name: str,
+        video_path: str,
+        frames: List[np.ndarray],
+        frame_indices: List[int],
+        annotations: List[List[Annotation]],
+        label_str: str,
+    ) -> str:
+        """Add a video and its frame annotations to the database.
+
+        Args:
+            dataset_name: Name of the dataset
+            video_path: Path to the video file
+            frames: List of video frames
+            frame_indices: List of frame indices
+            annotations: List of annotations per frame
+            label_str: String containing object labels used for detection
+
+        Returns:
+            video_id: Unique identifier for the video
+        """
+        # Create video metadata
+        video_id = f"{dataset_name}/{video_path}"
+        metadata = {
+            "dataset_name": dataset_name,
+            "video_path": video_path,
+            "num_frames": len(frames),
+            "frame_indices": frame_indices,
+            "label_str": label_str,
+        }
+
+        # Add video metadata
+        self.add_video(video_id, metadata)
+
+        # Add annotations for each frame
+        for frame_idx, frame_annotations in enumerate(annotations):
+            self.add_frame_annotations(
+                video_id=video_id,
+                frame=frame_indices[frame_idx],
+                annotations=frame_annotations,
+            )
+
+        return video_id
+
+    def delete_video_and_annotations(self, video_id: str) -> None:
+        """Delete a video and its annotations."""
+        self.delete_video(video_id)
+        self.delete_annotations(video_id)
+
+    def peek_database(self, limit: int = 5) -> Dict[str, List[Dict[str, Any]]]:
+        """Preview entries from both videos and annotations collections.
+
+        Args:
+            limit: Number of entries to return from each collection
+
+        Returns:
+            Dictionary containing sample entries from both collections
+        """
+        return {
+            "videos": list(self.videos.find().limit(limit)),
+            "annotations": list(self.annotations.find().limit(limit)),
+        }
+
 
 # make test inputs
 if __name__ == "__main__":
@@ -203,3 +268,14 @@ if __name__ == "__main__":
     # stats = db.get_database_stats()
     # print(stats)
     # breakpoint()
+
+    # Preview database contents
+    preview = db.peek_database(limit=3)
+    print("\nVideo samples:")
+    for video in preview["videos"]:
+        print(f"- {video['_id']}: {video['metadata']}")
+
+    print("\nAnnotation samples:")
+    for ann in preview["annotations"]:
+        print(f"- Video: {ann['video_id']}, Type: {ann['type']}, Frame: {ann['frame']}")
+    breakpoint()

@@ -37,7 +37,7 @@ PI_DEMO_TASKS = {
         "filename_prefix": "processed_fold_single_shorts",
     },
     "Paper towel in holder": {
-        "task": "The robot must place the new paper towel roll completely onto the holder.",
+        "task": "The robot must discard the old paper towel roll and place the new white paper towel roll completely onto the holder.",
         "filename_prefix": "processed_towel",
     },
     "Food in to go box": {

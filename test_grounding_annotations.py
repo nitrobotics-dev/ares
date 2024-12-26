@@ -1,4 +1,5 @@
 import os
+import pickle
 import tempfile
 from typing import List, Tuple
 
@@ -264,7 +265,7 @@ def visualize_annotations(
 if __name__ == "__main__":
     # Initialize components
     db = AnnotationDatabase()
-    annotator = GroundingAnnotator()
+    # annotator = GroundingAnnotator()
 
     # Process video
     dataset_name = "cmu_play_fusion"
@@ -280,11 +281,11 @@ if __name__ == "__main__":
 
     # Run detection and segmentation
     video_annotations = annotator.annotate_video(frames, label_str)
-    import pickle
+    # import pickle
 
-    pickle.dump(video_annotations, open("video_annotations.pkl", "wb"))
-    # video_annotations = pickle.load(open("video_annotations.pkl", "rb"))
-    breakpoint()
+    # pickle.dump(video_annotations, open("video_annotations.pkl", "wb"))
+    video_annotations = pickle.load(open("video_annotations.pkl", "rb"))
+    # breakpoint()
 
     # Store in database
     video_id = db.add_video_with_annotations(
