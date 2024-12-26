@@ -221,3 +221,12 @@ def load_video_frames(
     )
     print(f"Loaded {len(frames_to_process)} frames")
     return frames_to_process, frame_indices
+
+
+if __name__ == "__main__":
+    # load mp4, break to frames, and save to disk using the helpers
+    dataset = "pi_demos"
+    fname = "processed_toast_fail.mp4"
+    mp4_path = get_video_from_path(dataset, fname)
+    frames = split_video_to_frames(mp4_path)
+    save_video(frames, dataset, fname)

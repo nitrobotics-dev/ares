@@ -75,7 +75,7 @@ class VLM:
         else:
             prompt = info["prompt"]
         content.append({"type": "text", "text": prompt})
-        if images:
+        if images is not None and len(images) > 0:
             image_contents = []
             for i in range(len(images)):
                 text_content = {"type": "text", "text": f"Image {i}:"}

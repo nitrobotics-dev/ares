@@ -9,7 +9,7 @@ PI_DEMO_TASKS = {
         "filename_prefix": "processed_grocery_bagging",
     },
     "Toast out of toaster": {
-        "task": "The robot must remove the toast from the toaster and place it on the plate.",
+        "task": "The robot must remove the both pieces of toast from the toaster and place them both on the plate.",
         "filename_prefix": "processed_toast",
     },
     "Towel fold": {
