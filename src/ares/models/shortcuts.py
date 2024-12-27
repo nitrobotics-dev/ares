@@ -16,10 +16,6 @@ def get_all_embedders() -> dict[str, Embedder]:
     }
 
 
-def get_gemini_15_flash() -> VLM:
-    return VLM(provider="gemini", name="gemini-1.5-flash")
-
-
 def get_gemini_15_pro() -> VLM:
     return VLM(provider="gemini", name="gemini-1.5-pro")
 

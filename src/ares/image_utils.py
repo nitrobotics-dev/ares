@@ -37,7 +37,7 @@ def get_video_from_cloud(
 
 
 def save_video(
-    video: t.Union[str, bytes | io.BytesIO | np.ndarray | list[np.ndarray]],
+    video: t.Union[str, bytes | io.BytesIO | np.ndarray | list[np.ndarray] | list[str]],
     dataset: str,
     filename: str,
 ) -> tuple[str, str]:
@@ -64,6 +64,8 @@ def save_video(
             )
     elif isinstance(video, list) and all(isinstance(f, np.ndarray) for f in video):
         frames = video
+    elif isinstance(video, list) and all(isinstance(f, str) for f in video):
+        frames = video
     else:
         raise TypeError(
             f"Unsupported video format. Use numpy array or list of numpy arrays. Got {type(video)}{'with slices of type ' + str(type(video[0])) if (isinstance(video, list) and video) else ''}"
@@ -79,6 +81,9 @@ def save_video(
     # Save individual frames
     for i, frame in enumerate(frames):
         frame_path = os.path.join(frames_dir, f"frame_{i:04d}.jpg")
+        if isinstance(frame, str):
+            # constant memory usage
+            frame = cv2.imread(frame)
         cv2.imwrite(frame_path, frame)
     return mp4_path, frames_dir
 
@@ -199,6 +204,8 @@ def get_frame_indices_for_fps(video_path: str, target_fps: int = 1) -> list[int]
     Returns:
         List of frame indices to sample
     """
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video file not found: {video_path}")
     cap = cv2.VideoCapture(video_path)
     video_fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -224,9 +231,19 @@ def load_video_frames(
 
 
 if __name__ == "__main__":
+    from ares.task_utils import PI_DEMO_TASKS
+
     # load mp4, break to frames, and save to disk using the helpers
     dataset = "pi_demos"
-    fname = "processed_toast_fail.mp4"
-    mp4_path = get_video_from_path(dataset, fname)
-    frames = split_video_to_frames(mp4_path)
-    save_video(frames, dataset, fname)
+
+    for _, info in PI_DEMO_TASKS.items():
+        for attempt in ["success", "fail"]:
+            fname = info["filename_prefix"] + f"_{attempt}.mp4"
+            mp4_path = get_video_from_path(dataset, fname)
+
+            dirpath = mp4_path.replace(".mp4", "")
+            if not os.path.exists(dirpath) or not len(os.listdir(dirpath)):
+                frames = split_video_to_frames(mp4_path)
+                save_video(frames, dataset, fname)
+            else:
+                print(f"Folder already exists for {fname}, skipping...")

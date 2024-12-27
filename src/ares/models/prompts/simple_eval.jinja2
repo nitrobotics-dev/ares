@@ -1,8 +1,8 @@
-You will be provided with a task description, a video, and a set of success constraints. 
-Your objective is to describe the video and determine the robot's success at the end of the video according to the success constraints.
+You will be provided with a task description, a list of images from a video, and a set of success constraints. 
+Your objective is to describe the images and determine the robot's success at the end of the images according to the success constraints.
 
-First, describe the video. Make sure to include the end state of the video.
-Second, analyze the robot's success at the task according to the success constraints. Make sure to consider the end state of the video!
+First, describe the images. Make sure to include the end state of the scene from the last images.
+Second, analyze the robot's success at the task according to the success constraints. Make sure to consider the end state of the images!
 Third, determine the float score representing the robot's success at the task according to the success constraints.
 Output the answer as a JSON object with the following fields:
 {{output_format}}
@@ -16,4 +16,4 @@ Here are the success constraints:
 Remember, since you are returning a JSON object, you must return a valid JSON object. Begin with ```json and end with ```.
 Throughout your response, reference images by their index which is provided between images.
 
-Video:
+Images:

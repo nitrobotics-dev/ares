@@ -73,8 +73,8 @@ def simple_single_eval(
     )
     print(f"got answer; cost {completion_cost(res)}")
     outputs = defaultdict(list)
-    try:
-        for choice in res.choices:
+    for i, choice in enumerate(res.choices):
+        try:
             content = choice.message.content
             content = (
                 content.strip().removeprefix("```json").removesuffix("```").strip()
@@ -84,17 +84,18 @@ def simple_single_eval(
             )
             for k, v in structured_info.items():
                 outputs[k].append(v)
+            if i == 0:
+                for k, v in structured_info.items():
+                    print(f"- {k}: {v}")
 
-        votes = outputs["performance"]
-        print(f"SUCCESS FLAG: {success_flag.upper()}")
-        print(f"VOTES: {votes}")
-        print(f"MEAN: {np.mean(votes)}; MEDIAN: {np.median(votes)}")
+        except Exception as e:
+            print(f"Failed to parse JSON from response: {e}")
+            print(f"Response: {choice.message.content}")
 
-    except Exception as e:
-        print(f"Failed to parse JSON from response: {e}")
-        print(f"Response: {res.choices[0].message.content}")
-        breakpoint()
-
+    votes = outputs.get("performance", [])
+    print(f"SUCCESS FLAG: {success_flag.upper()}")
+    print(f"VOTES: {votes}")
+    print(f"MEAN: {np.mean(votes)}; MEDIAN: {np.median(votes)}")
     return outputs
 
 
@@ -104,14 +105,19 @@ if __name__ == "__main__":
     # fps = 1
     # fps = 0.5
     # fps = 0.25
-    fps_options = [1]
+    fps_options = [0.25, 0.5, 1]
 
     tasks = [
-        # tasks = PI_DEMO_TASKS.keys()
-        # task = "Paper towel in holder"
-        # task = "Toast out of toaster"
-        # "Laundry fold (shirts)"
-        "Laundry fold (shorts)"
+        "Eggs in carton",
+        "Grocery Bagging",
+        "Toast out of toaster",
+        "Towel fold",
+        "Stack bowls",
+        "Tupperware in microwave",
+        # "Laundry fold (shirts)",
+        # "Laundry fold (shorts)",
+        # "Paper towel in holder",
+        "Food in to go box",
     ]
 
     from ares.models.shortcuts import (
@@ -124,14 +130,15 @@ if __name__ == "__main__":
     )
 
     vlm_options = [
-        # vlm = get_gpt_4o_mini()
-        # vlm = get_gemini_2_flash()
-        # vlm = get_claude_3_5_sonnet()
-        get_gpt_4o(),
-        # vlm = get_gemini_15_pro()
+        # get_gpt_4o_mini(),
+        # get_claude_3_5_sonnet(),
+        # get_gpt_4o(),
+        # get_gemini_15_pro()
         # n_frames = [1, 5, 10, 20]
-        # vlm = get_gpt_o1_mini()
+        # get_gpt_o1_mini(),
         # vlm = get_gpt_4o_mini()
+        # get_gemini_15_pro(),
+        # get_gemini_2_flash(),
     ]
     success_flags = ["success", "fail"]
     # success_flags = ["fail"]
@@ -145,41 +152,54 @@ if __name__ == "__main__":
 
     prediction_rows = []
 
-    for task in tasks:
-        for vlm in vlm_options:
+    for vlm in vlm_options:
+        for task in tasks:
             for fps in fps_options:
                 for success_flag in success_flags:
-                    frames = easy_get_frames(task, success_flag, fps)
-                    success_constraints_str = dynamic_constraint_generation(
-                        vlm, task, frames
-                    )
-                    print(f"success constraints: {success_constraints_str}\n")
-                    # evaluate the task given success constraints
-                    outputs = simple_single_eval(
-                        vlm, task, frames, success_constraints_str
-                    )
-                    prediction_rows.append(
-                        dict(
-                            vlm=vlm,
-                            task=task,
-                            success_flag=success_flag,
-                            fps=fps,
-                            performance=outputs["performance"],
-                            mean_performance=np.mean(outputs["performance"]),
-                            median_performance=np.median(outputs["performance"]),
+                    try:
+                        frames = easy_get_frames(task, success_flag, fps)
+                        success_constraints_str = dynamic_constraint_generation(
+                            vlm, task, frames
                         )
-                    )
+                        print(f"success constraints: {success_constraints_str}\n")
+                        # evaluate the task given success constraints
+                        outputs = simple_single_eval(
+                            vlm, task, frames, success_constraints_str
+                        )
+                        votes = [
+                            x if x is not None else np.nan
+                            for x in outputs.get("performance", [])
+                        ]
+                        prediction_rows.append(
+                            dict(
+                                vlm=vlm.name,
+                                task=task,
+                                success_flag=success_flag,
+                                fps=fps,
+                                performance=votes,
+                                mean_performance=(
+                                    np.nanmean(votes) if any(votes) else np.nan
+                                ),
+                                median_performance=(
+                                    np.nanmedian(votes) if any(votes) else np.nan
+                                ),
+                            )
+                        )
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        traceback.print_exc()
+                        breakpoint()
 
-                    fname = f"/tmp/eval_output/{task}_{success_flag}_{fps}.mp4".replace(
-                        " ", "_"
-                    )
-                    save_frames_to_mp4(frames, fname)
-                    print(f"saved frames to {fname}")
+                    # fname = f"/tmp/eval_output/{task}_{success_flag}_{fps}.mp4".replace(
+                    #     " ", "_"
+                    # )
+                    # save_frames_to_mp4(frames, fname)
+                    # print(f"saved frames to {fname}")
 
-                    breakpoint()
+                    # breakpoint()
 
-    df = pd.DataFrame(prediction_rows)
-    df.to_csv(
-        f"/tmp/eval_results_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv",
-        index=False,
-    )
+        path = f"/tmp/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+        df = pd.DataFrame(prediction_rows)
+        df.to_csv(path, index=False)
+        print(f"saved results to {path}")
+        prediction_rows = []
