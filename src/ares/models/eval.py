@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from litellm import completion_cost
 from pydantic import BaseModel, Field
+from tqdm import tqdm
 
 from ares.configs.base import pydantic_to_field_instructions
 from ares.image_utils import load_video_frames
@@ -162,7 +163,7 @@ if __name__ == "__main__":
     prediction_rows = []
 
     for vlm in vlm_options:
-        for task in tasks:
+        for task in tqdm(tasks):
             for fps in fps_options:
                 for success_flag in success_flags:
                     try:

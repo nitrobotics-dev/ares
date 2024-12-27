@@ -2,6 +2,7 @@ import io
 import json
 import os
 import random
+import traceback
 import uuid
 from typing import Any, Union
 
@@ -22,6 +23,8 @@ from ares.app.plot_primitives import (
     create_robot_array_plot,
     display_video_card,
 )
+from ares.configs.annotations import Annotation
+from ares.databases.annotation_database import AnnotationDatabase
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
 from ares.image_utils import get_video_frames, get_video_mp4
 
@@ -194,6 +197,37 @@ def create_similarity_tabs(
                         )
 
 
+def get_video_annotation_data(video_id: str) -> dict:
+    """Retrieve video metadata and annotations from the annotation database.
+
+    Args:
+        video_id: UUID of the video
+        db: Annotation database instance
+
+    Returns:
+        Dictionary containing video metadata and annotations
+    """
+    # HACK! don't have everything in DB yet -- choose first one
+    print(f"CHOOSING FIRST VIDEO IN DB")
+    peek_data = st.session_state.annotations_db.peek_database(limit=1)
+    video_data = peek_data["videos"][0]
+    # annotation_data = peek_data["annotations"][0]
+
+    # metadata = st.session_state.annotations_db.get_video_metadata(video_id)
+    # if not metadata:
+    #     return None
+
+    # Get all annotations for this video
+    annotations: dict[int, list[Annotation]] = {
+        f: st.session_state.annotations_db.get_annotations(
+            video_id, annotation_type="detection", frame=f
+        )
+        for f in video_data["frame_indices"]
+    }
+    breakpoint()
+    return {"video_data": video_data, "annotations": annotations}
+
+
 def show_hero_display(
     df: pd.DataFrame,
     idx: int,
@@ -232,6 +266,24 @@ def show_hero_display(
                 if len(str(val)) > 1000:
                     continue
                 st.write(f"{col}: {val}")
+
+        # Add annotation data retrieval button
+        if st.button("Retrieve Annotation Data"):
+            try:
+
+                annotation_data = get_video_annotation_data(str(row["id"]))
+                if annotation_data:
+                    with st.expander("Annotation Data", expanded=True):
+                        st.write("Video Data:")
+                        st.json(annotation_data["video_data"])
+                        st.write("Annotations:")
+                        st.json(annotation_data["annotations"])
+                else:
+                    st.warning("No annotation data found for this video")
+            except Exception as e:
+                st.error(f"Error retrieving annotation data: {str(e)}")
+                st.error(traceback.format_exc())
+
         if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
             array_figs = generate_robot_array_plot_visualizations(
                 row, all_vecs, show_n, highlight_idx=idx
