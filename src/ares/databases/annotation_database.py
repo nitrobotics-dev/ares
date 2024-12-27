@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from pymongo import MongoClient
+from pymongo import Collection, Database, MongoClient
 
 from ares.configs.annotations import Annotation
 
@@ -10,13 +10,13 @@ TEST_ANNOTATION_DB_PATH = "mongodb://localhost:27017"
 
 
 class AnnotationDatabase:
-    def __init__(self):
-        self.client = MongoClient(TEST_ANNOTATION_DB_PATH)
-        self.db = self.client.video_annotations
+    def __init__(self, connection_string: str) -> None:
+        self.client: MongoClient = MongoClient(connection_string)
+        self.db: Database = self.client.video_annotations
 
         # Just two collections - videos and annotations
-        self.videos = self.db.videos
-        self.annotations = self.db.annotations
+        self.videos: Collection = self.db.videos
+        self.annotations: Collection = self.db.annotations
 
         # Set up indexes
         self._setup_indexes()
@@ -241,7 +241,7 @@ class AnnotationDatabase:
 
 # make test inputs
 if __name__ == "__main__":
-    db = AnnotationDatabase()
+    db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     # db.add_video("test_video", {"test": "test"})
     # db.add_annotation("test_video", "test_annotation", "test_value", "test_type", 1)
     # anns = db.get_annotations("test_video", "test_type", 1)

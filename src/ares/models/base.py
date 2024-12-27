@@ -103,7 +103,10 @@ class VLM:
         messages = self._construct_messages(
             info, prompt_filename, images, double_prompt
         )
-        print(f"submitting request to {self.name}")
+        print(
+            f"submitting request to {self.name}"
+            + (f"with {len(images)} images" if images else "")
+        )
         return messages, completion(model=self.name, messages=messages, **model_kwargs)
 
 

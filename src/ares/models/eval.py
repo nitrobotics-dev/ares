@@ -33,13 +33,20 @@ def save_frames_to_mp4(frames: list[np.ndarray], fname: str) -> None:
     video_writer.release()
 
 
-def easy_get_frames(task: str, success_flag: str, fps: int) -> list[np.ndarray]:
+def easy_get_frames(task: str, success_flag: str, fps: int | float) -> list[np.ndarray]:
+    # small hack -- if FPS is 0, just access first and last frame
     fname = f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success_flag}.mp4"
-    frames, frame_indices = load_video_frames(dataset_name, fname, target_fps=fps)
+    frames, frame_indices = load_video_frames(
+        dataset_name, fname, target_fps=fps if fps != 0 else 1
+    )
+    if fps == 0:
+        frames = [frames[0], frames[-1]]
 
     MAX_N_FRAMES = 35  # HACK: fix when higher tier TPM limits
     if len(frames) > MAX_N_FRAMES:
-        print(f"received {len(frames)} frames; downsampling to 40 frames")
+        print(
+            f"received {len(frames)} frames; downsampling to 40 frames. do you still need me?"
+        )
         middle_indices = np.linspace(1, len(frames) - 2, MAX_N_FRAMES - 2, dtype=int)
         frames = [frames[0]] + [frames[i] for i in middle_indices] + [frames[-1]]
     return frames
@@ -91,6 +98,8 @@ def simple_single_eval(
         except Exception as e:
             print(f"Failed to parse JSON from response: {e}")
             print(f"Response: {choice.message.content}")
+            # if "I'm sorry" in choice.message.content:
+            #     breakpoint()
 
     votes = outputs.get("performance", [])
     print(f"SUCCESS FLAG: {success_flag.upper()}")
@@ -105,7 +114,8 @@ if __name__ == "__main__":
     # fps = 1
     # fps = 0.5
     # fps = 0.25
-    fps_options = [0.25, 0.5, 1]
+    # fps_options = [0.25, 0.5, 1]
+    fps_options = [0]  # 2]
 
     tasks = [
         "Eggs in carton",
@@ -114,9 +124,9 @@ if __name__ == "__main__":
         "Towel fold",
         "Stack bowls",
         "Tupperware in microwave",
-        # "Laundry fold (shirts)",
-        # "Laundry fold (shorts)",
-        # "Paper towel in holder",
+        "Laundry fold (shirts)",
+        "Laundry fold (shorts)",
+        "Paper towel in holder",
         "Food in to go box",
     ]
 
@@ -130,22 +140,21 @@ if __name__ == "__main__":
     )
 
     vlm_options = [
-        # get_gpt_4o_mini(),
+        get_gpt_4o_mini(),
         # get_claude_3_5_sonnet(),
         # get_gpt_4o(),
-        # get_gemini_15_pro()
+        get_gemini_15_pro(),
         # n_frames = [1, 5, 10, 20]
         # get_gpt_o1_mini(),
         # vlm = get_gpt_4o_mini()
-        # get_gemini_15_pro(),
-        # get_gemini_2_flash(),
+        get_gemini_2_flash(),
     ]
     success_flags = ["success", "fail"]
     # success_flags = ["fail"]
 
     # for provider
     output_format = """
-    - description: str. A thorough description of everything that happens in the video. Focus on the robot's actions and how it performs the task.
+    - description: str. A thorough description of everything that happens in the sequence of images. Focus on the robot's actions and how it performs the task.
     - analysis: str. A detailed analysis determining which success_criteria were met and which were not.
     - performance: float between 0 and 1, where 1 is the robot successfully performed the task and 0 is the robot did not successfully perform the task. Performance should never be 0.5 as that is the threshold for a pass/fail.
     """.strip()
@@ -198,6 +207,7 @@ if __name__ == "__main__":
 
                     # breakpoint()
 
+        # periodically save results to cache in case of failure
         path = f"/tmp/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
         df = pd.DataFrame(prediction_rows)
         df.to_csv(path, index=False)

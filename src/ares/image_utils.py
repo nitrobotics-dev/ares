@@ -194,7 +194,9 @@ def choose_and_preprocess_frames(
     return frames
 
 
-def get_frame_indices_for_fps(video_path: str, target_fps: int = 1) -> list[int]:
+def get_frame_indices_for_fps(
+    video_path: str, target_fps: int | float = 1
+) -> list[int]:
     """Calculate frame indices to sample a video at a target FPS rate.
 
     Args:
@@ -217,7 +219,7 @@ def get_frame_indices_for_fps(video_path: str, target_fps: int = 1) -> list[int]
 
 
 def load_video_frames(
-    dataset_name: str, fname: str, target_fps: float = 1
+    dataset_name: str, fname: str, target_fps: int | float = 1
 ) -> tuple[t.List[np.ndarray], t.List[int]]:
     """Load video frames at specified FPS."""
     video_path = get_video_from_path(dataset_name, fname)

@@ -7,6 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ares.clustering import cluster_embeddings
+from ares.databases.annotation_database import (
+    TEST_ANNOTATION_DB_PATH,
+    AnnotationDatabase,
+)
 from ares.databases.embedding_database import (
     TEST_EMBEDDING_DB_PATH,
     FaissIndex,
@@ -133,6 +137,9 @@ def initialize_data(tmp_dump_dir: str) -> None:
         store_in_session(index_name, embeddings, reduced, labels)
     st.session_state.models = dict()
     st.session_state.models["summarizer"] = VLM(provider="openai", name="gpt-4o-mini")
+    st.session_state.annotations_db = AnnotationDatabase(
+        connection_string=TEST_ANNOTATION_DB_PATH
+    )
 
 
 def display_state_info() -> None:
