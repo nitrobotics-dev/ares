@@ -1,12 +1,14 @@
+import asyncio
 import base64
 import os
 import typing as t
+from asyncio import Semaphore
 
 import numpy as np
 import torch
 import vertexai
 from jinja2 import Environment, FileSystemLoader
-from litellm import completion
+from litellm import acompletion, completion
 from litellm.utils import ModelResponse
 from PIL import Image
 from sentence_transformers import SentenceTransformer
@@ -14,6 +16,13 @@ from transformers import AutoModel, AutoProcessor
 from vertexai.generative_models import GenerativeModel, Part
 
 from ares.image_utils import encode_image
+
+# TODO -- singleton, model specific rate limits
+RATE_LIMITS = {
+    "openai": 100,  # 5000 RPM
+    "anthropic": 10,  # 50 RPM
+    "gemini": 5,  # 100 RPM
+}
 
 
 def structure_image_messages(
@@ -38,7 +47,13 @@ class VLM:
     def __init__(self, provider: str, name: str):
         self.provider = provider
         self.name = name
+        # Add rate limiting per provider
+        self._setup_rate_limits()
         self.check_valid_key()
+
+    def _setup_rate_limits(self, max_concurrent: int | None = None):
+        max_concurrent = max_concurrent or RATE_LIMITS.get(self.provider, 10)
+        self.semaphore = Semaphore(max_concurrent)
 
     def check_valid_key(self) -> bool:
         # note: don't use litellm util here, it uses 10 tokens! roll our own check with 1
@@ -88,7 +103,7 @@ class VLM:
             content.append({"type": "text", "text": prompt})
         return [{"role": "user", "content": content}]
 
-    def ask(
+    async def ask_async(
         self,
         info: dict,
         prompt_filename: str | None = None,
@@ -97,17 +112,48 @@ class VLM:
         double_prompt: bool = False,
         model_kwargs: t.Dict | None = None,
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
-        model_kwargs = model_kwargs or dict()
-        if video_path:
-            raise NotImplementedError("Video path not implemented for this VLM")
-        messages = self._construct_messages(
-            info, prompt_filename, images, double_prompt
-        )
-        print(
-            f"submitting request to {self.name}"
-            + (f"with {len(images)} images" if images else "")
-        )
-        return messages, completion(model=self.name, messages=messages, **model_kwargs)
+        """Rate-limited async version of ask method"""
+        async with self.semaphore:
+            model_kwargs = model_kwargs or dict()
+            if video_path:
+                raise NotImplementedError("Video path not implemented for this VLM")
+            messages = self._construct_messages(
+                info, prompt_filename, images, double_prompt
+            )
+            print(
+                f"submitting async request to {self.name}"
+                + (f" with {len(images)} images" if images else "")
+            )
+            return messages, await acompletion(
+                model=self.name, messages=messages, **model_kwargs
+            )
+
+    async def ask_batch_async(
+        self,
+        infos: list[dict],
+        prompt_filename: str | None = None,
+        images_list: (
+            list[t.Sequence[t.Union[str, np.ndarray, Image.Image]]] | None
+        ) = None,
+        double_prompt: bool = False,
+        model_kwargs: t.Dict | None = None,
+    ) -> list[t.Tuple[list[dict[str, t.Any]], ModelResponse]]:
+        """Process multiple requests with rate limiting"""
+        if images_list is None:
+            images_list = [None] * len(infos)
+
+        tasks = [
+            self.ask_async(
+                info,
+                prompt_filename=prompt_filename,
+                images=images,
+                double_prompt=double_prompt,
+                model_kwargs=model_kwargs,
+            )
+            for info, images in zip(infos, images_list)
+        ]
+
+        return await asyncio.gather(*tasks)
 
 
 class GeminiVideoVLM(VLM):

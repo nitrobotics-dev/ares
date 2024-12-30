@@ -1,0 +1,20 @@
+You will be provided with a task description, a set of success constraints, and a list of paragraphs describing each frame from a video. 
+Your objective is to summarize the descriptions and determine the robot's success at the task according to the success constraints.
+
+First, summarize the descriptions.
+Second, analyze the robot's success at the task according to the success constraints. Make sure to consider the end state of the descriptions!
+Third, determine the float score representing the robot's success at the task according to the success constraints.
+Output the answer as a JSON object with the following fields:
+{{output_format}}
+
+Here is the task:
+{{task}}
+
+Here are the success constraints:
+{{success_constraints}}
+
+Remember, since you are returning a JSON object, you must return a valid JSON object. Begin with ```json and end with ```.
+Throughout your response, reference descriptions by their index which is provided between descriptions.
+
+Descriptions:
+{{descriptions}}

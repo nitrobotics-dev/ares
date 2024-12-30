@@ -220,11 +220,10 @@ def get_video_annotation_data(video_id: str) -> dict:
     # Get all annotations for this video
     annotations: dict[int, list[Annotation]] = {
         f: st.session_state.annotations_db.get_annotations(
-            video_id, annotation_type="detection", frame=f
+            video_data["_id"], annotation_type="detection", frame=f
         )
-        for f in video_data["frame_indices"]
+        for f in video_data["metadata"]["frame_indices"]
     }
-    breakpoint()
     return {"video_data": video_data, "annotations": annotations}
 
 

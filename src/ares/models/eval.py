@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import traceback
@@ -34,8 +35,10 @@ def save_frames_to_mp4(frames: list[np.ndarray], fname: str) -> None:
     video_writer.release()
 
 
-def easy_get_frames(task: str, success_flag: str, fps: int | float) -> list[np.ndarray]:
-    # small hack -- if FPS is 0, just access first and last frame
+def easy_get_frames(
+    dataset_name: str, task: str, success_flag: str, fps: int | float
+) -> list[np.ndarray]:
+    # small hack -- if FPS is 0, just access first and last frame!
     fname = f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success_flag}.mp4"
     frames, frame_indices = load_video_frames(
         dataset_name, fname, target_fps=fps if fps != 0 else 1
@@ -43,7 +46,7 @@ def easy_get_frames(task: str, success_flag: str, fps: int | float) -> list[np.n
     if fps == 0:
         frames = [frames[0], frames[-1]]
 
-    MAX_N_FRAMES = 35  # HACK: fix when higher tier TPM limits
+    MAX_N_FRAMES = 40  # HACK: fix when higher tier TPM limits
     if len(frames) > MAX_N_FRAMES:
         print(
             f"received {len(frames)} frames; downsampling to 40 frames. do you still need me?"
@@ -53,70 +56,147 @@ def easy_get_frames(task: str, success_flag: str, fps: int | float) -> list[np.n
     return frames
 
 
-def dynamic_constraint_generation(vlm: VLM, task: str, frames: list[np.ndarray]) -> str:
-    # generate success constraints
-    messages, res = vlm.ask(
+async def dynamic_constraint_generation_async(
+    vlm: VLM, task: str, frames: list[np.ndarray]
+) -> str:
+    messages, res = await vlm.ask_async(
         info=dict(
             task=PI_DEMO_TASKS[task]["task"],
         ),
         prompt_filename="success_constraint_generation.jinja2",
         images=[frames[0]],
     )
-    success_constraints_str = res.choices[0].message.content
-    return success_constraints_str
+    return res.choices[0].message.content
 
 
-def simple_single_eval(
-    vlm: VLM, task: str, frames: list[np.ndarray], success_constraints_str: str
+def parse_content(choice: dict) -> dict:
+    content = choice.message.content
+    content = content.strip().removeprefix("```json").removesuffix("```").strip()
+    structured_info = json.loads(content) if isinstance(content, str) else content
+    return structured_info
+
+
+async def simple_single_video_eval_async(
+    vlm: VLM,
+    task: str,
+    frames: list[np.ndarray],
+    success_constraints_str: str,
+    output_format: str,
 ) -> dict:
-    messages, res = vlm.ask(
+    messages, res = await vlm.ask_async(
         info=dict(
             task=PI_DEMO_TASKS[task]["task"],
             output_format=output_format,
             success_constraints=success_constraints_str,
         ),
-        prompt_filename="simple_eval.jinja2",
+        prompt_filename="simple_video_eval.jinja2",
         images=frames,
         model_kwargs=dict(n=5),
     )
+    return parse_responses(res)
+
+
+async def simple_single_frame_description_eval_async(
+    vlm: VLM,
+    task: str,
+    frames: list[np.ndarray],
+    success_constraints_str: str,
+    output_format: str,
+) -> dict:
+    # Get descriptions for all frames concurrently (rate limiting handled by VLM)
+    async def get_frame_description(frame: np.ndarray, frame_idx: int) -> str:
+        messages, res = await vlm.ask_async(
+            info=dict(task=task, success_constraints=success_constraints_str),
+            prompt_filename="task_frame_description.jinja2",
+            images=[frame],
+        )
+        return f"Frame {frame_idx}: {res.choices[0].message.content}"
+
+    descriptions = await asyncio.gather(
+        *[get_frame_description(frame, i) for i, frame in enumerate(frames)]
+    )
+    descriptions_str = "\n".join(descriptions)
+
+    messages, res = await vlm.ask_async(
+        info=dict(
+            task=task,
+            success_constraints=success_constraints_str,
+            descriptions=descriptions_str,
+            output_format=output_format,
+        ),
+        prompt_filename="summarization_frame_eval.jinja2",
+        model_kwargs=dict(n=5),
+    )
+    return parse_responses(res)
+
+
+def parse_responses(res: t.Any) -> dict:
+    """Helper to parse responses and collect outputs"""
     print(f"got answer; cost {completion_cost(res)}")
     outputs = defaultdict(list)
     for i, choice in enumerate(res.choices):
         try:
-            content = choice.message.content
-            content = (
-                content.strip().removeprefix("```json").removesuffix("```").strip()
-            )
-            structured_info = (
-                json.loads(content) if isinstance(content, str) else content
-            )
+            structured_info = parse_content(choice)
             for k, v in structured_info.items():
                 outputs[k].append(v)
             if i == 0:
                 for k, v in structured_info.items():
                     print(f"- {k}: {v}")
-
         except Exception as e:
             print(f"Failed to parse JSON from response: {e}")
             print(f"Response: {choice.message.content}")
-            # if "I'm sorry" in choice.message.content:
-            #     breakpoint()
-
-    votes = outputs.get("performance", [])
-    print(f"SUCCESS FLAG: {success_flag.upper()}")
-    print(f"VOTES: {votes}")
-    print(f"MEAN: {np.mean(votes)}; MEDIAN: {np.median(votes)}")
     return outputs
+
+
+async def process_task_async(
+    vlm: VLM,
+    dataset_name: str,
+    task: str,
+    fps: float,
+    success_flag: str,
+    method: str,
+) -> dict:
+    try:
+        frames = easy_get_frames(dataset_name, task, success_flag, fps)
+        success_constraints_str = await dynamic_constraint_generation_async(
+            vlm, task, frames
+        )
+        print(f"success constraints: {success_constraints_str}\n")
+
+        if method == "video":
+            outputs = await simple_single_video_eval_async(
+                vlm, task, frames, success_constraints_str, output_format
+            )
+        elif method == "frame_descriptions":
+            outputs = await simple_single_frame_description_eval_async(
+                vlm, task, frames, success_constraints_str, output_format
+            )
+        else:
+            raise ValueError(f"Invalid method: {method}")
+
+        votes = [x if x is not None else np.nan for x in outputs.get("performance", [])]
+        return dict(
+            vlm=vlm.name,
+            task=task,
+            success_flag=success_flag,
+            fps=fps,
+            performance=votes,
+            mean_performance=(np.nanmean(votes) if any(votes) else np.nan),
+            median_performance=(np.nanmedian(votes) if any(votes) else np.nan),
+            method=method,
+        )
+    except Exception as e:
+        print(f"Error processing task {task}: {e}")
+        traceback.print_exc()
+        return None
 
 
 if __name__ == "__main__":
     dataset_name = "pi_demos"
 
-    # fps = 1
-    # fps = 0.5
-    # fps = 0.25
-    # fps_options = [0.25, 0.5, 1]
-    fps_options = [0]  # 2]
+    # fps_options = [1]
+    fps_options = [0, 0.25, 0.5]  # , 1]
+    # fps_options = [0]  # 2]
 
     tasks = [
         "Eggs in carton",
@@ -144,14 +224,17 @@ if __name__ == "__main__":
         get_gpt_4o_mini(),
         # get_claude_3_5_sonnet(),
         # get_gpt_4o(),
-        get_gemini_15_pro(),
+        # get_gemini_15_pro(),
         # n_frames = [1, 5, 10, 20]
         # get_gpt_o1_mini(),
         # vlm = get_gpt_4o_mini()
-        get_gemini_2_flash(),
+        # get_gemini_2_flash(),
     ]
     success_flags = ["success", "fail"]
     # success_flags = ["fail"]
+
+    method = "frame_descriptions"
+    # method = "video"
 
     # for provider
     output_format = """
@@ -162,55 +245,32 @@ if __name__ == "__main__":
 
     prediction_rows = []
 
-    for vlm in vlm_options:
-        for task in tqdm(tasks):
-            for fps in fps_options:
-                for success_flag in success_flags:
-                    try:
-                        frames = easy_get_frames(task, success_flag, fps)
-                        success_constraints_str = dynamic_constraint_generation(
-                            vlm, task, frames
-                        )
-                        print(f"success constraints: {success_constraints_str}\n")
-                        # evaluate the task given success constraints
-                        outputs = simple_single_eval(
-                            vlm, task, frames, success_constraints_str
-                        )
-                        votes = [
-                            x if x is not None else np.nan
-                            for x in outputs.get("performance", [])
-                        ]
-                        prediction_rows.append(
-                            dict(
-                                vlm=vlm.name,
-                                task=task,
-                                success_flag=success_flag,
-                                fps=fps,
-                                performance=votes,
-                                mean_performance=(
-                                    np.nanmean(votes) if any(votes) else np.nan
-                                ),
-                                median_performance=(
-                                    np.nanmedian(votes) if any(votes) else np.nan
-                                ),
+    async def main() -> list[dict]:
+        all_results = []
+        for vlm in vlm_options:
+            tasks_to_process = []
+            for task in tasks:
+                for fps in fps_options:
+                    for success_flag in success_flags:
+                        tasks_to_process.append(
+                            process_task_async(
+                                vlm, dataset_name, task, fps, success_flag, method
                             )
                         )
-                    except Exception as e:
-                        print(f"Error: {e}")
-                        traceback.print_exc()
-                        breakpoint()
 
-                    # fname = f"/tmp/eval_output/{task}_{success_flag}_{fps}.mp4".replace(
-                    #     " ", "_"
-                    # )
-                    # save_frames_to_mp4(frames, fname)
-                    # print(f"saved frames to {fname}")
+            # Process all tasks for this VLM concurrently (rate limiting handled by VLM)
+            results = await asyncio.gather(*tasks_to_process)
+            results = [r for r in results if r is not None]  # Filter out failed tasks
 
-                    # breakpoint()
+            # Save results for this VLM
+            if results:
+                path = f"/tmp/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv"
+                df = pd.DataFrame(results)
+                df.to_csv(path, index=False)
+                print(f"saved results to {path}")
+                all_results.extend(results)
 
-        # periodically save results to cache in case of failure
-        path = f"/tmp/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
-        df = pd.DataFrame(prediction_rows)
-        df.to_csv(path, index=False)
-        print(f"saved results to {path}")
-        prediction_rows = []
+        return all_results
+
+    all_results = asyncio.run(main())
+    breakpoint()
