@@ -195,7 +195,7 @@ if __name__ == "__main__":
     dataset_name = "pi_demos"
 
     # fps_options = [1]
-    fps_options = [0, 0.25, 0.5]  # , 1]
+    fps_options = [0, 0.25, 0.5, 1]
     # fps_options = [0]  # 2]
 
     tasks = [
@@ -221,8 +221,8 @@ if __name__ == "__main__":
     )
 
     vlm_options = [
-        get_gpt_4o_mini(),
-        # get_claude_3_5_sonnet(),
+        # get_gpt_4o_mini(),
+        get_claude_3_5_sonnet(),
         # get_gpt_4o(),
         # get_gemini_15_pro(),
         # n_frames = [1, 5, 10, 20]
@@ -273,4 +273,5 @@ if __name__ == "__main__":
         return all_results
 
     all_results = asyncio.run(main())
+    print(f"found {len(all_results)} results")
     breakpoint()

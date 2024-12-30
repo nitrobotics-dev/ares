@@ -40,9 +40,12 @@ def get_claude_3_5_sonnet() -> VLM:
     return VLM(provider="anthropic", name="claude-3-5-sonnet-20240620")
 
 
+def get_claude_3_5_haiku() -> VLM:
+    return VLM(provider="anthropic", name="claude-3-5-haiku-20241022")
+
+
 def get_all_vlms() -> dict[str, VLM]:
     return {
-        "gemini-1.5-flash": get_gemini_15_flash(),
         "gemini-1.5-pro": get_gemini_15_pro(),
         "gemini-2-flash": get_gemini_2_flash(),
         "gpt-4o-mini": get_gpt_4o_mini(),

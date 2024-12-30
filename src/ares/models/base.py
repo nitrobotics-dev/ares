@@ -3,6 +3,7 @@ import base64
 import os
 import typing as t
 from asyncio import Semaphore
+from contextlib import nullcontext
 
 import numpy as np
 import torch
@@ -19,24 +20,15 @@ from ares.image_utils import encode_image
 
 # TODO -- singleton, model specific rate limits
 RATE_LIMITS = {
-    "openai": 100,  # 5000 RPM
-    "anthropic": 10,  # 50 RPM
-    "gemini": 5,  # 100 RPM
+    "openai": 20,  # 5000 RPM
+    "anthropic": 2,  # 1000 RPM
+    "gemini": 3,  # 100 RPM
 }
 
 
 def structure_image_messages(
     image: t.Union[str, np.ndarray, Image.Image], provider: str
 ) -> dict:
-    if "anthropic" in provider:
-        return {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/jpeg",  # matches the JPEG format above
-                "data": encode_image(image),
-            },
-        }
     return {
         "type": "image_url",
         "image_url": {"url": f"data:image/jpeg;base64,{encode_image(image)}"},
@@ -48,10 +40,11 @@ class VLM:
         self.provider = provider
         self.name = name
         # Add rate limiting per provider
+        self.semaphore: Semaphore | nullcontext = nullcontext()
         self._setup_rate_limits()
         self.check_valid_key()
 
-    def _setup_rate_limits(self, max_concurrent: int | None = None):
+    def _setup_rate_limits(self, max_concurrent: int | None = None) -> None:
         max_concurrent = max_concurrent or RATE_LIMITS.get(self.provider, 10)
         self.semaphore = Semaphore(max_concurrent)
 
@@ -127,6 +120,18 @@ class VLM:
             return messages, await acompletion(
                 model=self.name, messages=messages, **model_kwargs
             )
+
+    def ask(
+        self,
+        info: dict,
+        prompt_filename: str | None = None,
+        images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
+        double_prompt: bool = False,
+        model_kwargs: t.Dict | None = None,
+    ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
+        return asyncio.run(
+            self.ask_async(info, prompt_filename, images, double_prompt, model_kwargs)
+        )
 
     async def ask_batch_async(
         self,
