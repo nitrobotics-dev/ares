@@ -16,6 +16,10 @@ def get_all_embedders() -> dict[str, Embedder]:
     }
 
 
+def get_gemini_15_flash() -> VLM:
+    return VLM(provider="gemini", name="gemini-1.5-flash")
+
+
 def get_gemini_15_pro() -> VLM:
     return VLM(provider="gemini", name="gemini-1.5-pro")
 
@@ -48,6 +52,7 @@ def get_all_vlms() -> dict[str, VLM]:
     return {
         "gemini-1.5-pro": get_gemini_15_pro(),
         "gemini-2-flash": get_gemini_2_flash(),
+        "gemini-1.5-flash": get_gemini_15_flash(),
         "gpt-4o-mini": get_gpt_4o_mini(),
         "gpt-4o": get_gpt_4o(),
         "gpt-o1-mini": get_gpt_o1_mini(),

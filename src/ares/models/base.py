@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import os
+import time
 import typing as t
 from asyncio import Semaphore
 from contextlib import nullcontext
@@ -13,6 +14,7 @@ from litellm import acompletion, completion
 from litellm.utils import ModelResponse
 from PIL import Image
 from sentence_transformers import SentenceTransformer
+from tenacity import retry, stop_after_attempt, wait_exponential
 from transformers import AutoModel, AutoProcessor
 from vertexai.generative_models import GenerativeModel, Part
 
@@ -20,10 +22,14 @@ from ares.image_utils import encode_image
 
 # TODO -- singleton, model specific rate limits
 RATE_LIMITS = {
-    "openai": 20,  # 5000 RPM
-    "anthropic": 2,  # 1000 RPM
-    "gemini": 3,  # 100 RPM
+    "openai": 10,  # 5000 RPM
+    "anthropic": 4,  # 1000 RPM
+    "gemini": 4,  # 1000 RPM
 }
+
+MAX_RETRIES = 3
+INITIAL_WAIT_SECONDS = 1
+MAX_WAIT_SECONDS = 10
 
 
 def structure_image_messages(
@@ -96,6 +102,17 @@ class VLM:
             content.append({"type": "text", "text": prompt})
         return [{"role": "user", "content": content}]
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_exponential(multiplier=INITIAL_WAIT_SECONDS, max=MAX_WAIT_SECONDS),
+        reraise=True,
+    )
+    async def _make_api_call(
+        self, messages: list[dict], model_kwargs: dict
+    ) -> ModelResponse:
+        """Wrapper for API calls with retry logic"""
+        return await acompletion(model=self.name, messages=messages, **model_kwargs)
+
     async def ask_async(
         self,
         info: dict,
@@ -117,20 +134,26 @@ class VLM:
                 f"submitting async request to {self.name}"
                 + (f" with {len(images)} images" if images else "")
             )
-            return messages, await acompletion(
-                model=self.name, messages=messages, **model_kwargs
-            )
+            return messages, await self._make_api_call(messages, model_kwargs)
 
     def ask(
         self,
         info: dict,
         prompt_filename: str | None = None,
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
+        video_path: str | None = None,
         double_prompt: bool = False,
         model_kwargs: t.Dict | None = None,
     ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
         return asyncio.run(
-            self.ask_async(info, prompt_filename, images, double_prompt, model_kwargs)
+            self.ask_async(
+                info,
+                prompt_filename,
+                images,
+                video_path,
+                double_prompt,
+                model_kwargs,
+            )
         )
 
     async def ask_batch_async(

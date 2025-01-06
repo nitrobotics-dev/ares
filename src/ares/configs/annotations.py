@@ -53,7 +53,7 @@ class Annotation(BaseModel):
         return x1, y1, x2 - x1, y2 - y1
 
     # Add this validation method
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         """Validate bbox format after initialization."""
         x1, y1, x2, y2 = self.bbox
         if x1 > x2:
@@ -62,7 +62,7 @@ class Annotation(BaseModel):
             raise ValueError(f"Invalid bbox: y1 ({y1}) must be <= y2 ({y2})")
 
     @property
-    def mask(self) -> np.ndarray:
+    def mask(self) -> np.ndarray | None:
         """Convert RLE or polygon segmentation to binary mask."""
         if self.segmentation is None:
             return None
@@ -178,101 +178,6 @@ class Annotation(BaseModel):
             track_id=self.track_id,
             attributes=self.attributes,
         )
-
-    def visualize(
-        self,
-        image: Union[np.ndarray, Image.Image],
-        color: tuple = (0, 255, 0),
-        thickness: int = 2,
-    ) -> np.ndarray:
-        """Visualize the annotation on an image."""
-        # Convert PIL Image to numpy array if needed
-        if isinstance(image, Image.Image):
-            image = np.array(image)
-
-        vis_image = image.copy()
-
-        # Draw bbox
-        x1, y1, x2, y2 = [int(c) for c in self.bbox]
-        cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, thickness)
-
-        # Draw mask if available
-        if self.mask is not None:
-            mask_overlay = vis_image.copy()
-            mask_overlay[self.mask > 0] = color
-            vis_image = cv2.addWeighted(vis_image, 0.7, mask_overlay, 0.3, 0)
-
-        # Add text
-        text = f"{self.category_name}: {self.score:.2f}"
-        if self.track_id is not None:
-            text += f" ID: {self.track_id}"
-
-        cv2.putText(
-            vis_image,
-            text,
-            (x1, y1 - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            color,
-            thickness,
-        )
-
-        return vis_image
-
-    @staticmethod
-    def visualize_all(
-        image: Union[np.ndarray, Image.Image],
-        annotations: list["Annotation"],
-        colors: Optional[list[tuple]] = None,
-        thickness: int = 2,
-    ) -> np.ndarray:
-        """Draw all annotations on a single image."""
-        # Convert PIL Image to numpy array if needed
-        if isinstance(image, Image.Image):
-            image = np.array(image)
-
-        vis_image = image.copy()
-
-        # Generate colors if not provided
-        if colors is None:
-            colors = [
-                (
-                    np.random.randint(0, 255),
-                    np.random.randint(0, 255),
-                    np.random.randint(0, 255),
-                )
-                for _ in range(len(annotations))
-            ]
-
-        # Draw each annotation
-        for ann, color in zip(annotations, colors):
-            x1, y1, x2, y2 = [int(c) for c in ann.bbox]
-
-            # Draw mask if available
-            if ann.mask is not None:
-                mask_overlay = vis_image.copy()
-                mask_overlay[ann.mask > 0] = color
-                vis_image = cv2.addWeighted(vis_image, 0.7, mask_overlay, 0.3, 0)
-
-            # Draw bbox
-            cv2.rectangle(vis_image, (x1, y1), (x2, y2), color, thickness)
-
-            # Add text
-            text = f"{ann.category_name}: {ann.score:.2f}"
-            if ann.track_id is not None:
-                text += f" ID: {ann.track_id}"
-
-            cv2.putText(
-                vis_image,
-                text,
-                (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                color,
-                thickness,
-            )
-
-        return vis_image
 
     def to_dict(self) -> dict:
         """Convert annotation to dictionary format suitable for JSON serialization."""

@@ -17,7 +17,7 @@ sentencepiece
 einops
 pycocotools
 sentence-transformers
-
+tenacity
 
 # datasets and utilities
 datasets

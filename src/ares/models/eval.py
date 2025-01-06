@@ -91,7 +91,7 @@ async def simple_single_video_eval_async(
         ),
         prompt_filename="simple_video_eval.jinja2",
         images=frames,
-        model_kwargs=dict(n=5),
+        model_kwargs=dict(n=5) if "claude" not in vlm.name else None,
     )
     return parse_responses(res)
 
@@ -125,7 +125,7 @@ async def simple_single_frame_description_eval_async(
             output_format=output_format,
         ),
         prompt_filename="summarization_frame_eval.jinja2",
-        model_kwargs=dict(n=5),
+        model_kwargs=dict(n=5) if "claude" not in vlm.name else None,
     )
     return parse_responses(res)
 
@@ -195,7 +195,8 @@ if __name__ == "__main__":
     dataset_name = "pi_demos"
 
     # fps_options = [1]
-    fps_options = [0, 0.25, 0.5, 1]
+    fps_options = [0, 0.25, 0.5, 1, 2]
+    # fps_options = [2]
     # fps_options = [0]  # 2]
 
     tasks = [
@@ -214,6 +215,7 @@ if __name__ == "__main__":
     from ares.models.shortcuts import (
         get_claude_3_5_sonnet,
         get_gemini_2_flash,
+        get_gemini_15_flash,
         get_gemini_15_pro,
         get_gpt_4o,
         get_gpt_4o_mini,
@@ -221,21 +223,20 @@ if __name__ == "__main__":
     )
 
     vlm_options = [
+        # get_claude_3_5_sonnet(),
+        get_gpt_4o(),
         # get_gpt_4o_mini(),
-        get_claude_3_5_sonnet(),
-        # get_gpt_4o(),
-        # get_gemini_15_pro(),
+        get_gemini_15_pro(),
         # n_frames = [1, 5, 10, 20]
         # get_gpt_o1_mini(),
         # vlm = get_gpt_4o_mini()
         # get_gemini_2_flash(),
+        # get_gemini_15_flash(),
     ]
     success_flags = ["success", "fail"]
-    # success_flags = ["fail"]
-
-    method = "frame_descriptions"
-    # method = "video"
-
+    # methods = ["frame_descriptions", "video"]
+    # methods = ["video"]
+    methods = ["frame_descriptions"]
     # for provider
     output_format = """
     - description: str. A thorough description of everything that happens in the sequence of images. Focus on the robot's actions and how it performs the task.
@@ -247,27 +248,50 @@ if __name__ == "__main__":
 
     async def main() -> list[dict]:
         all_results = []
-        for vlm in vlm_options:
-            tasks_to_process = []
-            for task in tasks:
-                for fps in fps_options:
-                    for success_flag in success_flags:
-                        tasks_to_process.append(
-                            process_task_async(
-                                vlm, dataset_name, task, fps, success_flag, method
-                            )
-                        )
 
-            # Process all tasks for this VLM concurrently (rate limiting handled by VLM)
-            results = await asyncio.gather(*tasks_to_process)
-            results = [r for r in results if r is not None]  # Filter out failed tasks
+        # Process each method sequentially to avoid concurrent calls to same VLM
+        for method in methods:
+            # Create tasks for all VLMs for this method
+            vlm_tasks = []
+            for vlm in vlm_options:
 
-            # Save results for this VLM
-            if results:
-                path = f"/tmp/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv"
-                df = pd.DataFrame(results)
-                df.to_csv(path, index=False)
-                print(f"saved results to {path}")
+                async def process_vlm(
+                    model: VLM = vlm,
+                ) -> list[dict]:  # Capture vlm in closure
+                    tasks_to_process = []
+                    for task in tasks:
+                        for fps in fps_options:
+                            for success_flag in success_flags:
+                                tasks_to_process.append(
+                                    process_task_async(
+                                        vlm,
+                                        dataset_name,
+                                        task,
+                                        fps,
+                                        success_flag,
+                                        method,
+                                    )
+                                )
+
+                    # Process all tasks for this VLM concurrently
+                    results = await asyncio.gather(
+                        *tasks_to_process, return_exceptions=True
+                    )
+                    results = [r for r in results if r is not None]
+
+                    # Save results for this VLM
+                    if results:
+                        path = f"/workspaces/ares/data/eval_dump/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv"
+                        df = pd.DataFrame(results)
+                        df.to_csv(path, index=False)
+                        print(f"saved results to {path}")
+                    return results
+
+                vlm_tasks.append(process_vlm())
+
+            # Process all VLMs in parallel for this method
+            method_results = await asyncio.gather(*vlm_tasks)
+            for results in method_results:
                 all_results.extend(results)
 
         return all_results

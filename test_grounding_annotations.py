@@ -16,7 +16,10 @@ from transformers import (
 )
 
 from ares.configs.annotations import Annotation, binary_mask_to_rle
-from ares.databases.annotation_database import AnnotationDatabase
+from ares.databases.annotation_database import (
+    TEST_ANNOTATION_DB_PATH,
+    AnnotationDatabase,
+)
 from ares.image_utils import load_video_frames
 from ares.models.shortcuts import get_gemini_2_flash, get_gpt_4o
 
@@ -192,7 +195,7 @@ class GroundingAnnotator:
         return all_annotations
 
 
-def get_vlm_labels(vlm, frames: List[np.ndarray], prompt_filename: str) -> str:
+def get_vlm_labels(vlm: VLM, frames: List[np.ndarray], prompt_filename: str) -> str:
     """Get object labels from VLM."""
     messages, response = vlm.ask(
         info=dict(), prompt_filename=prompt_filename, images=frames
@@ -202,69 +205,9 @@ def get_vlm_labels(vlm, frames: List[np.ndarray], prompt_filename: str) -> str:
     return label_str
 
 
-def visualize_annotations(
-    frames: List[np.ndarray],
-    annotations: List[List[Annotation]],
-    base_output_dir: str = "/tmp/output_visualizations",
-) -> None:
-    """Visualize and save frame annotations."""
-    os.makedirs(base_output_dir, exist_ok=True)
-
-    for frame_idx, (frame, frame_annotations) in enumerate(zip(frames, annotations)):
-        # Create frame-specific directory
-        frame_dir = os.path.join(base_output_dir, f"frame_{frame_idx:03d}")
-        os.makedirs(frame_dir, exist_ok=True)
-
-        # Convert BGR to RGB for visualization
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Save original frame
-        cv2.imwrite(
-            os.path.join(frame_dir, "original.jpg"),
-            cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR),
-        )
-
-        # Save individual annotations
-        print(f"\nFrame {frame_idx} detections:")
-        for ann_idx, ann in enumerate(frame_annotations):
-            color = (
-                np.random.randint(0, 255),
-                np.random.randint(0, 255),
-                np.random.randint(0, 255),
-            )
-            vis_frame = ann.visualize(image=frame_rgb.copy(), color=color, thickness=2)
-
-            # Save visualization
-            output_name = (
-                f"detection_{ann_idx:02d}_{ann.category_name}_{ann.score:.2f}.jpg"
-            )
-            output_path = os.path.join(frame_dir, output_name)
-            cv2.imwrite(output_path, cv2.cvtColor(vis_frame, cv2.COLOR_RGB2BGR))
-
-            # Save mask if available
-            if ann.mask is not None:
-                mask_vis = frame_rgb.copy()
-                mask_vis[ann.mask > 0] = color
-                mask_path = os.path.join(
-                    frame_dir, f"mask_{ann_idx:02d}_{ann.category_name}.jpg"
-                )
-                cv2.imwrite(mask_path, cv2.cvtColor(mask_vis, cv2.COLOR_RGB2BGR))
-
-            print(f"- {ann.category_name}: {ann.score:.2f}")
-
-        # Save combined visualization
-        combined_vis = Annotation.visualize_all(
-            image=frame_rgb, annotations=frame_annotations, thickness=2
-        )
-        cv2.imwrite(
-            os.path.join(frame_dir, "combined.jpg"),
-            cv2.cvtColor(combined_vis, cv2.COLOR_RGB2BGR),
-        )
-
-
 if __name__ == "__main__":
     # Initialize components
-    db = AnnotationDatabase()
+    db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     # annotator = GroundingAnnotator()
 
     # Process video
