@@ -14,6 +14,7 @@ Total 2 indices per robot plus 2 for video, text description (plus one for 3D po
 import json
 import traceback
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type
@@ -96,6 +97,11 @@ class Index(ABC):
         pass
 
     @abstractmethod
+    def delete(self) -> None:
+        """Delete the index"""
+        pass
+
+    @abstractmethod
     def get_all_vectors(self) -> np.ndarray:
         """Get all vectors in the index"""
         pass
@@ -172,6 +178,7 @@ class FaissIndex(Index):
         return [self.id_map[i] for i in range(self.index.ntotal)]
 
     def save(self, path: Path) -> None:
+        self.last_save_path = str(path)  # Track where we last saved
         faiss.write_index(self.index, str(path))
         meta = {
             "feature_dim": self.feature_dim,
@@ -222,6 +229,23 @@ class FaissIndex(Index):
             return None
 
         return self.index.reconstruct(internal_id)
+
+    def delete(self) -> None:
+        """Delete the index from memory and remove associated files from disk"""
+        # Reset in-memory state
+        base_index = faiss.IndexFlatL2(self.total_dim)
+        self.index = faiss.IndexIDMap2(base_index)
+        self.id_map = {}
+        self.next_id = 0
+        self.n_entries = 0
+
+        # Remove files from disk if they exist
+        path = Path(self.last_save_path) if hasattr(self, "last_save_path") else None
+        if path and path.exists():
+            path.unlink()  # Delete the index file
+            meta_path = path.parent / f"{path.stem}_meta.json"
+            if meta_path.exists():
+                meta_path.unlink()  # Delete the metadata file
 
 
 class IndexManager:
@@ -365,9 +389,21 @@ class IndexManager:
             self.metadata[name] = {"n_entries": 0}  # Initialize with n_entries
         self.metadata[name].update(kwargs)  # Update with additional metadata
 
-    def get_stats(self, name: str) -> dict:
+    def get_index_stats(self, name: str) -> dict:
         """Get statistics for an index"""
         return self.metadata[name]
+
+    def get_overall_stats(self) -> dict:
+        """Get statistics for all indices"""
+        meta = self.metadata
+        summary = defaultdict(list)
+        for name, index_meta in meta.items():
+            for k, v in index_meta.items():
+                try:
+                    summary[k].append(int(v))
+                except:
+                    continue
+        return {f"avg_{k}": np.mean(v) for k, v in summary.items()}
 
     def search_matrix(
         self, name: str, query_matrix: np.ndarray, k: int
@@ -453,3 +489,19 @@ class IndexManager:
         # Reshape and denormalize
         matrix = vector.reshape(index.time_steps, index.feature_dim)
         return index.denormalize_matrix(matrix)
+
+    def delete_index(self, name: str) -> None:
+        """Delete an index"""
+        if name not in self.indices:
+            raise ValueError(f"Index {name} does not exist")
+        self.indices[name].delete()
+        del self.indices[name]
+        del self.metadata[name]
+        self.save()
+
+
+if __name__ == "__main__":
+    db = IndexManager(TEST_EMBEDDING_DB_PATH, FaissIndex)
+
+    breakpoint()
+    print(db.get_overall_stats())

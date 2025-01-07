@@ -144,12 +144,12 @@ def db_to_df(engine: Engine) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    from ares.configs.test_configs import ROLL1, ROLL2
-
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    add_rollout(engine, ROLL1, RolloutSQLModel)
-    add_rollout(engine, ROLL2, RolloutSQLModel)
-
-    sess = Session(engine)
-    res = sess.query(RolloutSQLModel).filter(RolloutSQLModel.task_success > 0.5)
+    df = db_to_df(engine)
     breakpoint()
+    # add_rollout(engine, ROLL1, RolloutSQLModel)
+    # add_rollout(engine, ROLL2, RolloutSQLModel)
+
+    # sess = Session(engine)
+    # res = sess.query(RolloutSQLModel).filter(RolloutSQLModel.task_success > 0.5)
+    # breakpoint()
