@@ -224,8 +224,8 @@ if __name__ == "__main__":
 
     vlm_options = [
         # get_claude_3_5_sonnet(),
-        get_gpt_4o(),
-        # get_gpt_4o_mini(),
+        # get_gpt_4o(),
+        get_gpt_4o_mini(),
         # get_gemini_15_pro(),
         # n_frames = [1, 5, 10, 20]
         # get_gpt_o1_mini(),

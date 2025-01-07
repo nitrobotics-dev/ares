@@ -32,6 +32,7 @@ class GroundingAnnotator:
         self,
         detector_id: str = "IDEA-Research/grounding-dino-tiny",
         segmenter_id: str | None = "facebook/sam-vit-base",
+        detector_thresholds: dict[str, float] | None = None,
         device: str = "cpu",
     ):
         self.device = device
@@ -39,6 +40,10 @@ class GroundingAnnotator:
         self.segmentor_processor, self.segmentor_model = self.setup_segmenter(
             segmenter_id
         )
+        self.detector_thresholds = detector_thresholds or {
+            "box_threshold": 0.4,
+            "text_threshold": 0.3,
+        }
         print(f"Loaded models for {detector_id} and {segmenter_id} on device {device}")
 
     def setup_detector(
@@ -67,8 +72,6 @@ class GroundingAnnotator:
         self,
         images: List[Image.Image],
         labels_str: str,
-        box_threshold: float = 0.4,
-        text_threshold: float = 0.3,
     ) -> List[List[Annotation]]:
         # Process all images in a single batch
         inputs = self.detector_processor(
@@ -83,8 +86,8 @@ class GroundingAnnotator:
         results = self.detector_processor.post_process_grounded_object_detection(
             outputs,
             inputs.input_ids,
-            box_threshold=box_threshold,
-            text_threshold=text_threshold,
+            box_threshold=self.detector_thresholds["box_threshold"],
+            text_threshold=self.detector_thresholds["text_threshold"],
             target_sizes=target_sizes,
         )
 
@@ -230,7 +233,10 @@ if __name__ == "__main__":
 
     # Initialize components
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
-    annotator = GroundingAnnotator(segmenter_id=None)
+    annotator = GroundingAnnotator(
+        segmenter_id=None,
+        detector_thresholds={"box_threshold": 0.3, "text_threshold": 0.2},
+    )
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
     # Process video
@@ -240,8 +246,7 @@ if __name__ == "__main__":
     formal_dataset_name = "UCSD Kitchen"
     dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
     # fnames = ["data/train/episode_2.mp4", "data/train/episode_3.mp4"]
-    fnames = ["data/train/episode_2.mp4"]
-
+    fnames = [f"data/train/episode_{i}.mp4" for i in range(10, 20)]
     target_fps = 1
 
     # vlm = get_gemini_2_flash()
@@ -259,8 +264,10 @@ if __name__ == "__main__":
             rollout.task.language_instruction,
         )
         # label_str = "a robot. a robot gripper. a sink. a cabinet"
+        label_str = label_str.replace("a ", "").replace("an ", "")
 
         video_annotations = annotator.annotate_video(frames, label_str)
+        ann_db.delete_video_and_annotations(video_id=f"{dataset_name}/{fname}")
         video_id = ann_db.add_video_with_annotations(
             dataset_name=dataset_name,
             video_path=fname,

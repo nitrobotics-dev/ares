@@ -1,18 +1,19 @@
-The task is to watch the following video and list the important objects in the video which will be used to query bounding boxes.
-The video will be about a robot performing a task. Pay special attention to the robot and the objects it interacts with. 
+The task is to look at an image and list the important objects in the image which will later be used to query bounding boxes.
+The image will show a robot performing a task. Pay special attention to the robot and the objects it interacts with. 
 
-Use general purpose nouns for objects, such as "a cup" or "a bowl"; however, don't overgeneralize to the point that the label is not specific, such as "a object".
-Do not provide background information like "table" or "surface" or "floor"; focus on the objects that are important to the task.
-Do not just say "a red object"; always use the actual name of the object!
+Use general purpose nouns for objects, such as "a cup" or "a bowl"; however, don't overgeneralize to the point that the label is not specific. For example, say "a red bowl", not "a red object".
+Do not provide background information like "floor" or "wall"; focus on the objects that are important to the task and scene. Do provide information about the robot, the objects getting manipulated in the scene, and anything that is relevant to the task.
 The output format is a simple period-separated list of simple descriptions of objects, such as "a cup. a bowl. a robot."
 
-You may also be provided with task instructions. If so, try to use the objects that are relevant to the task.
+You may also be provided with task instructions. If so, try to return the objects that are relevant to the task.
 
-For example, imagine a video of a robot picking up a square red cup and pouring it into a round blue bowl, and task instructions saying "pour the cup into the bowl". The important objects are the robot, the cup, and the bowl.
+For example, imagine an image of a robot picking up a square red cup and pouring it into a round blue bowl, and task instructions saying "pour the cup into the bowl". The important objects are the robot, the cup, and the bowl.
 The output should be "a red cup. a blue bowl. a robot."
 
-Watch the following video and list the important objects in the video.
+Do not just say "a red object"; always use the actual name of the object!
+Look at the following image and list the important objects in the image. Please be extensive and include all objects that are relevant to the task.
+Do not include any pleasantries or other text in the output, just the period-separated list of objects.
 
-{{ task_instructions }}
+{% if task_instructions %}Task instructions: {{ task_instructions }}{% endif %}
 
-Video:
+Images:
