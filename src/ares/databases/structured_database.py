@@ -3,11 +3,11 @@ import uuid
 from datetime import datetime
 
 import pandas as pd
-from sqlalchemy import Column, Engine, MetaData, inspect, text
+from sqlalchemy import Column, Engine, MetaData, inspect, select, text
 from sqlmodel import Session, SQLModel, create_engine
 
 from ares.configs.base import Rollout
-from ares.configs.pydantic_sql_helpers import create_flattened_model
+from ares.configs.pydantic_sql_helpers import create_flattened_model, recreate_model
 
 SQLITE_PREFIX = "sqlite:///"
 BASE_ROBOT_DB_PATH = SQLITE_PREFIX + "robot_data.db"
@@ -113,6 +113,34 @@ def get_rollouts(engine: Engine) -> pd.DataFrame:
             df[col] = pd.NA
 
         return df
+
+
+def get_rollout_by_name(
+    engine: Engine, formal_dataset_name: str, path: str
+) -> t.Optional[Rollout]:
+    with Session(engine) as session:
+        query = select(RolloutSQLModel).where(
+            RolloutSQLModel.dataset_name == formal_dataset_name,
+            RolloutSQLModel.path == path,
+        )
+        row = session.exec(query).first()
+        if row is None:
+            return None
+        return recreate_model(row[0], Rollout)
+
+
+def get_dataset_rollouts(engine: Engine, formal_dataset_name: str) -> pd.DataFrame:
+    with Session(engine) as session:
+        query = select(RolloutSQLModel).where(
+            RolloutSQLModel.dataset_name == formal_dataset_name,
+        )
+        return session.exec(query).all()
+
+
+def db_to_df(engine: Engine) -> pd.DataFrame:
+    query = select(RolloutSQLModel)
+    df = pd.read_sql(query, engine)
+    return df
 
 
 if __name__ == "__main__":

@@ -85,15 +85,31 @@ def draw_annotations(
             colored_mask[annotation.mask == 1] = color
             overlay = cv2.addWeighted(overlay, 1, colored_mask, alpha, 0)
 
-    # Draw legend
+    # Calculate legend dimensions
     legend_spacing = 25  # Vertical spacing between legend items
+    legend_height = len(unique_categories) * legend_spacing + 10
+    legend_padding = 20  # Padding around legend
+
+    # Create extended canvas for image + legend
+    canvas = np.full(
+        (image.shape[0] + legend_height + legend_padding, image.shape[1], 3),
+        255,  # White background
+        dtype=np.uint8,
+    )
+
+    # Place the annotated image at the top
+    canvas[: image.shape[0]] = cv2.addWeighted(
+        overlay, alpha, annotated_image, 1 - alpha, 0
+    )
+
+    # Draw legend below the image
     legend_x = 10
-    legend_y = 30
+    legend_y = image.shape[0] + legend_padding
 
     for idx, (category, color) in enumerate(unique_categories.items()):
         # Draw color box
         cv2.rectangle(
-            annotated_image,
+            canvas,
             (legend_x, legend_y + idx * legend_spacing - 15),
             (legend_x + 20, legend_y + idx * legend_spacing),
             color,
@@ -101,7 +117,7 @@ def draw_annotations(
         )
         # Draw category text
         cv2.putText(
-            annotated_image,
+            canvas,
             category,
             (legend_x + 30, legend_y + idx * legend_spacing - 3),
             cv2.FONT_HERSHEY_SIMPLEX,
@@ -111,6 +127,4 @@ def draw_annotations(
             cv2.LINE_AA,
         )
 
-    # Combine original image and overlay with transparency
-    annotated_image = cv2.addWeighted(overlay, alpha, annotated_image, 1 - alpha, 0)
-    return annotated_image
+    return canvas

@@ -8,6 +8,8 @@ import numpy as np
 import pymongo
 import torch
 from PIL import Image
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from tqdm import tqdm
 from transformers import (
     AutoModelForMaskGeneration,
@@ -21,6 +23,7 @@ from ares.databases.annotation_database import (
     AnnotationDatabase,
 )
 from ares.image_utils import load_video_frames
+from ares.models.base import VLM
 from ares.models.shortcuts import get_gemini_2_flash, get_gpt_4o
 
 
@@ -28,12 +31,12 @@ class GroundingAnnotator:
     def __init__(
         self,
         detector_id: str = "IDEA-Research/grounding-dino-tiny",
-        segmenter_id: str = "facebook/sam-vit-base",
+        segmenter_id: str | None = "facebook/sam-vit-base",
         device: str = "cpu",
     ):
         self.device = device
         self.detector_processor, self.detector_model = self.setup_detector(detector_id)
-        self.segmentor_processor, self.segmentator_model = self.setup_segmenter(
+        self.segmentor_processor, self.segmentor_model = self.setup_segmenter(
             segmenter_id
         )
         print(f"Loaded models for {detector_id} and {segmenter_id} on device {device}")
@@ -49,8 +52,10 @@ class GroundingAnnotator:
         return processor, model
 
     def setup_segmenter(
-        self, model_id: str
+        self, model_id: str | None
     ) -> Tuple[AutoProcessor, AutoModelForMaskGeneration]:
+        if model_id is None:
+            return None, None
         processor = AutoProcessor.from_pretrained(model_id)
         print(f"Downloading model {model_id}...")
         model = AutoModelForMaskGeneration.from_pretrained(
@@ -137,7 +142,7 @@ class GroundingAnnotator:
         ).to(self.device)
 
         with torch.no_grad():
-            outputs = self.segmentator_model(**inputs)
+            outputs = self.segmentor_model(**inputs)
 
         scores = outputs["iou_scores"]
         masks = self.segmentor_processor.post_process_masks(
@@ -169,8 +174,11 @@ class GroundingAnnotator:
             print("No detections found in any frame")
             return box_annotations
 
-        segment_annotations = self.run_segmenter(images, box_annotations)
-        return segment_annotations
+        if self.segmentor_model is not None:
+            segment_annotations = self.run_segmenter(images, box_annotations)
+            return segment_annotations
+        else:
+            return box_annotations
 
     def annotate_video(
         self,
@@ -195,63 +203,73 @@ class GroundingAnnotator:
         return all_annotations
 
 
-def get_vlm_labels(vlm: VLM, frames: List[np.ndarray], prompt_filename: str) -> str:
+def get_vlm_labels(
+    vlm: VLM, frames: List[np.ndarray], prompt_filename: str, task_instructions: str
+) -> str:
     """Get object labels from VLM."""
+    if task_instructions is None:
+        task_instructions = ""
+    print(f"Task instructions: {task_instructions}")
     messages, response = vlm.ask(
-        info=dict(), prompt_filename=prompt_filename, images=frames
+        info=dict(task_instructions=task_instructions),
+        prompt_filename=prompt_filename,
+        images=frames,
     )
     label_str = response.choices[0].message.content
-    print(f"Label string: {label_str}")
+    print(f"Label string: {label_str} ")
     return label_str
 
 
 if __name__ == "__main__":
+    from ares.databases.structured_database import (
+        TEST_ROBOT_DB_PATH,
+        RolloutSQLModel,
+        get_rollout_by_name,
+        setup_database,
+    )
+
     # Initialize components
-    db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
-    # annotator = GroundingAnnotator()
+    ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
+    annotator = GroundingAnnotator(segmenter_id=None)
+    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
     # Process video
-    dataset_name = "cmu_play_fusion"
-    fname = "data/train/episode_208.mp4"
+    # Process video
+    # dataset_name = "cmu_play_fusion"
+    # fname = "data/train/episode_208.mp4"
+    formal_dataset_name = "UCSD Kitchen"
+    dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
+    # fnames = ["data/train/episode_2.mp4", "data/train/episode_3.mp4"]
+    fnames = ["data/train/episode_2.mp4"]
+
     target_fps = 1
 
-    frames, frame_indices = load_video_frames(dataset_name, fname, target_fps)
-
-    # Get labels from VLM
     # vlm = get_gemini_2_flash()
     vlm = get_gpt_4o()
-    label_str = get_vlm_labels(vlm, frames, "grounding_description.jinja2")
 
-    # Run detection and segmentation
-    video_annotations = annotator.annotate_video(frames, label_str)
-    # import pickle
+    for fname in fnames:
+        rollout = get_rollout_by_name(
+            engine, formal_dataset_name, fname.replace("mp4", "npy")
+        )
+        frames, frame_indices = load_video_frames(dataset_name, fname, target_fps)
+        label_str = get_vlm_labels(
+            vlm,
+            frames,
+            "grounding_description.jinja2",
+            rollout.task.language_instruction,
+        )
+        # label_str = "a robot. a robot gripper. a sink. a cabinet"
 
-    # pickle.dump(video_annotations, open("video_annotations.pkl", "wb"))
-    video_annotations = pickle.load(open("video_annotations.pkl", "rb"))
-    # breakpoint()
-
-    # Store in database
-    video_id = db.add_video_with_annotations(
-        dataset_name=dataset_name,
-        video_path=fname,
-        frames=frames,
-        frame_indices=frame_indices,
-        annotations=video_annotations,
-        label_str=label_str,
-    )
-    print(
-        f"Added video {video_id} to database with {len(video_annotations)} annotated frames"
-    )
-
-    # Optionally visualize
-    # if visualize:
-    visualize_annotations(frames, video_annotations)
-    print(f"\nVisualization results saved to /tmp/output_visualizations/")
-
-    print(f"Processed video {video_id}")
-
-    breakpoint()
-
-    # retrieve annotations
-    annotations = db.get_annotations(video_id=video_id)
+        video_annotations = annotator.annotate_video(frames, label_str)
+        video_id = ann_db.add_video_with_annotations(
+            dataset_name=dataset_name,
+            video_path=fname,
+            frames=frames,
+            frame_indices=frame_indices,
+            annotations=video_annotations,
+            label_str=label_str,
+        )
+        print(
+            f"Added video {video_id} to database with {[len(x) for x in video_annotations]} frame annotations"
+        )
     breakpoint()

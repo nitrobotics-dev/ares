@@ -37,7 +37,7 @@ class Environment(BaseConfig):
     name: str
     lighting: str = Field(
         description="Lighting conditions in the environment",
-        pattern="^(dim|normal|bright)$",
+        # pattern="^(dim|normal|bright)$",
     )
     # background: str = Field(description="Description of the setting or background")
     simulation: bool = Field(
@@ -100,7 +100,7 @@ class Rollout(BaseConfig):
     ingestion_time: datetime
     path: str
     dataset_name: str
-    description: str = Field(
+    description: str | None = Field(
         description="A detailed description of the input video. Include analysis of the task the robot is completing, including success criteria and performance."
     )
     length: int

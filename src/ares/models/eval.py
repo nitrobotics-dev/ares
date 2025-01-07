@@ -226,7 +226,7 @@ if __name__ == "__main__":
         # get_claude_3_5_sonnet(),
         get_gpt_4o(),
         # get_gpt_4o_mini(),
-        get_gemini_15_pro(),
+        # get_gemini_15_pro(),
         # n_frames = [1, 5, 10, 20]
         # get_gpt_o1_mini(),
         # vlm = get_gpt_4o_mini()
@@ -251,47 +251,36 @@ if __name__ == "__main__":
 
         # Process each method sequentially to avoid concurrent calls to same VLM
         for method in methods:
-            # Create tasks for all VLMs for this method
+            # Process all VLMs in parallel for this method
             vlm_tasks = []
             for vlm in vlm_options:
-
-                async def process_vlm(
-                    model: VLM = vlm,
-                ) -> list[dict]:  # Capture vlm in closure
-                    tasks_to_process = []
-                    for task in tasks:
-                        for fps in fps_options:
-                            for success_flag in success_flags:
-                                tasks_to_process.append(
-                                    process_task_async(
-                                        vlm,
-                                        dataset_name,
-                                        task,
-                                        fps,
-                                        success_flag,
-                                        method,
-                                    )
+                tasks_to_process = []
+                for task in tasks:
+                    for fps in fps_options:
+                        for success_flag in success_flags:
+                            tasks_to_process.append(
+                                process_task_async(
+                                    vlm,
+                                    dataset_name,
+                                    task,
+                                    fps,
+                                    success_flag,
+                                    method,
                                 )
+                            )
 
-                    # Process all tasks for this VLM concurrently
-                    results = await asyncio.gather(
-                        *tasks_to_process, return_exceptions=True
-                    )
-                    results = [r for r in results if r is not None]
+                # Gather all tasks for this specific VLM
+                results = await asyncio.gather(
+                    *tasks_to_process, return_exceptions=True
+                )
+                results = [r for r in results if r is not None]
 
-                    # Save results for this VLM
-                    if results:
-                        path = f"/workspaces/ares/data/eval_dump/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv"
-                        df = pd.DataFrame(results)
-                        df.to_csv(path, index=False)
-                        print(f"saved results to {path}")
-                    return results
-
-                vlm_tasks.append(process_vlm())
-
-            # Process all VLMs in parallel for this method
-            method_results = await asyncio.gather(*vlm_tasks)
-            for results in method_results:
+                # Save results for this VLM
+                if results:
+                    path = f"/workspaces/ares/data/eval_dump/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv"
+                    df = pd.DataFrame(results)
+                    df.to_csv(path, index=False)
+                    print(f"saved results to {path}")
                 all_results.extend(results)
 
         return all_results
