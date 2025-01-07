@@ -90,7 +90,7 @@ def save_video(
 
 def get_video_frames(
     dataset: str, filename: str, n_frames: int | None = None, just_path: bool = False
-) -> list[np.ndarray] | list[str]:
+) -> list[np.ndarray | str]:
     """Get video as a list of frames from the frames directory."""
     base_filename = filename.replace(".mp4", "")
     frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
@@ -166,12 +166,12 @@ def split_video_to_frames(
 
 def choose_and_preprocess_frames(
     all_frames: list[np.ndarray | str],
-    n_frames: int = 10,
+    n_frames: int | None = None,
     specified_frames: list[int] | None = None,
     resize: tuple[int, int] | None = None,
 ) -> list[np.ndarray]:
-    assert n_frames > 0
     if specified_frames is None:
+        assert n_frames is not None
         if n_frames == 1:
             # if only one unspecified frame is requested, use the last frame
             frames = [all_frames[-1]]

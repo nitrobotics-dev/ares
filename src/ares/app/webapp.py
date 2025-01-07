@@ -97,6 +97,7 @@ def main() -> None:
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
         filtered_df = value_filtered_df
+        filtered_df = filtered_df[filtered_df["dataset_name"] == "UCSD Kitchen"]
         cluster_fig = None
         # print(kept_ids[:10])
         if len(kept_ids) == 0:
@@ -178,20 +179,23 @@ def main() -> None:
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
         st.header("Rollout Display")
 
-        # Let user select a row from the dataframe using helper function
-        selected_row, row_idx = select_row_from_df_user(filtered_df)
+        # initialize or persist selected row
+        select_row_from_df_user(filtered_df)
+        selected_row = st.session_state.get("selected_row")
 
-        show_dataframe(pd.DataFrame([selected_row]), title="Selected Row")
-
-        st.write(f"Selected row ID: {selected_row.id}")
-        hero_visualizations = show_hero_display(
-            filtered_df,
-            row_idx,
-            st.session_state.all_vecs,
-            show_n=100,
-            index_manager=st.session_state.INDEX_MANAGER,
-            lazy_load=False,
-        )
+        if selected_row is not None:
+            show_dataframe(pd.DataFrame([selected_row]), title="Selected Row")
+            st.write(f"Selected row ID: {selected_row.id}")
+            hero_visualizations = show_hero_display(
+                filtered_df,
+                selected_row,
+                st.session_state.all_vecs,
+                show_n=100,
+                index_manager=st.session_state.INDEX_MANAGER,
+                lazy_load=False,
+            )
+        else:
+            st.info("Please select a row to display details")
     st.divider()
 
     # section_plot_robots = "plot robot arrays"

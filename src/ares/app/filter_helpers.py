@@ -12,21 +12,25 @@ from ares.models.shortcuts import summarize
 
 
 def create_structured_data_filters(
-    df: pd.DataFrame, max_options: int = 25, n_cols: int = 3
+    df: pd.DataFrame, max_options: int = 25, n_cols: int = 3, debug: bool = False
 ) -> tuple[pd.DataFrame, list]:
     """Create filter controls for dataframe columns based on their types."""
     filtered_df = df.copy()
     skipped_cols = []
 
-    # Debug prints for initial state
-    print("Initial df shape:", df.shape)
-    print("Initial temp filters:", st.session_state.get("temp_filter_values", {}))
-    print("Initial active filters:", st.session_state.get("active_filter_values", {}))
+    if debug:
+        # Debug prints for initial state
+        print("Initial df shape:", df.shape)
+        print("Initial temp filters:", st.session_state.get("temp_filter_values", {}))
+        print(
+            "Initial active filters:", st.session_state.get("active_filter_values", {})
+        )
 
     # Add debug print to see actual values in the DataFrame
-    print("\nActual unique values in key columns:")
-    for col in ["robot_embodiment", "robot_rgb_cams"]:
-        print(f"{col} unique values:", filtered_df[col].unique())
+    if debug:
+        print("\nActual unique values in key columns:")
+        for col in ["robot_embodiment", "robot_rgb_cams"]:
+            print(f"{col} unique values:", filtered_df[col].unique())
 
     # Initialize temporary filter values if not exists
     if "temp_filter_values" not in st.session_state:
@@ -84,19 +88,20 @@ def create_structured_data_filters(
                 st.session_state.temp_filter_values[f"{col}_range"] = values
 
                 # Debug prints for numeric filters
-                print(f"\nNumeric filter for {col}:")
-                print(
-                    f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_range')}"
-                )
-                print(
-                    f"Active value: {st.session_state.active_filter_values.get(f'{col}_range')}"
-                )
-                print(
-                    f"Include None - Temp: {st.session_state.temp_filter_values.get(f'{col}_include_none')}"
-                )
-                print(
-                    f"Include None - Active: {st.session_state.active_filter_values.get(f'{col}_include_none')}"
-                )
+                if debug:
+                    print(f"\nNumeric filter for {col}:")
+                    print(
+                        f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_range')}"
+                    )
+                    print(
+                        f"Active value: {st.session_state.active_filter_values.get(f'{col}_range')}"
+                    )
+                    print(
+                        f"Include None - Temp: {st.session_state.temp_filter_values.get(f'{col}_include_none')}"
+                    )
+                    print(
+                        f"Include None - Active: {st.session_state.active_filter_values.get(f'{col}_include_none')}"
+                    )
 
                 # Only apply active filters
                 active_values = st.session_state.active_filter_values.get(
@@ -113,16 +118,18 @@ def create_structured_data_filters(
                         & (filtered_df[col] <= active_values[1])
                     ) | (filtered_df[col].isna() if active_include_none else False)
                     filtered_df = filtered_df[mask]
-                    print(
-                        f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
-                    )
+                    if debug:
+                        print(
+                            f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
+                        )
 
             elif viz_info["viz_type"] == "bar":
                 # Add debug print before filtering
                 if col in ["robot_rgb_cams"]:
-                    print(f"\nDEBUG {col} before filtering:")
-                    print(f"Unique values in df: {filtered_df[col].unique()}")
-                    print(f"Type of values in df: {filtered_df[col].dtype}")
+                    if debug:
+                        print(f"\nDEBUG {col} before filtering:")
+                        print(f"Unique values in df: {filtered_df[col].unique()}")
+                        print(f"Type of values in df: {filtered_df[col].dtype}")
 
                 # Convert None to "(None)" for display, but keep other values as is
                 options = [
@@ -152,13 +159,14 @@ def create_structured_data_filters(
                 st.session_state.temp_filter_values[f"{col}_select"] = selected
 
                 # Debug prints for categorical filters
-                print(f"\nCategory filter for {col}:")
-                print(
-                    f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_select')}"
-                )
-                print(
-                    f"Active value: {st.session_state.active_filter_values.get(f'{col}_select')}"
-                )
+                if debug:
+                    print(f"\nCategory filter for {col}:")
+                    print(
+                        f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_select')}"
+                    )
+                    print(
+                        f"Active value: {st.session_state.active_filter_values.get(f'{col}_select')}"
+                    )
 
                 # Only apply active filters
                 active_selected = st.session_state.active_filter_values.get(
@@ -187,17 +195,22 @@ def create_structured_data_filters(
                         ]
 
                     # Debug prints for problematic filters
-                    print(f"\nFiltering {col}:")
-                    print(f"Column dtype: {df[col].dtype}")
-                    print(f"Active values: {active_values}")
-                    print(f"Types of active values: {[type(x) for x in active_values]}")
+                    if debug:
+                        print(f"\nFiltering {col}:")
+                        print(f"Column dtype: {df[col].dtype}")
+                        print(f"Active values: {active_values}")
+                        print(
+                            f"Types of active values: {[type(x) for x in active_values]}"
+                        )
 
                     filtered_df = filtered_df[filtered_df[col].isin(active_values)]
-                    print(
-                        f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
-                    )
+                    if debug:
+                        print(
+                            f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
+                        )
 
-    print("\nFinal df shape:", filtered_df.shape)
+    if debug:
+        print("\nFinal df shape:", filtered_df.shape)
     # check if len(filtered_df) == 0
     if len(filtered_df) == 0:
         breakpoint()
@@ -247,71 +260,69 @@ def _handle_selection(
     return selector_fn(selected_value)
 
 
-def select_row_from_df_user(df: pd.DataFrame) -> tuple[pd.Series, int]:
+def select_row_from_df_user(df: pd.DataFrame) -> None:
     """Select a row from DataFrame with user input.
 
     Args:
         df: DataFrame to select from
 
     Returns:
-        tuple[pd.Series, int]: Selected row and its position in the filtered DataFrame
+        pd.Series: selected row
     """
     col1, col2, col3, col4 = st.columns(4)
     row = None
-    row_idx = 0  # Default index in filtered DataFrame
 
     # Option 1: Select by index
     with col1:
-        idx_options = list(range(len(df)))  # Use position instead of index
-        idx: int | None = st.selectbox(
+        idx_options = list(range(len(df)))
+        idx: int | str = st.selectbox(
             "Select by position",
-            options=["Choose an option"] + idx_options,
+            options=["Choose an option"] + sorted(idx_options),
             key="idx_select",
         )
         if st.button("Select by Position"):
             if idx != "Choose an option":
-                row = df.iloc[int(idx)]
-                row_idx = int(idx)
+                st.session_state["selected_row"] = df.iloc[int(idx)]
 
     # Option 2: Select by ID
     with col2:
         id_options = df.id.apply(str).tolist()
-        selected_id = st.selectbox(
+        selected_id: str | None = st.selectbox(
             "Select by ID",
-            options=["Choose an option"] + id_options,
+            options=["Choose an option"] + sorted(id_options),
             key="id_select",
         )
         if st.button("Select by ID"):
             if selected_id != "Choose an option":
                 mask = df.id.apply(str) == selected_id
-                row = df[mask].iloc[0]
-                row_idx = df[mask].index.get_indexer([row.name])[0]
+                st.session_state["selected_row"] = df[mask].iloc[0]
 
     # Option 3: Select by Path
     with col3:
         path_options = df.path.unique().tolist()
-        selected_path = st.selectbox(
+        selected_path: str | None = st.selectbox(
             "Select by Path",
-            options=["Choose an option"] + path_options,
+            options=["Choose an option"]
+            + sorted(
+                path_options,
+                key=lambda x: int(
+                    x.split("_")[-1].split(".")[0]
+                ),  # e.g. path/to/file_0.npy
+            ),
             key="path_select",
         )
         if st.button("Select by Path"):
             if selected_path != "Choose an option":
-                mask = df.path == selected_path
-                row = df[mask].iloc[0]
-                row_idx = df[mask].index.get_indexer([row.name])[0]
+                st.session_state["selected_row"] = df[df.path == selected_path].iloc[0]
 
     with col4:
         if st.button("Select Random"):
-            row_idx = np.random.randint(len(df))
-            row = df.iloc[row_idx]
+            random_idx = np.random.randint(len(df))
+            st.session_state["selected_row"] = df.iloc[random_idx]
 
-    if row is None:
+    if st.session_state.get("selected_row") is None:
         st.warning("No row selected, defaulting to first row")
-        row = df.iloc[0]
-        row_idx = 0
-
-    return row, row_idx
+        st.session_state["selected_row"] = df.iloc[0]
 
 
 def handle_selection(

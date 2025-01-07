@@ -13,6 +13,7 @@ import plotly.express as px
 import streamlit as st
 from Levenshtein import distance as levenshtein_distance
 
+from ares.app.annotation_helpers import draw_annotations
 from ares.app.data_analysis import (
     generate_automatic_visualizations,
     infer_visualization_type,
@@ -26,7 +27,11 @@ from ares.app.plot_primitives import (
 from ares.configs.annotations import Annotation
 from ares.databases.annotation_database import AnnotationDatabase
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
-from ares.image_utils import get_video_frames, get_video_mp4
+from ares.image_utils import (
+    choose_and_preprocess_frames,
+    get_video_frames,
+    get_video_mp4,
+)
 
 
 def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
@@ -201,35 +206,30 @@ def get_video_annotation_data(video_id: str) -> dict:
     """Retrieve video metadata and annotations from the annotation database.
 
     Args:
-        video_id: UUID of the video
+        video_id: dataset/path of row
         db: Annotation database instance
 
     Returns:
         Dictionary containing video metadata and annotations
     """
-    # HACK! don't have everything in DB yet -- choose first one
-    print(f"CHOOSING FIRST VIDEO IN DB")
-    peek_data = st.session_state.annotations_db.peek_database(limit=1)
-    video_data = peek_data["videos"][0]
-    # annotation_data = peek_data["annotations"][0]
-
-    # metadata = st.session_state.annotations_db.get_video_metadata(video_id)
-    # if not metadata:
-    #     return None
-
+    video_data = st.session_state.annotations_db.get_video_metadata(video_id)
+    if not video_data:
+        # HACK ! don't have everything in DB yet -- choose first one
+        print(f"COULNT FIND {video_id} IN DB, CHOOSING FIRST VIDEO IN DB")
+        peek_data = st.session_state.annotations_db.peek_database(limit=1)
+        video_data = peek_data["videos"][0]
     # Get all annotations for this video
-    annotations: dict[int, list[Annotation]] = {
-        f: st.session_state.annotations_db.get_annotations(
-            video_data["_id"], annotation_type="detection", frame=f
+    annotations: dict[int, list[Annotation]] = (
+        st.session_state.annotations_db.get_annotations(
+            video_id, annotation_type="detection", frame=None
         )
-        for f in video_data["metadata"]["frame_indices"]
-    }
+    )
     return {"video_data": video_data, "annotations": annotations}
 
 
 def show_hero_display(
     df: pd.DataFrame,
-    idx: int,
+    row: pd.Series,
     all_vecs: dict,
     show_n: int,
     index_manager: IndexManager,
@@ -244,7 +244,6 @@ def show_hero_display(
     Returns:
         List of visualization figures to be included in export
     """
-    row = df.iloc[idx]
     # video card
     col1, col2 = st.columns(2)
     with col1:
@@ -266,30 +265,55 @@ def show_hero_display(
                     continue
                 st.write(f"{col}: {val}")
 
-        # Add annotation data retrieval button
-        if st.button("Retrieve Annotation Data"):
-            try:
-
-                annotation_data = get_video_annotation_data(str(row["id"]))
-                if annotation_data:
-                    with st.expander("Annotation Data", expanded=True):
-                        st.write("Video Data:")
-                        st.json(annotation_data["video_data"])
-                        st.write("Annotations:")
-                        st.json(annotation_data["annotations"])
-
-                else:
-                    st.warning("No annotation data found for this video")
-            except Exception as e:
-                st.error(f"Error retrieving annotation data: {str(e)}")
-                st.error(traceback.format_exc())
-
         if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
             array_figs = generate_robot_array_plot_visualizations(
-                row, all_vecs, show_n, highlight_idx=idx
+                row, all_vecs, show_n, highlight_row=True
             )
         else:
             array_figs = []
+
+    # Add annotation data retrieval button
+    if st.button("Retrieve Annotation Data"):
+        try:
+            dataset_name = row["dataset_name"]
+            if dataset_name == "UCSD Kitchen":
+                dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
+            db_data = get_video_annotation_data(
+                f"{dataset_name}/{row['path']}".replace("npy", "mp4")
+            )
+            if db_data:
+                annotation_data = db_data["annotations"]
+                frame_inds = list(annotation_data.keys())
+                all_frame_paths = get_video_frames(
+                    dataset, fname, n_frames=None, just_path=True
+                )
+                selected_frames = choose_and_preprocess_frames(
+                    all_frame_paths,
+                    specified_frames=frame_inds,
+                )
+                annotated_frames = [
+                    draw_annotations(frame, anns)
+                    for frame, anns in zip(selected_frames, annotation_data.values())
+                ]
+                max_cols = 3
+                cols = st.columns(max_cols)
+                for i, frame in enumerate(annotated_frames):
+                    with cols[i % max_cols]:
+                        st.write(f"Frame {i}")
+                        st.image(frame)
+
+                with st.expander("Annotation Data", expanded=True):
+                    st.write("Video Data:")
+                    st.json(annotation_data["video_data"])
+                    st.write("Annotations:")
+                    st.json(annotation_data["annotations"])
+
+            else:
+                st.warning("No annotation data found for this video")
+        except Exception as e:
+            st.error(f"Error retrieving annotation data: {str(e)}")
+            st.error(traceback.format_exc())
+            breakpoint()
 
     # Row 3: n tabs covering most similar based on state, action, text
     st.write(f"**Similarity Search**")
@@ -355,12 +379,12 @@ def generate_robot_array_plot_visualizations(
     all_vecs: dict,
     show_n: int = 1000,
     keys: list[str] | None = None,
-    highlight_idx: int | None = None,
+    highlight_row: bool = False,
     scores: dict[str, np.ndarray] | None = None,
 ) -> list[plotly.graph_objects.Figure]:
-    if highlight_idx is not None and scores is not None:
+    if highlight_row and scores is not None:
         raise ValueError(
-            f"Cannot provide both highlight_idx and scores. Received highlight_idx: {highlight_idx}, scores: {scores}"
+            f"Cannot provide both highlight_row and scores. Received highlight_row: {highlight_row}, scores: {scores}"
         )
     keys = keys or ["states", "actions"]
     figs = []
@@ -370,6 +394,7 @@ def generate_robot_array_plot_visualizations(
         these_scores = scores.get(name_key) if scores else None
 
         with st.expander(f"Trajectory {key.title()} Display", expanded=False):
+            highlight_idx = row.name if highlight_row else None
             fig = create_robot_array_plot(
                 these_vecs,
                 title_base=f"Trajectory {key.title()} Display",

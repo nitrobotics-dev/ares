@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
@@ -73,21 +74,30 @@ class AnnotationDatabase:
     def get_video_metadata(self, video_id: str) -> Optional[Dict[str, Any]]:
         """Get video metadata."""
         video = self.videos.find_one({"_id": video_id})
-        return video["metadata"] if video else None
+        # Handle case where video exists but has no metadata
+        return video.get("metadata") if video else None
 
     def get_annotations(
         self,
         video_id: str,
         annotation_type: Optional[str] = None,
         frame: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, Any]] | None:
         """Get annotations for a video, optionally filtered by type and frame."""
+        # First check if video exists
+        if not self.videos.find_one({"_id": video_id}):
+            return None
+
         query = {"video_id": video_id}
         if annotation_type:
             query["type"] = annotation_type
         if frame is not None:
             query["frame"] = frame
-        return list(self.annotations.find(query))
+        anns = list(self.annotations.find(query))
+        output = defaultdict(list)
+        for ann in anns:
+            output[ann["frame"]].append(Annotation.from_dict(ann["value"]))
+        return output
 
     def add_frame_annotations(
         self, video_id: str, frame: int, annotations: List[Annotation]
@@ -106,14 +116,6 @@ class AnnotationDatabase:
             )
             annotation_ids.append(ann_id)
         return annotation_ids
-
-    def get_frame_annotations(self, video_id: str, frame: int) -> List["Annotation"]:
-        """Get all annotations for a specific frame."""
-
-        annotations = self.get_annotations(
-            video_id=video_id, annotation_type="detection", frame=frame
-        )
-        return [Annotation.from_dict(ann["value"]) for ann in annotations]
 
     def get_database_stats(self) -> Dict[str, Any]:
         """Get statistics about the current state of the database.
@@ -270,7 +272,8 @@ if __name__ == "__main__":
     # breakpoint()
 
     # Preview database contents
-    preview = db.peek_database(limit=3)
+    preview = db.peek_database(limit=5)
+    breakpoint()
     print("\nVideo samples:")
     for video in preview["videos"]:
         print(f"- {video['_id']}: {video['metadata']}")
