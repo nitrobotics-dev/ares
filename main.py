@@ -30,8 +30,8 @@ from ares.databases.structured_database import (
     add_rollout,
     setup_database,
 )
-from ares.image_utils import ARES_DATASET_VIDEO_PATH, save_video
 from ares.models.extractor import RandomInformationExtractor
+from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
 
 
 def build_dataset(

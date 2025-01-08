@@ -6,7 +6,6 @@ import streamlit as st
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ares.clustering import cluster_embeddings
 from ares.databases.annotation_database import (
     TEST_ANNOTATION_DB_PATH,
     AnnotationDatabase,
@@ -22,6 +21,7 @@ from ares.databases.structured_database import (
     setup_database,
 )
 from ares.models.base import VLM
+from ares.utils.clustering import cluster_embeddings
 
 
 def load_cached_embeddings(

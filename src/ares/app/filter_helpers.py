@@ -7,8 +7,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from ares.app.data_analysis import infer_visualization_type
-from ares.clustering import visualize_clusters
 from ares.models.shortcuts import summarize
+from ares.utils.clustering import visualize_clusters
 
 
 def create_structured_data_filters(

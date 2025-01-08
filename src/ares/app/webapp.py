@@ -32,7 +32,7 @@ from ares.app.viz_helpers import (
     total_statistics,
 )
 from ares.databases.structured_database import RolloutSQLModel
-from ares.task_utils import PI_DEMO_PATH
+from ares.utils.task_utils import PI_DEMO_PATH
 
 title = "ARES Dashboard"
 video_paths = list(os.listdir(PI_DEMO_PATH))
@@ -127,13 +127,11 @@ def main() -> None:
     #     #     )
     #     #     return
 
-    #     # Add a button to refresh the sample
-    #     st.button(
-    #         "Get New Random Sample"
-    #     )  # Button press triggers streamlit rerun, triggers new random sample
-    #     show_dataframe(
-    #         filtered_df.sample(min(5, len(filtered_df))), title="Data Sample"
-    #     )
+    # Add a button to refresh the sample
+    st.button(
+        "Get New Random Sample"
+    )  # Button press triggers streamlit rerun, triggers new random sample
+    show_dataframe(filtered_df.sample(min(5, len(filtered_df))), title="Data Sample")
     # st.divider()
 
     # section_display = "data distributions"
@@ -180,10 +178,8 @@ def main() -> None:
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
         st.header("Rollout Display")
 
-        # initialize or persist selected row
-        select_row_from_df_user(
-            filtered_df  # [filtered_df["dataset_name"] == "UCSD Kitchen"]
-        )
+        # initialize or persist selected row in state
+        select_row_from_df_user(filtered_df)
         selected_row = st.session_state.get("selected_row")
 
         if selected_row is not None:
@@ -193,10 +189,9 @@ def main() -> None:
                 filtered_df,
                 selected_row,
                 st.session_state.all_vecs,
-                show_n=100,
                 index_manager=st.session_state.INDEX_MANAGER,
                 lazy_load=False,
-                n_most_similar=10,
+                retrieve_n_most_similar=10,
             )
         else:
             st.info("Please select a row to display details")

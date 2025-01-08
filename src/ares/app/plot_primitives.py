@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from ares.image_utils import get_video_frames, get_video_mp4
+from ares.utils.image_utils import get_video_frames, get_video_mp4
 
 
 def create_line_plot(

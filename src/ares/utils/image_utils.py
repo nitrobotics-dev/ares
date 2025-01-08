@@ -237,7 +237,7 @@ def load_video_frames(
 
 
 if __name__ == "__main__":
-    from ares.task_utils import PI_DEMO_TASKS
+    from ares.utils.task_utils import PI_DEMO_TASKS
 
     # load mp4, break to frames, and save to disk using the helpers
     dataset = "pi_demos"

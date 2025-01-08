@@ -224,6 +224,7 @@ def create_similarity_tabs(
                     )
                     found_rows = df[df["id"] == search_id]
                     if len(found_rows) == 0:
+                        breakpoint()
                         st.write(f"No row found for id: {id_str}")
                     else:
                         display_video_card(
@@ -259,9 +260,9 @@ def show_hero_display(
     df: pd.DataFrame,
     row: pd.Series,
     all_vecs: dict,
-    show_n: int,
     index_manager: IndexManager,
-    n_most_similar: int = 5,
+    traj_array_show_n: int = 100,
+    retrieve_n_most_similar: int = 5,
     lazy_load: bool = False,
     max_cols: int = 5,
 ) -> list[dict]:
@@ -295,7 +296,7 @@ def show_hero_display(
 
         if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
             array_figs = generate_robot_array_plot_visualizations(
-                row, all_vecs, show_n, highlight_row=True
+                row, all_vecs, traj_array_show_n, highlight_row=True
             )
         else:
             array_figs = []
@@ -383,28 +384,28 @@ def show_hero_display(
         row,
         name=rollout_to_index_name(row, "states"),
         index_manager=index_manager,
-        n_most_similar=n_most_similar,
+        n_most_similar=retrieve_n_most_similar,
         filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
     )
     action_viz_data = create_embedding_similarity_visualization(
         row,
         name=rollout_to_index_name(row, "actions"),
         index_manager=index_manager,
-        n_most_similar=n_most_similar,
+        n_most_similar=retrieve_n_most_similar,
         filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
     )
     text_embedding_viz_data = create_embedding_similarity_visualization(
         row,
         name="description",  # HACK: fix naming convention
         index_manager=index_manager,
-        n_most_similar=n_most_similar,
+        n_most_similar=retrieve_n_most_similar,
         filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
     )
 
     text_viz_data = create_text_similarity_visualization(
         row,
         df,
-        n_most_similar,
+        retrieve_n_most_similar,
         text_data_key,
         distance_fn_name=text_distance_fn.lower(),
         filter_zero_distance_matches=st.session_state[zero_distance_filter_key],

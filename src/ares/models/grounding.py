@@ -1,16 +1,9 @@
-import os
-import pickle
-import tempfile
-import time
-from typing import List, Tuple
+from typing import Tuple
 
 import cv2
 import numpy as np
-import pymongo
 import torch
 from PIL import Image
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 from tqdm import tqdm
 from transformers import (
     AutoModelForMaskGeneration,
@@ -19,13 +12,7 @@ from transformers import (
 )
 
 from ares.configs.annotations import Annotation, binary_mask_to_rle
-from ares.databases.annotation_database import (
-    TEST_ANNOTATION_DB_PATH,
-    AnnotationDatabase,
-)
-from ares.image_utils import load_video_frames
 from ares.models.base import VLM
-from ares.models.shortcuts import get_gemini_2_flash, get_gpt_4o
 
 
 class GroundingAnnotator:
@@ -34,7 +21,7 @@ class GroundingAnnotator:
         detector_id: str = "IDEA-Research/grounding-dino-tiny",
         segmenter_id: str | None = "facebook/sam-vit-base",
         detector_thresholds: dict[str, float] | None = None,
-        device: str = "cpu",
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ):
         self.device = device
         self.detector_processor, self.detector_model = self.setup_detector(detector_id)
@@ -78,9 +65,9 @@ class GroundingAnnotator:
 
     def run_detector(
         self,
-        images: List[Image.Image],
+        images: list[Image.Image],
         labels_str: str,
-    ) -> List[List[Annotation]]:
+    ) -> list[list[Annotation]]:
         # Process all images in a single batch
         inputs = self.detector_processor(
             images=images, text=[labels_str] * len(images), return_tensors="pt"
@@ -116,9 +103,9 @@ class GroundingAnnotator:
 
     def run_segmenter(
         self,
-        images: List[Image.Image],
-        annotations: List[List[Annotation]],
-    ) -> List[List[Annotation]]:
+        images: list[Image.Image],
+        annotations: list[list[Annotation]],
+    ) -> list[list[Annotation]]:
         # Process each image's annotations
         all_points = []
         all_labels = []
@@ -176,9 +163,9 @@ class GroundingAnnotator:
 
     def process_batch(
         self,
-        images: List[Image.Image],
+        images: list[Image.Image],
         labels_str: str,
-    ) -> List[List[Annotation]]:
+    ) -> list[list[Annotation]]:
         """Process a batch of images with detection and segmentation."""
         box_annotations = self.run_detector(images, labels_str)
         if not any(box_annotations):
@@ -193,11 +180,11 @@ class GroundingAnnotator:
 
     def annotate_video(
         self,
-        frames: List[np.ndarray],
+        frames: list[np.ndarray],
         labels_str: str,
         batch_size: int = 2,
         desc: str = "Processing frames",
-    ) -> List[List[Annotation]]:
+    ) -> list[list[Annotation]]:
         """Annotate video frames in batches."""
         all_annotations = []
 
@@ -215,8 +202,11 @@ class GroundingAnnotator:
         return all_annotations
 
 
-def get_vlm_labels(
-    vlm: VLM, frames: List[np.ndarray], prompt_filename: str, task_instructions: str
+def get_grounding_nouns(
+    vlm: VLM,
+    frames: list[np.ndarray],
+    task_instructions: str,
+    prompt_filename: str = "grounding_description.jinja2",
 ) -> str:
     """Get object labels from VLM."""
     if task_instructions is None:
@@ -228,81 +218,5 @@ def get_vlm_labels(
         images=frames,
     )
     label_str = response.choices[0].message.content
-    print(f"Label string: {label_str} ")
+    label_str = label_str.replace("a ", "").replace("an ", "")
     return label_str
-
-
-if __name__ == "__main__":
-    from ares.databases.structured_database import (
-        TEST_ROBOT_DB_PATH,
-        RolloutSQLModel,
-        get_rollout_by_name,
-        setup_database,
-    )
-
-    # Initialize components
-    ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
-    annotator = GroundingAnnotator(
-        segmenter_id=None,
-    )
-    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-
-    # Process video
-    # Process video
-    # dataset_name = "cmu_play_fusion"
-    # fname = "data/train/episode_208.mp4"
-    formal_dataset_name = "UCSD Kitchen"
-    dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
-    fnames = [f"data/train/episode_{i}.mp4" for i in range(50, 150)]
-    target_fps = 5
-
-    # vlm = get_gemini_2_flash()
-    vlm = get_gpt_4o()
-
-    # Create progress bar for total files
-    tic = time.time()
-    total_anns = 0
-    total_processed = 0
-    total_frames = 0
-    pbar = tqdm(total=len(fnames), desc="Processing videos")
-
-    for fname in fnames:
-        rollout = get_rollout_by_name(
-            engine, formal_dataset_name, fname.replace("mp4", "npy")
-        )
-        frames, frame_indices = load_video_frames(dataset_name, fname, target_fps)
-        label_str = get_vlm_labels(
-            vlm,
-            frames,
-            "grounding_description.jinja2",
-            rollout.task.language_instruction,
-        )
-        label_str = label_str.replace("a ", "").replace("an ", "")
-
-        # Pass description to annotate_video
-        video_annotations = annotator.annotate_video(
-            frames, label_str, desc=f"Frames for {os.path.basename(fname)}"
-        )
-        total_anns += sum(len(anns) for anns in video_annotations)
-        total_frames += len(frames)
-        ann_db.delete_video_and_annotations(video_id=f"{dataset_name}/{fname}")
-        video_id = ann_db.add_video_with_annotations(
-            dataset_name=dataset_name,
-            video_path=fname,
-            frames=frames,
-            frame_indices=frame_indices,
-            annotations=video_annotations,
-            label_str=label_str,
-        )
-
-        total_processed += 1
-        pbar.update(1)
-        pbar.set_postfix({"Last file": os.path.basename(fname)})
-
-    pbar.close()
-    toc = time.time()
-    print(f"Total time: {toc - tic:.2f} seconds")
-    print(f"Total annotations: {total_anns}")
-    print(f"Total processed: {total_processed}")
-    print(f"Total frames: {total_frames}")
-    breakpoint()

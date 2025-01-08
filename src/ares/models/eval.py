@@ -14,9 +14,9 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 
 from ares.configs.base import pydantic_to_field_instructions
-from ares.image_utils import load_video_frames
 from ares.models.base import VLM
-from ares.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
+from ares.utils.image_utils import load_video_frames
+from ares.utils.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 
 IMAGE_TILE_SIZE = (512, 512)
 
