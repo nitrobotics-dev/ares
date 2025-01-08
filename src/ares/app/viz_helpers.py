@@ -144,17 +144,48 @@ def create_embedding_similarity_visualization(
     name: str,
     index_manager: IndexManager,
     n_most_similar: int,
+    filter_zero_distance_matches: bool = False,
 ) -> dict:
     """Create visualization for similar trajectories based on embedding feature type."""
     # get the query matrix
     query_matrix = index_manager.get_matrix_by_id(name, str(row.id))
     if query_matrix is None:
         raise ValueError(f"No matrix found for id: {row.id}")
-    distances, ids, matrices = index_manager.search_matrix(
-        name,
-        query_matrix,
-        n_most_similar + 1,  # to avoid self
-    )
+
+    if filter_zero_distance_matches:
+        # Try increasingly larger k values until we get enough non-zero distances
+        multipliers = [1, 10, 100]  # Will try k, 10k, 100k
+        for mult in multipliers:
+            k = (n_most_similar + 1) * mult  # +1 to account for self-match
+            distances, ids, matrices = index_manager.search_matrix(
+                name, query_matrix, k
+            )
+
+            # Filter out exact matches (using small epsilon to handle floating point)
+            non_zero_mask = distances > 1e-10
+            filtered_distances = distances[non_zero_mask]
+            filtered_ids = ids[non_zero_mask]
+            filtered_matrices = (
+                matrices[non_zero_mask] if matrices is not None else None
+            )
+
+            if len(filtered_distances) >= n_most_similar:
+                # We found enough non-zero matches
+                distances = filtered_distances[:n_most_similar]
+                ids = filtered_ids[:n_most_similar]
+                matrices = (
+                    filtered_matrices[:n_most_similar]
+                    if filtered_matrices is not None
+                    else None
+                )
+                break
+    else:
+        # Original behavior
+        distances, ids, matrices = index_manager.search_matrix(
+            name,
+            query_matrix,
+            n_most_similar + 1,  # to avoid self match
+        )
 
     # check index of id_str to see if it matches row.id then remove that index
     idx = np.where(ids == str(row.id))
@@ -163,7 +194,7 @@ def create_embedding_similarity_visualization(
         distances = np.delete(distances, idx)
         ids = np.delete(ids, idx)
         matrices = np.delete(matrices, idx, axis=0)
-    # Return the data instead of creating the visualization
+
     return {
         "distances": distances[:n_most_similar],
         "ids": ids[:n_most_similar],
@@ -175,17 +206,17 @@ def create_similarity_tabs(
     visualizations: list[dict],
     tab_names: list[str],
     df: pd.DataFrame,
-    max_cols: int = 5,
+    max_cols_in_tab: int = 5,
 ) -> None:
     """Create tabs specifically for similarity visualizations."""
     tabs = st.tabs(tab_names)
     for tab, viz_data in zip(tabs, visualizations):
         with tab:
-            similar_cols = st.columns(min(max_cols, len(viz_data["ids"])))
+            similar_cols = st.columns(min(max_cols_in_tab, len(viz_data["ids"])))
             for i, (dist, id_str) in enumerate(
                 zip(viz_data["distances"], viz_data["ids"])
             ):
-                with similar_cols[i % max_cols]:
+                with similar_cols[i % max_cols_in_tab]:
                     st.write(f"Distance: {dist:.3f}")
                     # Convert id_str to UUID only if it's not already a UUID
                     search_id = (
@@ -232,6 +263,7 @@ def show_hero_display(
     index_manager: IndexManager,
     n_most_similar: int = 5,
     lazy_load: bool = False,
+    max_cols: int = 5,
 ) -> list[dict]:
     """
     Row 1: text
@@ -256,11 +288,10 @@ def show_hero_display(
         else:
             st.video(get_video_mp4(dataset, fname))
     with col2:
+        if row.task_language_instruction:
+            st.write(f"**Task:** {row.task_language_instruction}")
         with st.expander("Row Details", expanded=False):
-            for col, val in row.items():
-                if len(str(val)) > 1000:
-                    continue
-                st.write(f"{col}: {val}")
+            st.json(row.to_dict())
 
         if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
             array_figs = generate_robot_array_plot_visualizations(
@@ -297,14 +328,15 @@ def show_hero_display(
                             selected_frames, annotation_data.values()
                         )
                     ]
-                    max_cols = 3
-                    cols = st.columns(max_cols)
-                    for i, (frame_ind, frame) in enumerate(
-                        zip(frame_inds, annotated_frames)
-                    ):
-                        with cols[i % max_cols]:
-                            st.write(f"Frame {frame_ind}")
-                            st.image(frame)
+                    with st.expander("Annotated Frames", expanded=False):
+                        max_cols = 3
+                        cols = st.columns(max_cols)
+                        for i, (frame_ind, frame) in enumerate(
+                            zip(frame_inds, annotated_frames)
+                        ):
+                            with cols[i % max_cols]:
+                                st.write(f"Frame {frame_ind}")
+                                st.image(frame)
 
                     with st.expander("Raw Annotation Data (as JSON)", expanded=False):
                         st.write("Video Data:")
@@ -332,24 +364,41 @@ def show_hero_display(
         "Action",
     ]
 
+    # some robotics datasets have lots of overlap, e.g. the same task instruction.
+    # we may want to filter out zero-distance matches, even if they aren't the same ID
+    # and will need to persist selection in state
+    zero_distance_filter_key = "filter_zero_distance_matches"
+    if zero_distance_filter_key not in st.session_state:
+        st.session_state[zero_distance_filter_key] = False
+
+    if st.checkbox(
+        "Filter zero-distance matches", value=st.session_state[zero_distance_filter_key]
+    ):
+        st.session_state[zero_distance_filter_key] = True
+    else:
+        st.session_state[zero_distance_filter_key] = False
+
     # Get the similarity data
     state_viz_data = create_embedding_similarity_visualization(
         row,
         name=rollout_to_index_name(row, "states"),
         index_manager=index_manager,
         n_most_similar=n_most_similar,
+        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
     )
     action_viz_data = create_embedding_similarity_visualization(
         row,
         name=rollout_to_index_name(row, "actions"),
         index_manager=index_manager,
         n_most_similar=n_most_similar,
+        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
     )
     text_embedding_viz_data = create_embedding_similarity_visualization(
         row,
-        name="description",  # HACK
+        name="description",  # HACK: fix naming convention
         index_manager=index_manager,
         n_most_similar=n_most_similar,
+        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
     )
 
     text_viz_data = create_text_similarity_visualization(
@@ -358,6 +407,7 @@ def show_hero_display(
         n_most_similar,
         text_data_key,
         distance_fn_name=text_distance_fn.lower(),
+        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
     )
 
     similarity_viz = [
@@ -372,6 +422,7 @@ def show_hero_display(
         similarity_viz,
         tab_names,
         df,
+        max_cols_in_tab=max_cols,
     )
 
     # Return all visualizations for export
@@ -426,12 +477,10 @@ def create_text_similarity_visualization(
     n_most_similar: int,
     data_key: str,
     distance_fn_name: str = "levenshtein",
+    filter_zero_distance_matches: bool = False,
 ) -> dict:
     """Create visualization for similar trajectories based on text similarity of task instructions."""
-    # Get the reference instruction
     reference = row[data_key]
-
-    # Calculate distances for all instructions
     distance_fns = {"levenshtein": levenshtein_distance}
     distance_fn = distance_fns[distance_fn_name]
     distances = pd.Series(
@@ -442,6 +491,10 @@ def create_text_similarity_visualization(
     current_row_idx = df[df["id"] == row["id"]].index
     if len(current_row_idx) > 0:
         distances = distances.drop(current_row_idx)
+
+    if filter_zero_distance_matches:
+        # Filter out exact matches (distance = 0)
+        distances = distances[distances > 0]
 
     # Get the top N indices, making sure we don't request more than available
     n_available = min(n_most_similar, len(distances))
@@ -468,3 +521,21 @@ def total_statistics(df: pd.DataFrame) -> None:
     with col4:
         st.subheader(f"Total datasets:")
         st.write(str(df["dataset_name"].nunique()))
+
+
+def annotation_statistics(ann_db: AnnotationDatabase) -> None:
+    stats = ann_db.get_database_stats()
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.subheader(f"Total videos:")
+        st.write(str(stats["total_videos"]))
+    with col2:
+        st.subheader(f"Total annotated frames:")
+        st.write(str(stats["total_annotated_frames"]))
+    with col3:
+        st.subheader(f"Total annotations:")
+        st.write(str(stats["total_annotations"]))
+    with col4:
+        st.subheader(f"Annotations by type:")
+        for k, v in stats["annotations_by_type"].items():
+            st.write(f"{k}: {v}")

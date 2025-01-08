@@ -302,13 +302,13 @@ def select_row_from_df_user(df: pd.DataFrame) -> None:
         path_options = df.path.unique().tolist()
         selected_path: str | None = st.selectbox(
             "Select by Path",
-            options=["Choose an option"]
-            + sorted(
-                path_options,
-                key=lambda x: int(
-                    x.split("_")[-1].split(".")[0]
-                ),  # e.g. path/to/file_0.npy
-            ),
+            options=["Choose an option"] + path_options,
+            # + sorted(
+            #     path_options,
+            #     key=lambda x: int(
+            #         x.split("_")[-1].split(".")[0]
+            #     ),  # e.g. path/to/file_0.npy
+            # ),
             key="path_select",
         )
         if st.button("Select by Path"):

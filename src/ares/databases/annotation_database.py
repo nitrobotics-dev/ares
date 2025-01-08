@@ -1,3 +1,4 @@
+import time
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
@@ -123,20 +124,29 @@ class AnnotationDatabase:
         Returns:
             Dict containing:
             - Total number of videos
+            - Total number of unique annotated frames (across all videos)
             - Total number of annotations
             - Annotations per type
-            - Number of frame-specific vs video-level annotations
         """
+        tic = time.time()
+        pipeline = [
+            {
+                "$group": {
+                    "_id": {"video_id": "$video_id", "frame": "$frame"},
+                    "count": {"$sum": 1},
+                }
+            },
+            {"$count": "total"},
+        ]
+
+        total_frames_result = list(self.annotations.aggregate(pipeline))
+        total_frames = total_frames_result[0]["total"] if total_frames_result else 0
+
         stats = {
             "total_videos": self.videos.count_documents({}),
+            "total_annotated_frames": total_frames,
             "total_annotations": self.annotations.count_documents({}),
             "annotations_by_type": {},
-            "frame_annotations": self.annotations.count_documents(
-                {"frame": {"$ne": None}}
-            ),
-            "video_level_annotations": self.annotations.count_documents(
-                {"frame": None}
-            ),
         }
 
         # Get counts per annotation type
@@ -144,6 +154,8 @@ class AnnotationDatabase:
         for type_stat in self.annotations.aggregate(pipeline):
             stats["annotations_by_type"][type_stat["_id"]] = type_stat["count"]
 
+        toc = time.time()
+        print(f"Time to get annotationdatabase stats: {toc - tic:.2f} seconds")
         return stats
 
     def delete_annotations(
@@ -272,13 +284,14 @@ if __name__ == "__main__":
     # breakpoint()
 
     # Preview database contents
-    preview = db.peek_database(limit=5)
-    breakpoint()
-    print("\nVideo samples:")
-    for video in preview["videos"]:
-        print(f"- {video['_id']}: {video['metadata']}")
+    stats = db.get_database_stats()
+    # preview = db.peek_database(limit=5)
+    # breakpoint()
+    # print("\nVideo samples:")
+    # for video in preview["videos"]:
+    #     print(f"- {video['_id']}: {video['metadata']}")
 
-    print("\nAnnotation samples:")
-    for ann in preview["annotations"]:
-        print(f"- Video: {ann['video_id']}, Type: {ann['type']}, Frame: {ann['frame']}")
+    # print("\nAnnotation samples:")
+    # for ann in preview["annotations"]:
+    #     print(f"- Video: {ann['video_id']}, Type: {ann['type']}, Frame: {ann['frame']}")
     breakpoint()

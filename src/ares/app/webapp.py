@@ -22,6 +22,7 @@ from ares.app.filter_helpers import (
 from ares.app.init_data import display_state_info, initialize_data
 from ares.app.plot_primitives import show_dataframe
 from ares.app.viz_helpers import (
+    annotation_statistics,
     create_tabbed_visualizations,
     display_video_grid,
     generate_robot_array_plot_visualizations,
@@ -85,6 +86,7 @@ def main() -> None:
     with filter_error_context(section_state_info), timer_context(section_state_info):
         display_state_info()
         total_statistics(df)
+        annotation_statistics(st.session_state.annotations_db)
         st.divider()
 
     section_filters = "data filters"
@@ -97,7 +99,6 @@ def main() -> None:
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
         filtered_df = value_filtered_df
-        filtered_df = filtered_df[filtered_df["dataset_name"] == "UCSD Kitchen"]
         cluster_fig = None
         # print(kept_ids[:10])
         if len(kept_ids) == 0:
@@ -180,7 +181,9 @@ def main() -> None:
         st.header("Rollout Display")
 
         # initialize or persist selected row
-        select_row_from_df_user(filtered_df)
+        select_row_from_df_user(
+            filtered_df  # [filtered_df["dataset_name"] == "UCSD Kitchen"]
+        )
         selected_row = st.session_state.get("selected_row")
 
         if selected_row is not None:
@@ -193,6 +196,7 @@ def main() -> None:
                 show_n=100,
                 index_manager=st.session_state.INDEX_MANAGER,
                 lazy_load=False,
+                n_most_similar=10,
             )
         else:
             st.info("Please select a row to display details")

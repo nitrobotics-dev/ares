@@ -253,7 +253,7 @@ if __name__ == "__main__":
     # fname = "data/train/episode_208.mp4"
     formal_dataset_name = "UCSD Kitchen"
     dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
-    fnames = [f"data/train/episode_{i}.mp4" for i in range(20, 50)]
+    fnames = [f"data/train/episode_{i}.mp4" for i in range(50, 150)]
     target_fps = 5
 
     # vlm = get_gemini_2_flash()
