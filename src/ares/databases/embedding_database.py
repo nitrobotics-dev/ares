@@ -173,9 +173,9 @@ class FaissIndex(Index):
         )
         return distances, string_ids, vectors
 
-    def get_all_ids(self) -> List[str]:
+    def get_all_ids(self) -> np.ndarray:
         """Get all string IDs in the index, in the same order as get_all_vectors()"""
-        return [self.id_map[i] for i in range(self.index.ntotal)]
+        return np.array([self.id_map[i] for i in range(self.index.ntotal)])
 
     def save(self, path: Path) -> None:
         self.last_save_path = str(path)  # Track where we last saved
@@ -436,7 +436,7 @@ class IndexManager:
 
     def get_all_matrices(
         self, name: str | list[str] | None = None
-    ) -> Dict[str, Dict[str, np.ndarray | List[str] | None]]:
+    ) -> Dict[str, Dict[str, np.ndarray | None]]:
         """Get all vectors and their IDs from the manager, reshaping vectors to matrices.
 
         Args:

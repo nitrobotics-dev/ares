@@ -170,8 +170,11 @@ def choose_and_preprocess_frames(
     specified_frames: list[int] | None = None,
     resize: tuple[int, int] | None = None,
 ) -> list[np.ndarray]:
-    if specified_frames is None:
-        assert n_frames is not None
+    if specified_frames is not None:
+        # Filter out any indices that exceed the frame count
+        specified_frames = [i for i in specified_frames if i < len(all_frames)]
+        frames = [all_frames[i] for i in specified_frames]
+    elif n_frames is not None:
         if n_frames == 1:
             # if only one unspecified frame is requested, use the last frame
             frames = [all_frames[-1]]
@@ -184,7 +187,7 @@ def choose_and_preprocess_frames(
             )
             frames = [all_frames[i] for i in indices]
     else:
-        frames = [all_frames[i] for i in specified_frames]
+        raise ValueError("Either n_frames or specified_frames must be provided")
 
     if isinstance(frames[0], str):
         frames = [cv2.imread(str(frame)) for frame in frames]
@@ -215,7 +218,8 @@ def get_frame_indices_for_fps(
 
     # Calculate frame indices to sample at desired fps_rate
     sample_interval = int(video_fps / target_fps)
-    return list(range(0, total_frames, sample_interval))
+    # Ensure we don't generate indices beyond total_frames - 1
+    return list(range(0, min(total_frames - 1, total_frames), sample_interval))
 
 
 def load_video_frames(

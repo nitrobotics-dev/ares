@@ -230,9 +230,7 @@ def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -
             # handle persisting state for button
             if persist_key not in st.session_state:
                 st.session_state[persist_key] = False
-            # don't show load button if video is already loaded
-            if not st.session_state[persist_key]:
-                st.button("Load Video", key=this_key)
+            if st.button("Load Video", key=this_key):
                 st.session_state[persist_key] = True
             if st.session_state[persist_key]:
                 st.video(get_video_mp4(dataset, fname))

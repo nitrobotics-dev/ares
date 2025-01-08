@@ -1,6 +1,7 @@
 import os
 import pickle
 import tempfile
+import time
 from typing import List, Tuple
 
 import cv2
@@ -44,7 +45,14 @@ class GroundingAnnotator:
             "box_threshold": 0.4,
             "text_threshold": 0.3,
         }
-        print(f"Loaded models for {detector_id} and {segmenter_id} on device {device}")
+        print(
+            f"Loaded detector {detector_id}"
+            + (
+                f"and segmenter {segmenter_id} on device {device}"
+                if segmenter_id
+                else ""
+            )
+        )
 
     def setup_detector(
         self, model_id: str
@@ -188,6 +196,7 @@ class GroundingAnnotator:
         frames: List[np.ndarray],
         labels_str: str,
         batch_size: int = 2,
+        desc: str = "Processing frames",
     ) -> List[List[Annotation]]:
         """Annotate video frames in batches."""
         all_annotations = []
@@ -198,7 +207,7 @@ class GroundingAnnotator:
         ]
 
         # Process in batches
-        for i in tqdm(range(0, len(pil_frames), batch_size)):
+        for i in tqdm(range(0, len(pil_frames), batch_size), desc=desc, leave=False):
             batch_frames = pil_frames[i : i + batch_size]
             batch_annotations = self.process_batch(batch_frames, labels_str)
             all_annotations.extend(batch_annotations)
@@ -235,7 +244,6 @@ if __name__ == "__main__":
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     annotator = GroundingAnnotator(
         segmenter_id=None,
-        detector_thresholds={"box_threshold": 0.3, "text_threshold": 0.2},
     )
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
@@ -245,12 +253,18 @@ if __name__ == "__main__":
     # fname = "data/train/episode_208.mp4"
     formal_dataset_name = "UCSD Kitchen"
     dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
-    # fnames = ["data/train/episode_2.mp4", "data/train/episode_3.mp4"]
-    fnames = [f"data/train/episode_{i}.mp4" for i in range(10, 20)]
-    target_fps = 1
+    fnames = [f"data/train/episode_{i}.mp4" for i in range(20, 50)]
+    target_fps = 5
 
     # vlm = get_gemini_2_flash()
     vlm = get_gpt_4o()
+
+    # Create progress bar for total files
+    tic = time.time()
+    total_anns = 0
+    total_processed = 0
+    total_frames = 0
+    pbar = tqdm(total=len(fnames), desc="Processing videos")
 
     for fname in fnames:
         rollout = get_rollout_by_name(
@@ -263,10 +277,14 @@ if __name__ == "__main__":
             "grounding_description.jinja2",
             rollout.task.language_instruction,
         )
-        # label_str = "a robot. a robot gripper. a sink. a cabinet"
         label_str = label_str.replace("a ", "").replace("an ", "")
 
-        video_annotations = annotator.annotate_video(frames, label_str)
+        # Pass description to annotate_video
+        video_annotations = annotator.annotate_video(
+            frames, label_str, desc=f"Frames for {os.path.basename(fname)}"
+        )
+        total_anns += sum(len(anns) for anns in video_annotations)
+        total_frames += len(frames)
         ann_db.delete_video_and_annotations(video_id=f"{dataset_name}/{fname}")
         video_id = ann_db.add_video_with_annotations(
             dataset_name=dataset_name,
@@ -276,7 +294,15 @@ if __name__ == "__main__":
             annotations=video_annotations,
             label_str=label_str,
         )
-        print(
-            f"Added video {video_id} to database with {[len(x) for x in video_annotations]} frame annotations"
-        )
+
+        total_processed += 1
+        pbar.update(1)
+        pbar.set_postfix({"Last file": os.path.basename(fname)})
+
+    pbar.close()
+    toc = time.time()
+    print(f"Total time: {toc - tic:.2f} seconds")
+    print(f"Total annotations: {total_anns}")
+    print(f"Total processed: {total_processed}")
+    print(f"Total frames: {total_frames}")
     breakpoint()

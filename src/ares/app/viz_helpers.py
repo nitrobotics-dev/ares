@@ -398,7 +398,12 @@ def generate_robot_array_plot_visualizations(
         these_scores = scores.get(name_key) if scores else None
 
         with st.expander(f"Trajectory {key.title()} Display", expanded=False):
-            highlight_idx = np.where(st.session_state.all_ids[name_key] == row.id)[0][0]
+            try:
+                highlight_idx = np.where(
+                    st.session_state.all_ids[name_key] == str(row.id)
+                )[0][0]
+            except:
+                breakpoint()
             fig = create_robot_array_plot(
                 these_vecs,
                 title_base=f"Trajectory {key.title()} Display",
