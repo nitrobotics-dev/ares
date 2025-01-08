@@ -202,7 +202,7 @@ def create_similarity_tabs(
                         )
 
 
-def get_video_annotation_data(video_id: str) -> dict:
+def get_video_annotation_data(video_id: str) -> dict | None:
     """Retrieve video metadata and annotations from the annotation database.
 
     Args:
@@ -214,10 +214,7 @@ def get_video_annotation_data(video_id: str) -> dict:
     """
     video_data = st.session_state.annotations_db.get_video_metadata(video_id)
     if not video_data:
-        # HACK ! don't have everything in DB yet -- choose first one
-        print(f"COULNT FIND {video_id} IN DB, CHOOSING FIRST VIDEO IN DB")
-        peek_data = st.session_state.annotations_db.peek_database(limit=1)
-        video_data = peek_data["videos"][0]
+        return None
     # Get all annotations for this video
     annotations: dict[int, list[Annotation]] = (
         st.session_state.annotations_db.get_annotations(
@@ -281,32 +278,39 @@ def show_hero_display(
             db_data = get_video_annotation_data(
                 f"{dataset_name}/{row['path']}".replace("npy", "mp4")
             )
-            if db_data:
-                annotation_data = db_data["annotations"]
-                frame_inds = list(annotation_data.keys())
-                all_frame_paths = get_video_frames(
-                    dataset, fname, n_frames=None, just_path=True
-                )
-                selected_frames = choose_and_preprocess_frames(
-                    all_frame_paths,
-                    specified_frames=frame_inds,
-                )
-                annotated_frames = [
-                    draw_annotations(frame, anns)
-                    for frame, anns in zip(selected_frames, annotation_data.values())
-                ]
-                max_cols = 3
-                cols = st.columns(max_cols)
-                for i, frame in enumerate(annotated_frames):
-                    with cols[i % max_cols]:
-                        st.write(f"Frame {i}")
-                        st.image(frame)
+            if db_data is not None:
+                annotation_data = db_data.get("annotations")
+                if not annotation_data:
+                    st.warning("No annotation data found for this video.")
+                else:
+                    frame_inds = list(annotation_data.keys())
+                    all_frame_paths = get_video_frames(
+                        dataset, fname, n_frames=None, just_path=True
+                    )
+                    selected_frames = choose_and_preprocess_frames(
+                        all_frame_paths,
+                        specified_frames=frame_inds,
+                    )
+                    annotated_frames = [
+                        draw_annotations(frame, anns)
+                        for frame, anns in zip(
+                            selected_frames, annotation_data.values()
+                        )
+                    ]
+                    max_cols = 3
+                    cols = st.columns(max_cols)
+                    for i, (frame_ind, frame) in enumerate(
+                        zip(frame_inds, annotated_frames)
+                    ):
+                        with cols[i % max_cols]:
+                            st.write(f"Frame {frame_ind}")
+                            st.image(frame)
 
-                with st.expander("Annotation Data", expanded=True):
-                    st.write("Video Data:")
-                    st.json(annotation_data["video_data"])
-                    st.write("Annotations:")
-                    st.json(annotation_data["annotations"])
+                    with st.expander("Raw Annotation Data (as JSON)", expanded=False):
+                        st.write("Video Data:")
+                        st.json(db_data["video_data"])
+                        st.write("Annotations:")
+                        st.json(db_data["annotations"])
 
             else:
                 st.warning("No annotation data found for this video")
@@ -394,7 +398,7 @@ def generate_robot_array_plot_visualizations(
         these_scores = scores.get(name_key) if scores else None
 
         with st.expander(f"Trajectory {key.title()} Display", expanded=False):
-            highlight_idx = row.name if highlight_row else None
+            highlight_idx = np.where(st.session_state.all_ids[name_key] == row.id)[0][0]
             fig = create_robot_array_plot(
                 these_vecs,
                 title_base=f"Trajectory {key.title()} Display",
@@ -425,15 +429,22 @@ def create_text_similarity_visualization(
     # Calculate distances for all instructions
     distance_fns = {"levenshtein": levenshtein_distance}
     distance_fn = distance_fns[distance_fn_name]
-    distances = df[data_key].apply(lambda x: distance_fn(reference, x))
+    distances = pd.Series(
+        {idx: distance_fn(reference, text) for idx, text in df[data_key].items()}
+    )
 
-    distances = pd.Series(distances, index=df.index)
-    distances = distances[distances.index != row.name]  # remove ROW
-    top_indices = distances.nsmallest(n_most_similar).index
+    # Remove the reference row if it exists in this filtered df
+    current_row_idx = df[df["id"] == row["id"]].index
+    if len(current_row_idx) > 0:
+        distances = distances.drop(current_row_idx)
+
+    # Get the top N indices, making sure we don't request more than available
+    n_available = min(n_most_similar, len(distances))
+    similar_pairs = distances.nsmallest(n_available)
 
     return {
-        "distances": distances[top_indices].values,
-        "ids": df.iloc[top_indices]["id"].values,
+        "distances": similar_pairs.values,
+        "ids": df.loc[similar_pairs.index]["id"].values,
         "matrices": None,
     }
 

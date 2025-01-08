@@ -18,12 +18,50 @@ def get_color_mapping(category_str: str) -> tuple[int, int, int]:
     return (r, g, b)
 
 
+def draw_legend(
+    canvas: np.ndarray,
+    unique_categories: dict,
+    start_y: int,
+    legend_spacing: int = 25,
+    legend_x: int = 10,
+) -> None:
+    """Draw category legend on the canvas.
+
+    Args:
+        canvas: Image to draw legend on
+        unique_categories: Dictionary mapping category names to colors
+        start_y: Y coordinate to start drawing legend
+        legend_spacing: Vertical spacing between legend items
+        legend_x: X coordinate to start drawing legend
+    """
+    for idx, (category, color) in enumerate(unique_categories.items()):
+        # Draw color box
+        cv2.rectangle(
+            canvas,
+            (legend_x, start_y + idx * legend_spacing - 15),
+            (legend_x + 20, start_y + idx * legend_spacing),
+            color,
+            -1,
+        )
+        # Draw category text
+        cv2.putText(
+            canvas,
+            category,
+            (legend_x + 30, start_y + idx * legend_spacing - 3),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (0, 0, 0),
+            1,
+            cv2.LINE_AA,
+        )
+
+
 # Draw annotations
 def draw_annotations(
     image: np.ndarray,
     annotations: list[Annotation],
     show_scores: bool = True,
-    alpha: float = 0.5,  # transparency for segmentation masks
+    alpha: float = 0.25,
 ) -> np.ndarray:
     annotated_image = image.copy()
     overlay = image.copy()
@@ -39,11 +77,13 @@ def draw_annotations(
         # Draw bounding box
         if annotation.bbox:
             x1, y1, x2, y2 = map(int, annotation.bbox)
-            # Draw rectangle with transparency
-            cv2.rectangle(
-                overlay, (x1, y1), (x2, y2), color, -1
-            )  # Filled box for overlay
+
             cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)  # Border
+            # Draw rectangle with transparency
+            if not annotation.segmentation:
+                cv2.rectangle(
+                    overlay, (x1, y1), (x2, y2), color, -1
+                )  # Filled box for overlay
 
             # Prepare label text
             if show_scores and annotation.score is not None:
@@ -102,29 +142,8 @@ def draw_annotations(
         overlay, alpha, annotated_image, 1 - alpha, 0
     )
 
-    # Draw legend below the image
-    legend_x = 10
+    # Draw legend using helper function
     legend_y = image.shape[0] + legend_padding
-
-    for idx, (category, color) in enumerate(unique_categories.items()):
-        # Draw color box
-        cv2.rectangle(
-            canvas,
-            (legend_x, legend_y + idx * legend_spacing - 15),
-            (legend_x + 20, legend_y + idx * legend_spacing),
-            color,
-            -1,
-        )
-        # Draw category text
-        cv2.putText(
-            canvas,
-            category,
-            (legend_x + 30, legend_y + idx * legend_spacing - 3),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 0, 0),
-            1,
-            cv2.LINE_AA,
-        )
+    draw_legend(canvas, unique_categories, legend_y)
 
     return canvas

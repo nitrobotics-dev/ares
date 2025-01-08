@@ -224,7 +224,17 @@ def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -
             # show placeholder image (along the same path), then button to load and play video
             frame = get_video_frames(dataset, fname, n_frames=1)[0]
             st.image(frame)
-            if st.button("Load Video", key=f"video_button_{row['id']} + {key}"):
+            this_key = f"video_button_{row['id']}_{key}"
+            persist_key = f"video_button_persist_{row['id']}_{key}"
+
+            # handle persisting state for button
+            if persist_key not in st.session_state:
+                st.session_state[persist_key] = False
+            # don't show load button if video is already loaded
+            if not st.session_state[persist_key]:
+                st.button("Load Video", key=this_key)
+                st.session_state[persist_key] = True
+            if st.session_state[persist_key]:
                 st.video(get_video_mp4(dataset, fname))
 
         st.write(f"**{row['id']}**")
