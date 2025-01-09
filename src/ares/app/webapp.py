@@ -138,7 +138,6 @@ def main() -> None:
     with filter_error_context(section_display), timer_context(section_display):
         # Create overview of all data
         st.header("Distribution Analytics")
-        breakpoint()
         general_visualizations = generate_automatic_visualizations(
             filtered_df, time_column="ingestion_time"
         )

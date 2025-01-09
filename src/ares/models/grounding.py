@@ -1,20 +1,14 @@
-import asyncio
 import os
 from typing import Tuple
 
-import cv2
 import numpy as np
 import torch
 from PIL import Image
-from tqdm import tqdm
 from transformers import (
     AutoModelForMaskGeneration,
     AutoModelForZeroShotObjectDetection,
     AutoProcessor,
 )
-
-from ares.configs.annotations import Annotation, binary_mask_to_rle
-from ares.models.base import VLM
 
 
 class GroundingAnnotator:
@@ -159,7 +153,7 @@ class GroundingAnnotator:
                 zip(frame_masks, frame_scores, frame_anns)
             ):
                 best_mask = mask[score.argmax()]
-                ann["segmentation"] = binary_mask_to_rle(best_mask.numpy())
+                ann["segmentation"] = best_mask.numpy()
 
         return annotations
 
@@ -182,17 +176,16 @@ class GroundingAnnotator:
 
     def annotate_video(
         self,
-        frames: list[np.ndarray],
+        frames: list,
         labels_str: str,
-        batch_size: int = 2,
+        batch_size: int = 12,
     ) -> list[list[dict]]:
         """Annotate video frames in batches."""
         all_annotations = []
 
-        # Convert frames to PIL Images
-        pil_frames = [
-            Image.fromarray(cv2.cvtColor(f, cv2.COLOR_BGR2RGB)) for f in frames
-        ]
+        # Convert frames to PIL Images using PIL instead of cv2
+        frames = [np.array(f) for f in frames]
+        pil_frames = [Image.fromarray(f).convert("RGB") for f in frames]
 
         # Process in batches
         for i in range(0, len(pil_frames), batch_size):
@@ -201,44 +194,3 @@ class GroundingAnnotator:
             all_annotations.extend(batch_annotations)
 
         return all_annotations
-
-
-async def get_grounding_nouns_async(
-    vlm: VLM,
-    image: np.ndarray,
-    task_instructions: str,
-    prompt_filename: str = "grounding_description.jinja2",
-) -> str:
-    """Get object labels from VLM asynchronously."""
-    if task_instructions is None:
-        task_instructions = ""
-    print(f"Task instructions: {task_instructions}")
-    _, response = await vlm.ask_async(
-        info=dict(task_instructions=task_instructions),
-        prompt_filename=prompt_filename,
-        images=[image],
-    )
-    label_str = response.choices[0].message.content
-    label_str = label_str.replace("a ", "").replace("an ", "")
-    return label_str
-
-
-def get_grounding_nouns(
-    vlm: VLM,
-    image: np.ndarray,
-    task_instructions: str,
-    prompt_filename: str = "grounding_description.jinja2",
-) -> str:
-    return asyncio.run(
-        get_grounding_nouns_async(vlm, image, task_instructions, prompt_filename)
-    )
-
-
-def convert_to_annotations(
-    detection_results: list[list[dict]],
-) -> list[list[Annotation]]:
-    """Convert detection results from dictionaries to Annotation objects."""
-    return [
-        [Annotation(**ann_dict) for ann_dict in frame_anns]
-        for frame_anns in detection_results
-    ]

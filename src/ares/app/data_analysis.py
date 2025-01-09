@@ -28,6 +28,7 @@ def generate_automatic_visualizations(
             bar_cols.append(col)
 
     # Create histogram visualizations
+    breakpoint()
     for col in histogram_cols:
         col_title = col.replace("_", " ").replace("-", " ").title()
         visualizations.append(

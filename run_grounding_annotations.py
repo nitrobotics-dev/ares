@@ -5,10 +5,7 @@ import tempfile
 import time
 from typing import List, Tuple
 
-import cv2
 import numpy as np
-import pymongo
-import torch
 from PIL import Image
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
@@ -21,12 +18,8 @@ from ares.databases.annotation_database import (
 )
 from ares.databases.structured_database import get_dataset_rollouts, get_rollout_by_name
 from ares.models.base import VLM
-from ares.models.grounding import (
-    GroundingAnnotator,
-    convert_to_annotations,
-    get_grounding_nouns,
-    get_grounding_nouns_async,
-)
+from ares.models.grounding import GroundingAnnotator
+from ares.models.grounding_utils import get_grounding_nouns_async
 from ares.models.shortcuts import get_gemini_2_flash, get_gpt_4o
 from ares.utils.image_utils import load_video_frames
 
