@@ -101,13 +101,13 @@ class AnnotationDatabase:
         return output
 
     def add_frame_annotations(
-        self, video_id: str, frame: int, annotations: List[Annotation]
+        self, video_id: str, frame: int, annotations: List[Annotation | dict]
     ) -> List[str]:
         """Add multiple annotations for a specific frame."""
         annotation_ids = []
         for ann in annotations:
             # Convert the Annotation object to a dict suitable for MongoDB
-            ann_dict = ann.to_dict()
+            ann_dict = ann.to_dict() if isinstance(ann, Annotation) else ann
             ann_id = self.add_annotation(
                 video_id=video_id,
                 key=f"frame_{frame}_annotation",
@@ -211,6 +211,7 @@ class AnnotationDatabase:
             video_id: Unique identifier for the video
         """
         # Create video metadata
+        video_path = video_path.replace(".npy", ".mp4")
         video_id = f"{dataset_name}/{video_path}"
         metadata = {
             "dataset_name": dataset_name,

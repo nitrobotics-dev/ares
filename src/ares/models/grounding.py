@@ -165,7 +165,6 @@ class GroundingAnnotator:
         """Process a batch of images with detection and segmentation."""
         box_annotations = self.run_detector(images, labels_str)
         if not any(box_annotations):
-            print("No detections found in any frame")
             return box_annotations
 
         if self.segmentor_model is not None:
@@ -176,6 +175,7 @@ class GroundingAnnotator:
 
     def annotate_video(
         self,
+        rollout_id: str,
         frames: list,
         labels_str: str,
         batch_size: int = 12,
@@ -192,5 +192,4 @@ class GroundingAnnotator:
             batch_frames = pil_frames[i : i + batch_size]
             batch_annotations = self.process_batch(batch_frames, labels_str)
             all_annotations.extend(batch_annotations)
-
-        return all_annotations
+        return rollout_id, all_annotations

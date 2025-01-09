@@ -17,28 +17,6 @@ from ares.models.base import VLM
 from ares.models.grounding_utils import convert_to_annotations
 from run_grounding_annotations import setup_query
 
-# Create image with necessary dependencies
-image = (
-    Image.debian_slim()
-    .apt_install("python3-opencv")
-    .pip_install(
-        "torch", "transformers", "numpy", "opencv-python", "tqdm", "numpy", "pillow"
-    )
-)
-
-# Create Modal app instance
-app = App("ares-grounding-modal", image=image)
-
-
-@app.cls(image=image)
-class ModalWrapper:
-    def __enter__(self) -> None:
-        self.annotator = GroundingAnnotator(segmenter_id=None)
-
-    @method()
-    def annotate_video(self, frames, label_str):  # -> list[list[dict]]:
-        return self.annotator.annotate_video(frames, label_str)
-
 
 async def run_modal(
     rollouts: list[Rollout],

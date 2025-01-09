@@ -307,13 +307,16 @@ def show_hero_display(
             dataset_name = row["dataset_name"]
             if dataset_name == "UCSD Kitchen":
                 dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
-            db_data = get_video_annotation_data(
-                f"{dataset_name}/{row['path']}".replace("npy", "mp4")
-            )
+            elif dataset_name == "CMU Stretch":
+                dataset_name = "cmu_stretch"
+            video_id = f"{dataset_name}/{row['path']}".replace("npy", "mp4")
+            db_data = get_video_annotation_data(video_id)
             if db_data is not None:
                 annotation_data = db_data.get("annotations")
                 if not annotation_data:
-                    st.warning("No annotation data found for this video.")
+                    st.warning(
+                        f"No annotation data found for this video for {video_id}"
+                    )
                 else:
                     frame_inds = list(annotation_data.keys())
                     all_frame_paths = get_video_frames(
@@ -346,7 +349,7 @@ def show_hero_display(
                         st.json(db_data["annotations"])
 
             else:
-                st.warning("No annotation data found for this video")
+                st.warning(f"No video or annotation data found for {video_id}")
         except Exception as e:
             st.error(f"Error retrieving annotation data: {str(e)}")
             st.error(traceback.format_exc())

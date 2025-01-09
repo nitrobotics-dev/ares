@@ -28,7 +28,6 @@ def generate_automatic_visualizations(
             bar_cols.append(col)
 
     # Create histogram visualizations
-    breakpoint()
     for col in histogram_cols:
         col_title = col.replace("_", " ").replace("-", " ").title()
         visualizations.append(
@@ -44,25 +43,23 @@ def generate_automatic_visualizations(
             }
         )
 
-    # Create bar visualizations - do aggregation in one pass
-    if bar_cols:
-        agg_data = df.groupby(bar_cols).agg({time_column: "count"}).reset_index()
-
-        for col in bar_cols:
-            col_title = col.replace("_", " ").replace("-", " ").title()
-            visualizations.append(
-                {
-                    "figure": create_bar_plot(
-                        agg_data,
-                        x=col,
-                        y=time_column,
-                        color="#1f77b4",
-                        title=f"Count by {col_title}",
-                        labels={col: col_title, time_column: "Count"},
-                    ),
-                    "title": f"{col_title} Distribution",
-                }
-            )
+    # Create bar visualizations - handle each column separately
+    for col in bar_cols:
+        col_title = col.replace("_", " ").replace("-", " ").title()
+        agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
+        visualizations.append(
+            {
+                "figure": create_bar_plot(
+                    agg_data,
+                    x=col,
+                    y=time_column,
+                    color="#1f77b4",
+                    title=f"Count by {col_title}",
+                    labels={col: col_title, time_column: "Count"},
+                ),
+                "title": f"{col_title} Distribution",
+            }
+        )
 
     return visualizations
 
