@@ -150,6 +150,23 @@ def db_to_df(engine: Engine) -> pd.DataFrame:
     return df
 
 
+def setup_rollouts(
+    engine: Engine,
+    format_dataset_name: str,
+    filenames: list[str] | None = None,
+) -> list[Rollout]:
+    # either get filenames from db or filenames for specific ones
+    if filenames is None:
+        rollouts = get_dataset_rollouts(engine, format_dataset_name)
+    else:
+        rollout_attempts = [
+            get_rollout_by_name(engine, format_dataset_name, fname)
+            for fname in filenames
+        ]
+        rollouts = [r for r in rollout_attempts if r is not None]
+    return rollouts
+
+
 if __name__ == "__main__":
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     df = db_to_df(engine)

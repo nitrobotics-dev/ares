@@ -24,23 +24,6 @@ from ares.models.shortcuts import get_gemini_2_flash, get_gpt_4o
 from ares.utils.image_utils import load_video_frames
 
 
-def setup_rollouts(
-    engine: Engine,
-    format_dataset_name: str,
-    filenames: list[str] | None = None,
-) -> list[Rollout]:
-    # either get filenames from db or filenames for specific ones
-    if filenames is None:
-        rollouts = get_dataset_rollouts(engine, format_dataset_name)
-    else:
-        rollout_attempts = [
-            get_rollout_by_name(engine, format_dataset_name, fname)
-            for fname in filenames
-        ]
-        rollouts = [r for r in rollout_attempts if r is not None]
-    return rollouts
-
-
 async def setup_query(
     dataset_name: str,
     rollout: Rollout,
@@ -105,6 +88,7 @@ if __name__ == "__main__":
         RolloutSQLModel,
         get_rollout_by_name,
         setup_database,
+        setup_rollouts,
     )
 
     # Initialize components

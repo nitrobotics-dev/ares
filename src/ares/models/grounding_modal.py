@@ -37,26 +37,33 @@ class ModalWrapper:
 async def run_annotation_parallel(
     annotator: ModalWrapper,
     rollout_ids: list[str],
-    annotation_inputs: list[t.Any],
+    annotation_input_futures: list[t.Any],
     db: "AnnotationDatabase",
     rollouts: list["Rollout"],
     dataset_file_name: str,
 ) -> dict[str, int]:
     id_to_rollout = {r.id: r for r in rollouts}
-    id_to_inputs = {
-        r_id: (r_id, frames, frame_indices, label_str)
-        for r_id, (frames, frame_indices, label_str) in zip(
-            rollout_ids, annotation_inputs
-        )
-    }
+    id_to_annotation_inputs = dict()
 
-    # Create coroutines with their metadata
-    tasks = [
-        asyncio.create_task(
-            annotator.annotate_video.remote.aio(rollout_id, frames, label_str)
+    # as the futures get completed, launch the annotate tasks
+    tasks = []
+    for future in asyncio.as_completed(annotation_input_futures):
+        rollout_id, frames, frame_indices, label_str = await future
+        print(
+            f"received {rollout_id}: {len(frames)} frames, {len(frame_indices)} frame indices, label str: {label_str}"
         )
-        for rollout_id, (_, frames, frame_indices, label_str) in id_to_inputs.items()
-    ]
+        id_to_annotation_inputs[rollout_id] = (
+            rollout_id,
+            frames,
+            frame_indices,
+            label_str,
+        )
+        # create annotation task for each rollout with the label_str from the future
+        tasks.append(
+            asyncio.create_task(
+                annotator.annotate_video.remote.aio(rollout_id, frames, label_str)
+            )
+        )
 
     # Process and store results as they complete
     tracker = dict(videos=0, frames=0, annotations=0, video_ids=[])
@@ -64,13 +71,14 @@ async def run_annotation_parallel(
         try:
             rollout_id, all_frame_annotation_dicts = await coro
             rollout = id_to_rollout[rollout_id]
-            _, frames, frame_indices, label_str = id_to_inputs[rollout_id]
+            _, frames, frame_indices, label_str = id_to_annotation_inputs[rollout_id]
             tracker["videos"] += 1
             tracker["frames"] += len(all_frame_annotation_dicts)
             tracker["annotations"] += sum(
                 len(frame_annotations)
                 for frame_annotations in all_frame_annotation_dicts
             )
+            # add to database
             video_id = db.add_video_with_annotations(
                 dataset_name=dataset_file_name,
                 video_path=rollout.path,
@@ -91,6 +99,7 @@ def test() -> None:
     # do whatever local test
     import numpy as np
 
+    from ares.configs.base import Rollout
     from ares.databases.annotation_database import (
         TEST_ANNOTATION_DB_PATH,
         AnnotationDatabase,
@@ -98,10 +107,59 @@ def test() -> None:
     from ares.databases.structured_database import (
         TEST_ROBOT_DB_PATH,
         RolloutSQLModel,
-        get_rollout_by_name,
         setup_database,
+        setup_rollouts,
     )
-    from run_grounding_annotations import setup_query, setup_rollouts
+    from ares.models.base import VLM
+    from ares.models.grounding_utils import get_grounding_nouns_async
+    from ares.models.shortcuts import get_gpt_4o
+    from ares.utils.image_utils import load_video_frames
+
+    async def setup_query(
+        dataset_name: str,
+        rollout: Rollout,
+        vlm: VLM,
+        target_fps: int = 5,
+    ) -> tuple[str, list[np.ndarray], list[int], str]:
+        frames, frame_indices = load_video_frames(
+            dataset_name,
+            rollout.path,
+            target_fps,
+        )
+        label_str = await get_grounding_nouns_async(
+            vlm,
+            frames[0],
+            rollout.task.language_instruction,
+        )
+        return rollout.id, frames, frame_indices, label_str
+
+    async def run_ground_and_annotate(
+        dataset_file_name: str,
+        rollouts: list[Rollout],
+        vlm: VLM,
+        ann_db: AnnotationDatabase,
+        target_fps: int = 5,
+    ):
+        rollout_ids = [r.id for r in rollouts]
+
+        # Create and gather the futures properly
+        annotation_input_futures = [
+            asyncio.create_task(
+                setup_query(dataset_file_name, rollout, vlm, target_fps)
+            )
+            for rollout in rollouts
+        ]
+
+        annotator = ModalWrapper()
+        stats = await run_annotation_parallel(
+            annotator,
+            rollout_ids,
+            annotation_input_futures,
+            ann_db,
+            rollouts,
+            dataset_file_name,
+        )
+        return stats
 
     formal_dataset_name = "CMU Stretch"
     dataset_file_name = "cmu_stretch"
@@ -109,24 +167,20 @@ def test() -> None:
 
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    rollouts = setup_rollouts(engine, formal_dataset_name)
-
-    annotator = ModalWrapper()
-    rollout_ids, annotation_inputs = pickle.load(open("label_results.pkl", "rb"))
-    print(f"loading {len(annotation_inputs)} annotations")
-    rollout_ids = rollout_ids[:5]
-    annotation_inputs = annotation_inputs[:5]
+    rollouts = setup_rollouts(engine, formal_dataset_name)[100:]
+    vlm = get_gpt_4o()
     tic = time.time()
+
     stats = asyncio.run(
-        run_annotation_parallel(
-            annotator,
-            rollout_ids,
-            annotation_inputs,
-            ann_db,
-            rollouts,
+        run_ground_and_annotate(
             dataset_file_name,
+            rollouts,
+            vlm,
+            ann_db,
+            target_fps,
         )
     )
+
     print("time taken", time.time() - tic)
-    print(stats)
+    print(f"\n\nstats: {stats}\n\n")
     breakpoint()

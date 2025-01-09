@@ -12,7 +12,10 @@ The output should be "a red cup. a blue bowl. a robot."
 
 Do not just say "a red object"; always use the actual name of the object! If an object is important, try to disambiguate it from other objects.
 Look at the following image and list the important objects in the image. Please be extensive and include all objects that are relevant to the task.
+
 Do not include any pleasantries or other text in the output, just the period-separated list of objects.
+Again, do not include any comments like "I'm unable to see the image" or "I'm not sure what's in the image", just return the period-separated list of objects.
+
 
 {% if task_instructions %}Task instructions: {{ task_instructions }}{% endif %}
 

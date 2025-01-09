@@ -297,23 +297,21 @@ def select_row_from_df_user(df: pd.DataFrame) -> None:
                 mask = df.id.apply(str) == selected_id
                 st.session_state["selected_row"] = df[mask].iloc[0]
 
-    # Option 3: Select by Path
+    # Option 3: Select by Dataset Name + Path
     with col3:
-        path_options = df.path.unique().tolist()
+        path_options = pd.Series(
+            [f"{name}/{path}" for name, path in zip(df.dataset_name, df.path)]
+        )
         selected_path: str | None = st.selectbox(
             "Select by Path",
-            options=["Choose an option"] + path_options,
-            # + sorted(
-            #     path_options,
-            #     key=lambda x: int(
-            #         x.split("_")[-1].split(".")[0]
-            #     ),  # e.g. path/to/file_0.npy
-            # ),
+            options=["Choose an option"] + path_options.tolist(),
             key="path_select",
         )
         if st.button("Select by Path"):
             if selected_path != "Choose an option":
-                st.session_state["selected_row"] = df[df.path == selected_path].iloc[0]
+                st.session_state["selected_row"] = df[
+                    path_options == selected_path
+                ].iloc[0]
 
     with col4:
         if st.button("Select Random"):
