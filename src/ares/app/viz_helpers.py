@@ -27,7 +27,7 @@ from ares.app.plot_primitives import (
 from ares.configs.annotations import Annotation
 from ares.databases.annotation_database import AnnotationDatabase
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
-from ares.image_utils import (
+from ares.utils.image_utils import (
     choose_and_preprocess_frames,
     get_video_frames,
     get_video_mp4,

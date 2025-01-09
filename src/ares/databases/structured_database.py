@@ -129,12 +129,19 @@ def get_rollout_by_name(
         return recreate_model(row[0], Rollout)
 
 
-def get_dataset_rollouts(engine: Engine, formal_dataset_name: str) -> pd.DataFrame:
+def get_dataset_rollouts(engine: Engine, formal_dataset_name: str) -> list[Rollout]:
     with Session(engine) as session:
         query = select(RolloutSQLModel).where(
             RolloutSQLModel.dataset_name == formal_dataset_name,
         )
-        return session.exec(query).all()
+        rows = session.exec(query).all()
+        rollouts = []
+        for row in rows:
+            try:
+                rollouts.append(recreate_model(row[0], Rollout))
+            except Exception as e:
+                print(f"Error recreating model: {e}")
+        return rollouts
 
 
 def db_to_df(engine: Engine) -> pd.DataFrame:

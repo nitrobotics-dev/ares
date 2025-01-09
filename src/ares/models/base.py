@@ -18,7 +18,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from transformers import AutoModel, AutoProcessor
 from vertexai.generative_models import GenerativeModel, Part
 
-from ares.image_utils import encode_image
+from ares.utils.image_utils import encode_image
 
 # TODO -- singleton, model specific rate limits
 RATE_LIMITS = {

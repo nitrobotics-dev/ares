@@ -134,16 +134,17 @@ def main() -> None:
     show_dataframe(filtered_df.sample(min(5, len(filtered_df))), title="Data Sample")
     # st.divider()
 
-    # section_display = "data distributions"
-    # with filter_error_context(section_display), timer_context(section_display):
-    #     # Create overview of all data
-    #     st.header("Distribution Analytics")
-    #     general_visualizations = generate_automatic_visualizations(
-    #         filtered_df, time_column="ingestion_time"
-    #     )
-    #     create_tabbed_visualizations(
-    #         general_visualizations, [viz["title"] for viz in general_visualizations]
-    #     )
+    section_display = "data distributions"
+    with filter_error_context(section_display), timer_context(section_display):
+        # Create overview of all data
+        st.header("Distribution Analytics")
+        breakpoint()
+        general_visualizations = generate_automatic_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            general_visualizations, [viz["title"] for viz in general_visualizations]
+        )
 
     # section_success_rate = "success rate analytics"
     # with (

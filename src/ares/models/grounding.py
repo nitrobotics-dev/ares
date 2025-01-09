@@ -1,3 +1,5 @@
+import asyncio
+import os
 from typing import Tuple
 
 import cv2
@@ -67,7 +69,7 @@ class GroundingAnnotator:
         self,
         images: list[Image.Image],
         labels_str: str,
-    ) -> list[list[Annotation]]:
+    ) -> list[list[dict]]:
         # Process all images in a single batch
         inputs = self.detector_processor(
             images=images, text=[labels_str] * len(images), return_tensors="pt"
@@ -96,7 +98,7 @@ class GroundingAnnotator:
                         "category_name": result["labels"][box_idx],
                         "score": result["scores"][box_idx].item(),
                     }
-                    frame_annotations.append(Annotation(**ann_dict))
+                    frame_annotations.append(ann_dict)
             all_annotations.append(frame_annotations)
 
         return all_annotations
@@ -104,8 +106,8 @@ class GroundingAnnotator:
     def run_segmenter(
         self,
         images: list[Image.Image],
-        annotations: list[list[Annotation]],
-    ) -> list[list[Annotation]]:
+        annotations: list[list[dict]],
+    ) -> list[list[dict]]:
         # Process each image's annotations
         all_points = []
         all_labels = []
@@ -114,8 +116,8 @@ class GroundingAnnotator:
         for frame_anns in annotations:
             frame_points = [
                 [
-                    (box.bbox_xyxy[0] + box.bbox_xyxy[2]) / 2,
-                    (box.bbox_xyxy[1] + box.bbox_xyxy[3]) / 2,
+                    (box["bbox"][0] + box["bbox"][2]) / 2,
+                    (box["bbox"][1] + box["bbox"][3]) / 2,
                 ]
                 for box in frame_anns
             ]
@@ -157,7 +159,7 @@ class GroundingAnnotator:
                 zip(frame_masks, frame_scores, frame_anns)
             ):
                 best_mask = mask[score.argmax()]
-                ann.segmentation = binary_mask_to_rle(best_mask.numpy())
+                ann["segmentation"] = binary_mask_to_rle(best_mask.numpy())
 
         return annotations
 
@@ -165,7 +167,7 @@ class GroundingAnnotator:
         self,
         images: list[Image.Image],
         labels_str: str,
-    ) -> list[list[Annotation]]:
+    ) -> list[list[dict]]:
         """Process a batch of images with detection and segmentation."""
         box_annotations = self.run_detector(images, labels_str)
         if not any(box_annotations):
@@ -183,8 +185,7 @@ class GroundingAnnotator:
         frames: list[np.ndarray],
         labels_str: str,
         batch_size: int = 2,
-        desc: str = "Processing frames",
-    ) -> list[list[Annotation]]:
+    ) -> list[list[dict]]:
         """Annotate video frames in batches."""
         all_annotations = []
 
@@ -194,12 +195,32 @@ class GroundingAnnotator:
         ]
 
         # Process in batches
-        for i in tqdm(range(0, len(pil_frames), batch_size), desc=desc, leave=False):
+        for i in range(0, len(pil_frames), batch_size):
             batch_frames = pil_frames[i : i + batch_size]
             batch_annotations = self.process_batch(batch_frames, labels_str)
             all_annotations.extend(batch_annotations)
 
         return all_annotations
+
+
+async def get_grounding_nouns_async(
+    vlm: VLM,
+    frames: list[np.ndarray],
+    task_instructions: str,
+    prompt_filename: str = "grounding_description.jinja2",
+) -> str:
+    """Get object labels from VLM asynchronously."""
+    if task_instructions is None:
+        task_instructions = ""
+    print(f"Task instructions: {task_instructions}")
+    _, response = await vlm.ask_async(
+        info=dict(task_instructions=task_instructions),
+        prompt_filename=prompt_filename,
+        images=frames,
+    )
+    label_str = response.choices[0].message.content
+    label_str = label_str.replace("a ", "").replace("an ", "")
+    return label_str
 
 
 def get_grounding_nouns(
@@ -208,15 +229,16 @@ def get_grounding_nouns(
     task_instructions: str,
     prompt_filename: str = "grounding_description.jinja2",
 ) -> str:
-    """Get object labels from VLM."""
-    if task_instructions is None:
-        task_instructions = ""
-    print(f"Task instructions: {task_instructions}")
-    messages, response = vlm.ask(
-        info=dict(task_instructions=task_instructions),
-        prompt_filename=prompt_filename,
-        images=frames,
+    return asyncio.run(
+        get_grounding_nouns_async(vlm, frames, task_instructions, prompt_filename)
     )
-    label_str = response.choices[0].message.content
-    label_str = label_str.replace("a ", "").replace("an ", "")
-    return label_str
+
+
+def convert_to_annotations(
+    detection_results: list[list[dict]],
+) -> list[list[Annotation]]:
+    """Convert detection results from dictionaries to Annotation objects."""
+    return [
+        [Annotation(**ann_dict) for ann_dict in frame_anns]
+        for frame_anns in detection_results
+    ]
