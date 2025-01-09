@@ -92,7 +92,7 @@ def get_video_frames(
     dataset: str, filename: str, n_frames: int | None = None, just_path: bool = False
 ) -> list[np.ndarray | str]:
     """Get video as a list of frames from the frames directory."""
-    base_filename = filename.replace(".mp4", "")
+    base_filename = filename.removesuffix(".mp4").removesuffix(".npy")
     frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
 
     if not os.path.exists(frames_dir):
@@ -132,7 +132,8 @@ def encode_image(image: t.Union[str, np.ndarray, Image.Image]) -> str:
         return base64.b64encode(buffered.getvalue()).decode("utf-8")
     else:
         raise TypeError(
-            "Unsupported image format. Use file path, numpy array, or PIL image."
+            f"Unsupported image format. Use file path, numpy array, or PIL image. Received {type(image)}"
+            f"{type(image)}"
         )
 
 
@@ -209,7 +210,8 @@ def get_frame_indices_for_fps(
     Returns:
         List of frame indices to sample
     """
-    if not os.path.exists(video_path):
+    video_path = video_path.replace(".npy", ".mp4")
+    if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
     cap = cv2.VideoCapture(video_path)
     video_fps = cap.get(cv2.CAP_PROP_FPS)

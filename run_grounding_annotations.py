@@ -54,10 +54,14 @@ async def setup_query(
     vlm: VLM,
     target_fps: int = 5,
 ) -> tuple[list[np.ndarray], list[int], str]:
-    frames, frame_indices = load_video_frames(dataset_name, rollout.path, target_fps)
+    frames, frame_indices = load_video_frames(
+        dataset_name,
+        rollout.path,
+        target_fps,
+    )
     label_str = await get_grounding_nouns_async(
         vlm,
-        frames,
+        frames[0],
         rollout.task.language_instruction,
     )
     return frames, frame_indices, label_str

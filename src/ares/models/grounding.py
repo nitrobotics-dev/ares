@@ -205,7 +205,7 @@ class GroundingAnnotator:
 
 async def get_grounding_nouns_async(
     vlm: VLM,
-    frames: list[np.ndarray],
+    image: np.ndarray,
     task_instructions: str,
     prompt_filename: str = "grounding_description.jinja2",
 ) -> str:
@@ -216,7 +216,7 @@ async def get_grounding_nouns_async(
     _, response = await vlm.ask_async(
         info=dict(task_instructions=task_instructions),
         prompt_filename=prompt_filename,
-        images=frames,
+        images=[image],
     )
     label_str = response.choices[0].message.content
     label_str = label_str.replace("a ", "").replace("an ", "")
@@ -225,12 +225,12 @@ async def get_grounding_nouns_async(
 
 def get_grounding_nouns(
     vlm: VLM,
-    frames: list[np.ndarray],
+    image: np.ndarray,
     task_instructions: str,
     prompt_filename: str = "grounding_description.jinja2",
 ) -> str:
     return asyncio.run(
-        get_grounding_nouns_async(vlm, frames, task_instructions, prompt_filename)
+        get_grounding_nouns_async(vlm, image, task_instructions, prompt_filename)
     )
 
 

@@ -1,5 +1,6 @@
 import asyncio
 import time
+import traceback
 from concurrent.futures import as_completed
 
 import numpy as np
@@ -22,10 +23,11 @@ image = (
     .apt_install(["libgl1"])  # If you need OpenCV
 )
 
-stub = Stub("ares-grounding-modal")
+# Create Modal app instance
+app = Stub("ares-grounding-modal")
 
 
-@stub.cls(image=image)
+@app.cls(image=image)
 class ModalWrapper:
     def __enter__(self) -> None:
         self.annotator = GroundingAnnotator(segmenter_id=None)
@@ -48,74 +50,49 @@ async def run_modal(
     total_anns = 0
     total_processed = 0
     total_frames = 0
-    id_to_rollout = {rollout.id: rollout for rollout in rollouts}
     failed_rollouts = []
 
-    # Start all setup_query tasks with error handling
-    setup_futures = {}
-    for rollout_id, rollout in id_to_rollout.items():
+    # Create tasks for all rollouts
+    setup_tasks = []
+    rollout_ids = []
+    for rollout in rollouts:
         try:
-            setup_futures[rollout_id] = setup_query(
-                dataset_name, rollout, vlm, target_fps
-            )
+            task = setup_query(dataset_name, rollout, vlm, target_fps)
+            setup_tasks.append(task)
+            rollout_ids.append(rollout.id)
         except Exception as e:
-            failed_rollouts.append(rollout_id)
-    rev_setup_futures = {v: k for k, v in setup_futures.items()}
-    # Process setup results and start annotations
-    annotation_futures = {}
-    future_to_metadata = {}
+            failed_rollouts.append(
+                ("setup futures", rollout.id, e, traceback.format_exc())
+            )
 
-    # As setup queries complete, start annotations
-    for setup_future in asyncio.as_completed(setup_futures.values()):
-        try:
-            rollout_id = rev_setup_futures[setup_future]
-            frames, frame_indices, label_str = await setup_future
+    # Process all setup tasks concurrently using gather
+    try:
+        results = await asyncio.gather(*setup_tasks, return_exceptions=True)
+        for rollout_id, result in zip(rollout_ids, results):
+            if isinstance(result, Exception):
+                failed_rollouts.append(
+                    ("setup gather", rollout_id, result, traceback.format_exc())
+                )
+                continue
 
+            frames, frame_indices, label_str = result
+            print(label_str)
             # Start annotation for this result
-            ann_future = annotator.annotate_video.remote(frames, label_str)
-            annotation_futures[rollout_id] = ann_future
-            future_to_metadata[rollout_id] = (
-                frames,
-                frame_indices,
-                label_str,
-                id_to_rollout[rollout_id].path,
-            )
-        except Exception as e:
-            failed_rollouts.append(rollout_id)
-    rev_annotation_futures = {v: k for k, v in annotation_futures.items()}
+            # ann_future = annotator.annotate_video.remote(frames, label_str)
+            # annotation_futures[rollout_id] = ann_future
+            # future_to_metadata[rollout_id] = (
+            #     frames,
+            #     frame_indices,
+            #     label_str,
+            #     id_to_rollout[rollout_id].path,
+            # )
+    except Exception as e:
+        failed_rollouts.append(("gather", "all", e, traceback.format_exc()))
 
-    # Process annotation results as they complete
-    for ann_future in as_completed(list(annotation_futures.values())):
-        try:
-            rollout_id = rev_annotation_futures[ann_future]
-            frames, frame_indices, label_str, video_path = future_to_metadata[
-                rollout_id
-            ]
-            detection_results = await ann_future
-            video_annotations = convert_to_annotations(detection_results)
-
-            total_anns += sum(len(anns) for anns in video_annotations)
-            total_frames += len(frames)
-
-            video_id = ann_db.add_video_with_annotations(
-                dataset_name=dataset_name,
-                video_path=video_path,
-                frames=frames,
-                frame_indices=frame_indices,
-                annotations=video_annotations,
-                label_str=label_str,
-            )
-            total_processed += 1
-        except Exception as e:
-            failed_rollouts.append(rollout_id)
-
-    if failed_rollouts:
-        print(f"Failed rollouts: {failed_rollouts}")
-
-    return total_anns, total_processed, total_frames
+    return failed_rollouts
 
 
-if __name__ == "__main__":
+def run() -> None:
     from ares.databases.annotation_database import (
         TEST_ANNOTATION_DB_PATH,
         AnnotationDatabase,
@@ -126,7 +103,6 @@ if __name__ == "__main__":
         get_rollout_by_name,
         setup_database,
     )
-    from ares.models.grounding import get_grounding_nouns
     from ares.models.shortcuts import get_gemini_2_flash, get_gpt_4o
     from run_grounding_annotations import setup_query, setup_rollouts
 
@@ -143,9 +119,16 @@ if __name__ == "__main__":
     annotator = ModalWrapper()
 
     tic = time.time()
-    total_anns, total_processed, total_frames = asyncio.run(
+    # total_anns, total_processed, total_frames = asyncio.run(
+    out = asyncio.run(
         run_modal(rollouts, vlm, annotator, ann_db, dataset_name, target_fps)
     )
+    breakpoint()
     print(f"Total annotations: {total_anns}")
     print(f"Total frames: {total_frames}")
     print(f"Total processed: {total_processed}")
+    breakpoint()
+
+
+if __name__ == "__main__":
+    run()
