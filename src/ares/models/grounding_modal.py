@@ -53,10 +53,11 @@ async def run_annotation_parallel(
         if isinstance(res, dict):
             # failure!
             failures.append(res)
+            continue
         else:
             rollout_id, frames, frame_indices, label_str = res
         print(
-            f"received {rollout_id}: {len(frames)} frames, {len(frame_indices)} frame indices, label str: {label_str}"
+            f"received grounding output/ annotation input for {rollout_id}: {len(frames)} frames, {len(frame_indices)} frame indices, label str: {label_str}"
         )
         id_to_annotation_inputs[rollout_id] = (
             rollout_id,
@@ -154,7 +155,11 @@ def test() -> None:
                 target_fps,
             )
         except Exception as e:
-            return {"rollout": rollout, "error_pattern": "loading_failure", "error": e}
+            return {
+                "rollout_id": rollout.id,
+                "error_pattern": "loading_failure",
+                "error": e,
+            }
 
         try:
             label_str = await get_grounding_nouns_async(
@@ -164,14 +169,18 @@ def test() -> None:
             )
         except Exception as e:
             return {
-                "rollout": rollout,
+                "rollout_id": rollout.id,
                 "error_pattern": "grounding_request_failure",
                 "error": e,
             }
 
         refusal_phrases = refusal_phrases or ["I'm"]
         if any(phrase in label_str for phrase in refusal_phrases):
-            return {"rollout": rollout, "error_pattern": "refusal", "error": label_str}
+            return {
+                "rollout_id": rollout.id,
+                "error_pattern": "refusal",
+                "error": label_str,
+            }
         return rollout.id, frames, frame_indices, label_str
 
     async def run_ground_and_annotate(
@@ -208,15 +217,47 @@ def test() -> None:
     #     "LSMO Dataset",
     #     "tokyo_u_lsmo_converted_externally_to_rlds",
     # )
+    # formal_dataset_name, dataset_file_name = (
+    #     "Berkeley Fanuc Manipulation",
+    #     "berkeley_fanuc_manipulation",
+    # )
+    # formal_dataset_name, dataset_file_name = (
+    #     "CMU Franka Exploration",
+    #     "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+    # )
     formal_dataset_name, dataset_file_name = (
-        "Berkeley Fanuc Manipulation",
-        "berkeley_fanuc_manipulation",
+        "CMU Play Fusion",
+        "cmu_play_fusion",
     )
+    # formal_dataset_name, dataset_file_name = (
+    #     "NYU ROT",
+    #     "nyu_rot",
+    # )
+    # formal_dataset_name, dataset_file_name = (
+    #     "UCSD Pick Place",
+    #     "ucsd_pick_place_dataset_converted_externally_to_rlds",
+    # )
+    # formal_dataset_name, dataset_file_name = (
+    #     "USC Jaco Play",
+    #     "usc_jaco_play",
+    # )
+
     target_fps = 5
+
+    retry_failed = None  # path to pickle file with failures
+    # retry_failed = "failures.pkl"
 
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     rollouts = setup_rollouts(engine, formal_dataset_name)
+
+    if retry_failed:
+        with open(retry_failed, "rb") as f:
+            failures = pickle.load(f)
+
+        failed_ids = [str(f["rollout_id"]) for f in failures]
+        rollouts = [r for r in rollouts if str(r.id) in failed_ids]
+
     print(f"\n\nfound {len(rollouts)} rollouts\n\n")
     vlm = get_gpt_4o()
     tic = time.time()
@@ -231,12 +272,13 @@ def test() -> None:
         )
     )
 
-    print("time taken", time.time() - tic)
-    print(f"\n\n")
-    for k, v in stats.items():
-        print(f"{k}: {v}" if not isinstance(v, list) else f"{k}: {v[:10]}...")
     print(f"\n\nfailures: {failures}\n\n")
     # write failures to file
     with open("failures.pkl", "wb") as f:
         pickle.dump(failures, f)
+
+    print("time taken", time.time() - tic)
+    print(f"\n\n")
+    for k, v in stats.items():
+        print(f"{k}: {v}" if not isinstance(v, list) else f"{k}: {v[:10]}...")
     breakpoint()

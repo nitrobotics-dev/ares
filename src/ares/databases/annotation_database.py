@@ -211,7 +211,7 @@ class AnnotationDatabase:
             video_id: Unique identifier for the video
         """
         # Create video metadata
-        video_path = video_path.replace(".npy", ".mp4")
+        video_path = video_path.replace(".npy", ".mp4").replace(".npz", ".mp4")  # HACK
         video_id = f"{dataset_name}/{video_path}"
         metadata = {
             "dataset_name": dataset_name,

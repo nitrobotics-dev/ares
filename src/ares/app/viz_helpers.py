@@ -148,59 +148,62 @@ def create_embedding_similarity_visualization(
     filter_zero_distance_matches: bool = False,
 ) -> dict:
     """Create visualization for similar trajectories based on embedding feature type."""
-    # get the query matrix
-    query_matrix = index_manager.get_matrix_by_id(name, str(row.id))
-    if query_matrix is None:
-        raise ValueError(f"No matrix found for id: {row.id}")
+    try:
+        # get the query matrix
+        query_matrix = index_manager.get_matrix_by_id(name, str(row.id))
+        if query_matrix is None:
+            raise ValueError(f"No matrix found for id: {row.id}")
 
-    if filter_zero_distance_matches:
-        # Try increasingly larger k values until we get enough non-zero distances
-        multipliers = [1, 10, 100]  # Will try k, 10k, 100k
-        for mult in multipliers:
-            k = (n_most_similar + 1) * mult  # +1 to account for self-match
-            distances, ids, matrices = index_manager.search_matrix(
-                name, query_matrix, k
-            )
-
-            # Filter out exact matches (using small epsilon to handle floating point)
-            non_zero_mask = distances > 1e-10
-            filtered_distances = distances[non_zero_mask]
-            filtered_ids = ids[non_zero_mask]
-            filtered_matrices = (
-                matrices[non_zero_mask] if matrices is not None else None
-            )
-
-            if len(filtered_distances) >= n_most_similar:
-                # We found enough non-zero matches
-                distances = filtered_distances[:n_most_similar]
-                ids = filtered_ids[:n_most_similar]
-                matrices = (
-                    filtered_matrices[:n_most_similar]
-                    if filtered_matrices is not None
-                    else None
+        if filter_zero_distance_matches:
+            # Try increasingly larger k values until we get enough non-zero distances
+            multipliers = [1, 10, 100]  # Will try k, 10k, 100k
+            for mult in multipliers:
+                k = (n_most_similar + 1) * mult  # +1 to account for self-match
+                distances, ids, matrices = index_manager.search_matrix(
+                    name, query_matrix, k
                 )
-                break
-    else:
-        # Original behavior
-        distances, ids, matrices = index_manager.search_matrix(
-            name,
-            query_matrix,
-            n_most_similar + 1,  # to avoid self match
-        )
 
-    # check index of id_str to see if it matches row.id then remove that index
-    idx = np.where(ids == str(row.id))
-    if len(idx[0]) != 0:
-        idx = idx[0][0]
-        distances = np.delete(distances, idx)
-        ids = np.delete(ids, idx)
-        matrices = np.delete(matrices, idx, axis=0)
+                # Filter out exact matches (using small epsilon to handle floating point)
+                non_zero_mask = distances > 1e-10
+                filtered_distances = distances[non_zero_mask]
+                filtered_ids = ids[non_zero_mask]
+                filtered_matrices = (
+                    matrices[non_zero_mask] if matrices is not None else None
+                )
 
-    return {
-        "distances": distances[:n_most_similar],
-        "ids": ids[:n_most_similar],
-        "matrices": matrices[:n_most_similar] if matrices is not None else None,
-    }
+                if len(filtered_distances) >= n_most_similar:
+                    # We found enough non-zero matches
+                    distances = filtered_distances[:n_most_similar]
+                    ids = filtered_ids[:n_most_similar]
+                    matrices = (
+                        filtered_matrices[:n_most_similar]
+                        if filtered_matrices is not None
+                        else None
+                    )
+                    break
+        else:
+            # Original behavior
+            distances, ids, matrices = index_manager.search_matrix(
+                name,
+                query_matrix,
+                n_most_similar + 1,  # to avoid self match
+            )
+
+        # check index of id_str to see if it matches row.id then remove that index
+        idx = np.where(ids == str(row.id))
+        if len(idx[0]) != 0:
+            idx = idx[0][0]
+            distances = np.delete(distances, idx)
+            ids = np.delete(ids, idx)
+            matrices = np.delete(matrices, idx, axis=0)
+
+        return {
+            "distances": distances[:n_most_similar],
+            "ids": ids[:n_most_similar],
+            "matrices": matrices[:n_most_similar] if matrices is not None else None,
+        }
+    except Exception as e:
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 def create_similarity_tabs(
@@ -213,6 +216,9 @@ def create_similarity_tabs(
     tabs = st.tabs(tab_names)
     for tab, viz_data in zip(tabs, visualizations):
         with tab:
+            if "error" in viz_data:
+                st.warning(viz_data)
+                continue
             similar_cols = st.columns(min(max_cols_in_tab, len(viz_data["ids"])))
             for i, (dist, id_str) in enumerate(
                 zip(viz_data["distances"], viz_data["ids"])
@@ -310,7 +316,9 @@ def show_hero_display(
                 # HACK FOR NOW
                 dataset_name = DATASET_NAMES[dataset_name]["file_name"]
 
-            video_id = f"{dataset_name}/{row['path']}".replace("npy", "mp4")
+            video_id = f"{dataset_name}/{row['path']}".replace("npy", "mp4").replace(
+                "npz", "mp4"
+            )
             db_data = get_video_annotation_data(video_id)
             if db_data is not None:
                 annotation_data = db_data.get("annotations")

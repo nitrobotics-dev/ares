@@ -23,4 +23,30 @@ DATASET_NAMES = {
         "formal_name": "Berkeley Fanuc Manipulation",
         "file_name": "berkeley_fanuc_manipulation",
     },
+    "CMU Franka Exploration": {
+        "formal_name": "CMU Franka Exploration",
+        "file_name": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+    },
+    "cmu_franka_exploration": {
+        "formal_name": "CMU Franka Exploration",
+        "file_name": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+    },
+    "CMU Play Fusion": {
+        "formal_name": "CMU Play Fusion",
+        "file_name": "cmu_play_fusion",
+    },
+    # DLR wheelchair
+    # imperial
+    "NYU ROT": {
+        "formal_name": "NYU ROT",
+        "file_name": "nyu_rot",
+    },
+    "UCSD Pick Place": {
+        "formal_name": "UCSD Pick Place",
+        "file_name": "ucsd_pick_place_dataset_converted_externally_to_rlds",
+    },
+    "USC Jaco Play": {
+        "formal_name": "USC Jaco Play",
+        "file_name": "usc_jaco_play",
+    },
 }

@@ -100,7 +100,9 @@ def get_video_frames(
     if dataset in DATASET_NAMES:
         dataset = DATASET_NAMES[dataset]["file_name"]
 
-    base_filename = filename.removesuffix(".mp4").removesuffix(".npy")
+    base_filename = (
+        filename.removesuffix(".mp4").removesuffix(".npy").removesuffix(".npz")
+    )
     frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
 
     if not os.path.exists(frames_dir):
@@ -222,7 +224,7 @@ def get_frame_indices_for_fps(
     Returns:
         List of frame indices to sample
     """
-    video_path = video_path.replace(".npy", ".mp4")
+    video_path = video_path.replace(".npy", ".mp4").replace(".npz", ".mp4")  # HACK
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
     cap = cv2.VideoCapture(video_path)
