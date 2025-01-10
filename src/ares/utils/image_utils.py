@@ -100,8 +100,12 @@ def get_video_frames(
     if dataset in DATASET_NAMES:
         dataset = DATASET_NAMES[dataset]["file_name"]
 
+    # .replace(".npy")
     base_filename = (
-        filename.removesuffix(".mp4").removesuffix(".npy").removesuffix(".npz")
+        filename.removesuffix(".mp4")
+        .removesuffix(".npy")
+        .removesuffix(".npz")
+        .removesuffix(".p")
     )
     frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
 
@@ -224,7 +228,9 @@ def get_frame_indices_for_fps(
     Returns:
         List of frame indices to sample
     """
-    video_path = video_path.replace(".npy", ".mp4").replace(".npz", ".mp4")  # HACK
+    video_path = (
+        video_path.replace(".npy", ".mp4").replace(".npz", ".mp4").replace(".p", ".mp4")
+    )  # HACK
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
     cap = cv2.VideoCapture(video_path)
@@ -253,19 +259,21 @@ def load_video_frames(
 
 
 if __name__ == "__main__":
-    from ares.utils.task_utils import PI_DEMO_TASKS
+    # from ares.utils.task_utils import PI_DEMO_TASKS
 
     # load mp4, break to frames, and save to disk using the helpers
-    dataset = "pi_demos"
+    # dataset = "pi_demos"
+    dataset = "cmu_play_fusion"
 
-    for _, info in PI_DEMO_TASKS.items():
-        for attempt in ["success", "fail"]:
-            fname = info["filename_prefix"] + f"_{attempt}.mp4"
-            mp4_path = get_video_from_path(dataset, fname)
+    # for _, info in PI_DEMO_TASKS.items():
+    #     for attempt in ["success", "fail"]:
+    # fname = info["filename_prefix"] + f"_{attempt}.mp4"
+    fname = "data/train/episode_212.mp4"
+    mp4_path = get_video_from_path(dataset, fname)
 
-            dirpath = mp4_path.replace(".mp4", "")
-            if not os.path.exists(dirpath) or not len(os.listdir(dirpath)):
-                frames = split_video_to_frames(mp4_path)
-                save_video(frames, dataset, fname)
-            else:
-                print(f"Folder already exists for {fname}, skipping...")
+    dirpath = mp4_path.replace(".mp4", "")
+    if not os.path.exists(dirpath) or not len(os.listdir(dirpath)):
+        frames = split_video_to_frames(mp4_path)
+        save_video(frames, dataset, fname)
+    else:
+        print(f"Folder already exists for {fname}, skipping...")

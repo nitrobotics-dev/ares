@@ -225,22 +225,22 @@ def test() -> None:
     #     "CMU Franka Exploration",
     #     "cmu_franka_exploration_dataset_converted_externally_to_rlds",
     # )
-    formal_dataset_name, dataset_file_name = (
-        "CMU Play Fusion",
-        "cmu_play_fusion",
-    )
+    # formal_dataset_name, dataset_file_name = (
+    #     "CMU Play Fusion",
+    #     "cmu_play_fusion",
+    # )
     # formal_dataset_name, dataset_file_name = (
     #     "NYU ROT",
     #     "nyu_rot",
     # )
     # formal_dataset_name, dataset_file_name = (
     #     "UCSD Pick Place",
-    #     "ucsd_pick_place_dataset_converted_externally_to_rlds",
+    #     "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
     # )
-    # formal_dataset_name, dataset_file_name = (
-    #     "USC Jaco Play",
-    #     "usc_jaco_play",
-    # )
+    formal_dataset_name, dataset_file_name = (
+        "USC Jaco Play",
+        "usc_jaco_play",
+    )
 
     target_fps = 5
 

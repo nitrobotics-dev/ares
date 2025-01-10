@@ -316,8 +316,10 @@ def show_hero_display(
                 # HACK FOR NOW
                 dataset_name = DATASET_NAMES[dataset_name]["file_name"]
 
-            video_id = f"{dataset_name}/{row['path']}".replace("npy", "mp4").replace(
-                "npz", "mp4"
+            video_id = (
+                f"{dataset_name}/{row['path']}".replace(".npy", ".mp4")
+                .replace(".npz", ".mp4")
+                .replace(".p", ".mp4")
             )
             db_data = get_video_annotation_data(video_id)
             if db_data is not None:
@@ -356,7 +358,6 @@ def show_hero_display(
                         st.json(db_data["video_data"])
                         st.write("Annotations:")
                         st.json(db_data["annotations"])
-
             else:
                 st.warning(f"No video or annotation data found for {video_id}")
         except Exception as e:
@@ -385,7 +386,8 @@ def show_hero_display(
         st.session_state[zero_distance_filter_key] = False
 
     if st.checkbox(
-        "Filter zero-distance matches", value=st.session_state[zero_distance_filter_key]
+        "Filter out zero-distance matches",
+        value=st.session_state[zero_distance_filter_key],
     ):
         st.session_state[zero_distance_filter_key] = True
     else:

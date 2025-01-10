@@ -43,7 +43,15 @@ DATASET_NAMES = {
     },
     "UCSD Pick Place": {
         "formal_name": "UCSD Pick Place",
-        "file_name": "ucsd_pick_place_dataset_converted_externally_to_rlds",
+        "file_name": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+    },
+    "ucsd_pick_place_dataset": {
+        "formal_name": "UCSD Pick Place",
+        "file_name": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+    },
+    "ucsd_pick_place_dataset_converted_externally_to_rlds": {
+        "formal_name": "UCSD Pick Place",
+        "file_name": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
     },
     "USC Jaco Play": {
         "formal_name": "USC Jaco Play",
