@@ -20,7 +20,7 @@ image = (
 app = App("ares-grounding-modal", image=image)
 
 
-@app.cls(image=image, gpu="any")
+@app.cls(image=image, gpu="t4")
 class ModalWrapper:
     @build()
     @enter()
@@ -47,8 +47,14 @@ async def run_annotation_parallel(
 
     # as the futures get completed, launch the annotate tasks
     tasks = []
+    failures = []
     for future in asyncio.as_completed(annotation_input_futures):
-        rollout_id, frames, frame_indices, label_str = await future
+        res = await future
+        if isinstance(res, dict):
+            # failure!
+            failures.append(res)
+        else:
+            rollout_id, frames, frame_indices, label_str = res
         print(
             f"received {rollout_id}: {len(frames)} frames, {len(frame_indices)} frame indices, label str: {label_str}"
         )
@@ -70,6 +76,18 @@ async def run_annotation_parallel(
     for coro in asyncio.as_completed(tasks):
         try:
             rollout_id, all_frame_annotation_dicts = await coro
+        except Exception as e:
+            print(f"Error processing task: {e}; {traceback.format_exc()}")
+            failures.append(
+                {
+                    "rollout_id": rollout_id,
+                    "error_pattern": "grounding_failure",
+                    "error": traceback.format_exc(),
+                }
+            )
+            continue
+
+        try:
             rollout = id_to_rollout[rollout_id]
             _, frames, frame_indices, label_str = id_to_annotation_inputs[rollout_id]
             tracker["videos"] += 1
@@ -90,7 +108,14 @@ async def run_annotation_parallel(
             tracker["video_ids"].append(video_id)
         except Exception as e:
             print(f"Error processing task: {e}; {traceback.format_exc()}")
-    return tracker
+            failures.append(
+                {
+                    "rollout_id": rollout_id,
+                    "error_pattern": "",
+                    "traceback": traceback.format_exc(),
+                }
+            )
+    return tracker, failures
 
 
 # test remote modal
@@ -120,17 +145,33 @@ def test() -> None:
         rollout: Rollout,
         vlm: VLM,
         target_fps: int = 5,
-    ) -> tuple[str, list[np.ndarray], list[int], str]:
-        frames, frame_indices = load_video_frames(
-            dataset_name,
-            rollout.path,
-            target_fps,
-        )
-        label_str = await get_grounding_nouns_async(
-            vlm,
-            frames[0],
-            rollout.task.language_instruction,
-        )
+        refusal_phrases: list[str] | None = None,
+    ) -> tuple[str, list[np.ndarray], list[int], str] | dict[str, Rollout | str]:
+        try:
+            frames, frame_indices = load_video_frames(
+                dataset_name,
+                rollout.path,
+                target_fps,
+            )
+        except Exception as e:
+            return {"rollout": rollout, "error_pattern": "loading_failure", "error": e}
+
+        try:
+            label_str = await get_grounding_nouns_async(
+                vlm,
+                frames[0],
+                rollout.task.language_instruction,
+            )
+        except Exception as e:
+            return {
+                "rollout": rollout,
+                "error_pattern": "grounding_request_failure",
+                "error": e,
+            }
+
+        refusal_phrases = refusal_phrases or ["I'm"]
+        if any(phrase in label_str for phrase in refusal_phrases):
+            return {"rollout": rollout, "error_pattern": "refusal", "error": label_str}
         return rollout.id, frames, frame_indices, label_str
 
     async def run_ground_and_annotate(
@@ -139,7 +180,7 @@ def test() -> None:
         vlm: VLM,
         ann_db: AnnotationDatabase,
         target_fps: int = 5,
-    ):
+    ) -> tuple[dict, list[dict]]:
         rollout_ids = [r.id for r in rollouts]
 
         # Create and gather the futures properly
@@ -151,7 +192,7 @@ def test() -> None:
         ]
 
         annotator = ModalWrapper()
-        stats = await run_annotation_parallel(
+        stats, failures = await run_annotation_parallel(
             annotator,
             rollout_ids,
             annotation_input_futures,
@@ -159,7 +200,7 @@ def test() -> None:
             rollouts,
             dataset_file_name,
         )
-        return stats
+        return stats, failures
 
     formal_dataset_name = "CMU Stretch"
     dataset_file_name = "cmu_stretch"
@@ -171,7 +212,7 @@ def test() -> None:
     vlm = get_gpt_4o()
     tic = time.time()
 
-    stats = asyncio.run(
+    stats, failures = asyncio.run(
         run_ground_and_annotate(
             dataset_file_name,
             rollouts,
@@ -183,4 +224,5 @@ def test() -> None:
 
     print("time taken", time.time() - tic)
     print(f"\n\nstats: {stats}\n\n")
+    print(f"\n\nfailures: {failures}\n\n")
     breakpoint()
