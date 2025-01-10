@@ -27,6 +27,7 @@ from ares.app.plot_primitives import (
 from ares.configs.annotations import Annotation
 from ares.databases.annotation_database import AnnotationDatabase
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
+from ares.name_remapper import DATASET_NAMES
 from ares.utils.image_utils import (
     choose_and_preprocess_frames,
     get_video_frames,
@@ -305,10 +306,10 @@ def show_hero_display(
     if st.button("Retrieve Annotation Data"):
         try:
             dataset_name = row["dataset_name"]
-            if dataset_name == "UCSD Kitchen":
-                dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
-            elif dataset_name == "CMU Stretch":
-                dataset_name = "cmu_stretch"
+            if dataset_name in DATASET_NAMES:
+                # HACK FOR NOW
+                dataset_name = DATASET_NAMES[dataset_name]["file_name"]
+
             video_id = f"{dataset_name}/{row['path']}".replace("npy", "mp4")
             db_data = get_video_annotation_data(video_id)
             if db_data is not None:

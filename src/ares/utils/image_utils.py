@@ -12,6 +12,8 @@ import requests
 from moviepy.editor import ImageSequenceClip
 from PIL import Image
 
+from ares.name_remapper import DATASET_NAMES
+
 ARES_DATASET_VIDEO_PATH = "/workspaces/ares/data/videos"
 
 
@@ -26,6 +28,8 @@ def get_video_from_path(
     dataset: str, path: str
 ) -> str | bytes | io.BytesIO | np.ndarray:
     # TODO: implement
+    if dataset in DATASET_NAMES:
+        dataset = DATASET_NAMES[dataset]["file_name"]
     return os.path.join(ARES_DATASET_VIDEO_PATH, dataset, path)
 
 
@@ -75,8 +79,8 @@ def save_video(
         raise ValueError(f"No frames to save for {filename}; received {frames}")
 
     # Save MP4 using moviepy
-    # clip = ImageSequenceClip(frames, fps=30)
-    # clip.write_videofile(mp4_path, codec="libx264", logger=None)
+    clip = ImageSequenceClip(frames, fps=30)
+    clip.write_videofile(mp4_path, codec="libx264", logger=None)
 
     # Save individual frames
     for i, frame in enumerate(frames):
@@ -92,6 +96,10 @@ def get_video_frames(
     dataset: str, filename: str, n_frames: int | None = None, just_path: bool = False
 ) -> list[np.ndarray | str]:
     """Get video as a list of frames from the frames directory."""
+    # HACK FOR NOW
+    if dataset in DATASET_NAMES:
+        dataset = DATASET_NAMES[dataset]["file_name"]
+
     base_filename = filename.removesuffix(".mp4").removesuffix(".npy")
     frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
 
@@ -113,6 +121,10 @@ def get_video_mp4(dataset: str, filename: str) -> str:
     """Get path to the MP4 video file."""
     if not filename.endswith(".mp4"):
         filename += ".mp4"
+    # HACK FOR NOW
+    if dataset in DATASET_NAMES:
+        dataset = DATASET_NAMES[dataset]["file_name"]
+    print("mp4: ", dataset, filename)
     mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, filename)
 
     if not os.path.exists(mp4_path):

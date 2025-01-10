@@ -17,6 +17,6 @@ Do not include any pleasantries or other text in the output, just the period-sep
 Again, do not include any comments like "I'm unable to see the image" or "I'm not sure what's in the image", just return the period-separated list of objects.
 
 
-{% if task_instructions %}Task instructions: {{ task_instructions }}{% endif %}
+{% if task_instructions %}Task instructions: {{ task_instructions }}. Most nouns in the instructions are important objects.{% endif %}
 
 Images:

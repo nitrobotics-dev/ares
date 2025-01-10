@@ -202,13 +202,22 @@ def test() -> None:
         )
         return stats, failures
 
-    formal_dataset_name = "CMU Stretch"
-    dataset_file_name = "cmu_stretch"
+    # formal_dataset_name = "CMU Stretch"
+    # dataset_file_name = "cmu_stretch"
+    # formal_dataset_name, dataset_file_name = (
+    #     "LSMO Dataset",
+    #     "tokyo_u_lsmo_converted_externally_to_rlds",
+    # )
+    formal_dataset_name, dataset_file_name = (
+        "Berkeley Fanuc Manipulation",
+        "berkeley_fanuc_manipulation",
+    )
     target_fps = 5
 
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    rollouts = setup_rollouts(engine, formal_dataset_name)[100:]
+    rollouts = setup_rollouts(engine, formal_dataset_name)
+    print(f"\n\nfound {len(rollouts)} rollouts\n\n")
     vlm = get_gpt_4o()
     tic = time.time()
 
@@ -223,6 +232,11 @@ def test() -> None:
     )
 
     print("time taken", time.time() - tic)
-    print(f"\n\nstats: {stats}\n\n")
+    print(f"\n\n")
+    for k, v in stats.items():
+        print(f"{k}: {v}" if not isinstance(v, list) else f"{k}: {v[:10]}...")
     print(f"\n\nfailures: {failures}\n\n")
+    # write failures to file
+    with open("failures.pkl", "wb") as f:
+        pickle.dump(failures, f)
     breakpoint()
