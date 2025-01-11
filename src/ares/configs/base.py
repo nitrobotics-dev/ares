@@ -68,11 +68,15 @@ class Trajectory(BaseConfig):
     is_last: int | None  # index of last step
     is_terminal: int | None  # index of terminal step
     states: str | None  # JSON string of list[list[float]]
+    rewards: str | None = None  # JSON string of list[float]
+    reward_step: int | None = (
+        None  # if -1; never reach reward. if > 0, the index of the first step to recieve reward of 1. If None, we do not have reward data.
+    )
 
     @model_validator(mode="before")
     def convert_sequences_to_json(cls, data: dict) -> dict:
         # Convert any list fields to JSON strings
-        for field in ["actions", "states"]:
+        for field in ["actions", "states", "rewards"]:
             if isinstance(data.get(field), (list, np.ndarray)):
                 # Convert numpy arrays to lists first if needed
                 value = data[field]
@@ -93,6 +97,13 @@ class Trajectory(BaseConfig):
             return None
         return np.array(json.loads(self.states))
 
+    @property
+    def rewards_array(self) -> np.ndarray | None:
+        """Get rewards as a numpy array instead of JSON string."""
+        if self.rewards is None:
+            return None
+        return np.array(json.loads(self.rewards))
+
 
 class Rollout(BaseConfig):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -101,7 +112,8 @@ class Rollout(BaseConfig):
     path: str
     dataset_name: str
     description: str | None = Field(
-        description="A detailed description of the input video. Include analysis of the task the robot is completing, including success criteria and performance."
+        description="A detailed description of the input video. Include analysis of the task the robot is completing, including success criteria and performance.",
+        default=None,
     )
     length: int
     robot: Robot

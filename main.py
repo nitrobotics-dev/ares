@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     from ares.models.shortcuts import get_nomic_embedder
 
-    EMBEDDER = get_nomic_embedder()
+    # EMBEDDER = get_nomic_embedder()
 
     index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     for dataset_name in [
         # "ucsd_kitchen_dataset_converted_externally_to_rlds",
         # dataset_name = "cmu_play_fusion"
-        "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+        # "cmu_franka_exploration_dataset_converted_externally_to_rlds",
         # # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
         # "asu_table_top_converted_externally_to_rlds",
         # "berkeley_fanuc_manipulation",
@@ -77,7 +77,7 @@ if __name__ == "__main__":
         # ones that failed
         # "jaco_play",
         # "nyu_rot_dataset_converted_externally_to_rlds",
-        # "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
+        "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
         # "dlr_edan_shared_control_converted_externally_to_rlds"
         # "imperialcollege_sawyer_wrist_cam"
         # "tokyo_u_lsmo_converted_externally_to_rlds"
@@ -109,10 +109,11 @@ if __name__ == "__main__":
         tic = time.time()
         for i, ep in tqdm(enumerate(ds)):
             try:
-                steps = list(ep["steps"])
+                raw_steps = list(ep["steps"])
                 if i == 0:
-                    print(steps[0]["observation"].keys())
+                    print(raw_steps[0]["observation"].keys())
                 episode = OpenXEmbodimentEpisode(**ep)
+                steps = episode.steps
 
                 if episode.episode_metadata is None:
                     # construct our own metadata
@@ -123,54 +124,58 @@ if __name__ == "__main__":
                 rollout = random_extractor.extract(
                     episode=episode, dataset_info=dataset_info
                 )
+                # print(episode.episode_metadata)
+                # rewards = [step.reward for step in steps]
+                # print(rewards)
                 breakpoint()
+                print(rollout.trajectory.rewards_array, rollout.trajectory.reward_step)
 
-                video = [step.observation.image for step in episode.steps]
-                fname = os.path.splitext(episode.episode_metadata.file_path)[0]
-                # check if the file exists
-                if os.path.exists(
-                    os.path.join(
-                        ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
-                    )
-                ):
-                    continue
-                out = save_video(video, dataset_name, fname)
+                # video = [step.observation.image for step in episode.steps]
+                # fname = os.path.splitext(episode.episode_metadata.file_path)[0]
+                # # check if the file exists
+                # if os.path.exists(
+                #     os.path.join(
+                #         ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
+                #     )
+                # ):
+                #     continue
+                # out = save_video(video, dataset_name, fname)
 
-                rollouts.append(rollout)
-                # just track this
-                start_time = time.time()
-                add_rollout(engine, rollout, RolloutSQLModel)
-                all_times.append(time.time() - start_time)
+                # rollouts.append(rollout)
+                # # just track this
+                # start_time = time.time()
+                # add_rollout(engine, rollout, RolloutSQLModel)
+                # all_times.append(time.time() - start_time)
 
-                # add the non-robot specific embeddings
-                for name in ["task", "description"]:
-                    inp = (
-                        rollout.task.language_instruction
-                        if name == "description"
-                        else rollout.task.success_criteria
-                    )
-                    if inp is None:
-                        continue
-                    embedding = EMBEDDER.embed(inp)
-                    index_manager.add_vector(name, embedding, str(rollout.id))
+                # # add the non-robot specific embeddings
+                # for name in ["task", "description"]:
+                #     inp = (
+                #         rollout.task.language_instruction
+                #         if name == "description"
+                #         else rollout.task.success_criteria
+                #     )
+                #     if inp is None:
+                #         continue
+                #     embedding = EMBEDDER.embed(inp)
+                #     index_manager.add_vector(name, embedding, str(rollout.id))
 
-                embedding_pack = rollout_to_embedding_pack(rollout)
+                # embedding_pack = rollout_to_embedding_pack(rollout)
 
-                for index_name, matrix in embedding_pack.items():
-                    if index_name not in index_manager.indices.keys():
-                        index_manager.init_index(
-                            index_name,
-                            matrix.shape[1],
-                            TEST_TIME_STEPS,
-                            norm_means=None,
-                            norm_stds=None,
-                        )
-                    if not (
-                        matrix is None
-                        or (isinstance(matrix, list) and all(x is None for x in matrix))
-                        or len(matrix.shape) != 2
-                    ):
-                        index_manager.add_matrix(index_name, matrix, str(rollout.id))
+                # for index_name, matrix in embedding_pack.items():
+                #     if index_name not in index_manager.indices.keys():
+                #         index_manager.init_index(
+                #             index_name,
+                #             matrix.shape[1],
+                #             TEST_TIME_STEPS,
+                #             norm_means=None,
+                #             norm_stds=None,
+                #         )
+                #     if not (
+                #         matrix is None
+                #         or (isinstance(matrix, list) and all(x is None for x in matrix))
+                #         or len(matrix.shape) != 2
+                #     ):
+                #         index_manager.add_matrix(index_name, matrix, str(rollout.id))
 
             except Exception as e:
                 print(f"Error processing episode {i}: {e}")

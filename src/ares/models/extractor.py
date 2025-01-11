@@ -84,14 +84,25 @@ def hard_coded_dataset_info_extraction_tfds(dataset_info: DatasetInfo) -> dict:
 
 
 def hard_coded_episode_info_extraction(episode: OpenXEmbodimentEpisode) -> dict:
+    # gather data
     steps = episode.steps
-    actions = np.stack([step.action for step in steps]).tolist()
     firsts = [step.is_first for step in steps]
     lasts = [step.is_last for step in steps]
     terminals = [step.is_terminal for step in steps]
+    rewards = [step.reward for step in steps]
+    # get indices instead of steps for first, last, terminal
     is_first = np.where(firsts)[0][0] if np.any(firsts) else None
     is_last = np.where(lasts)[0][-1] if np.any(lasts) else None
     is_terminal = np.where(terminals)[0][-1] if np.any(terminals) else None
+    success = episode.episode_metadata.success
+    reward_step = None
+    if any([x is not None for x in rewards]):
+        if np.any(np.array(rewards) == 1):
+            reward_step = np.where(np.array(rewards) == 1)[0][0]
+        else:
+            reward_step = -1
+    # gather trajectory data
+    actions = np.stack([step.action for step in steps]).tolist()
     states = np.stack([step.observation.state for step in steps]).tolist()
     return {
         "rollout": {
@@ -104,8 +115,13 @@ def hard_coded_episode_info_extraction(episode: OpenXEmbodimentEpisode) -> dict:
             "is_last": is_last,
             "is_terminal": is_terminal,
             "states": states,
+            "rewards": rewards,
+            "reward_step": reward_step,
         },
-        "task": {"language_instruction": steps[0].language_instruction},
+        "task": {
+            "language_instruction": steps[0].language_instruction,
+            "success": success,
+        },
     }
 
 

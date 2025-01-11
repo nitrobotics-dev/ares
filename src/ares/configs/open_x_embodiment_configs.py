@@ -40,6 +40,7 @@ class TensorConverterMixin(BaseModel):
 
 class OpenXEmbodimentEpisodeMetadata(TensorConverterMixin, BaseModel):
     file_path: str
+    success: bool | None = None
 
 
 class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
