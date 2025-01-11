@@ -167,6 +167,60 @@ def setup_rollouts(
     return rollouts
 
 
+def add_column_with_vals_and_defaults(
+    engine: Engine,
+    new_column_name: str,
+    python_type: type,
+    default_value: any = None,
+    key_mapping_col_names: list[str] = None,
+    specific_key_mapping_values: dict[tuple, any] = None,
+) -> None:
+    """
+    Add a new column to the rollout table with optional default and specific values.
+
+    Args:
+        engine: SQLAlchemy engine
+        new_column_name: Name of the new column
+        python_type: Python type for the column
+        default_value: Default value for all rows (optional)
+        key_mapping_col_names: List of column names to use for key mapping (optional)
+        specific_key_mapping_values: Dict mapping e.g. (dataset_name, path) tuples to values (optional)
+    """
+    with engine.begin() as conn:
+        # Add the new column
+        sql_type = get_sql_type(python_type)
+        conn.execute(
+            text(f"ALTER TABLE rollout ADD COLUMN {new_column_name} {sql_type}")
+        )
+
+        # Set default value if provided
+        if default_value is not None:
+            conn.execute(
+                text(f"UPDATE rollout SET {new_column_name} = :value"),
+                {"value": default_value},
+            )
+
+        # Set specific values based on key_mapping_col_names
+        if specific_key_mapping_values and key_mapping_col_names:
+            for key_tuple, value in specific_key_mapping_values.items():
+                # Build WHERE clause dynamically based on key_mapping_col_names
+                where_conditions = " AND ".join(
+                    f"{col_name} = :{col_name}" for col_name in key_mapping_col_names
+                )
+
+                # Create params dict by zipping column names with key tuple values
+                params = dict(zip(key_mapping_col_names, key_tuple))
+                params["value"] = value
+
+                conn.execute(
+                    text(
+                        f"UPDATE rollout SET {new_column_name} = :value "
+                        f"WHERE {where_conditions}"
+                    ),
+                    params,
+                )
+
+
 if __name__ == "__main__":
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     df = db_to_df(engine)
