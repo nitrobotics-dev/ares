@@ -18,9 +18,16 @@ image = (
 )
 
 app = App("ares-grounding-modal", image=image)
+MODAL_CONCURRENCY_LIMIT = 10
+MODAL_TIMEOUT = 600
 
 
-@app.cls(image=image, gpu="t4")
+@app.cls(
+    image=image,
+    gpu="t4",
+    concurrency_limit=MODAL_CONCURRENCY_LIMIT,
+    timeout=MODAL_TIMEOUT,
+)
 class ModalWrapper:
     @build()
     @enter()
@@ -78,7 +85,7 @@ async def run_annotation_parallel(
         try:
             rollout_id, all_frame_annotation_dicts = await coro
         except Exception as e:
-            print(f"Error processing task: {e}; {traceback.format_exc()}")
+            print(f"Error processing task: {e}")
             failures.append(
                 {
                     "rollout_id": rollout_id,
@@ -249,7 +256,7 @@ def test() -> None:
 
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    rollouts = setup_rollouts(engine, formal_dataset_name)
+    rollouts = setup_rollouts(engine, formal_dataset_name)[700:900]
 
     if retry_failed:
         with open(retry_failed, "rb") as f:

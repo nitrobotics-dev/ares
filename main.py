@@ -69,7 +69,7 @@ if __name__ == "__main__":
     for dataset_name in [
         # "ucsd_kitchen_dataset_converted_externally_to_rlds",
         # dataset_name = "cmu_play_fusion"
-        # "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+        "cmu_franka_exploration_dataset_converted_externally_to_rlds",
         # # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
         # "asu_table_top_converted_externally_to_rlds",
         # "berkeley_fanuc_manipulation",
@@ -123,6 +123,7 @@ if __name__ == "__main__":
                 rollout = random_extractor.extract(
                     episode=episode, dataset_info=dataset_info
                 )
+                breakpoint()
 
                 video = [step.observation.image for step in episode.steps]
                 fname = os.path.splitext(episode.episode_metadata.file_path)[0]
