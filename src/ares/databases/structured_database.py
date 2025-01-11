@@ -177,21 +177,19 @@ def add_column_with_vals_and_defaults(
 ) -> None:
     """
     Add a new column to the rollout table with optional default and specific values.
-
-    Args:
-        engine: SQLAlchemy engine
-        new_column_name: Name of the new column
-        python_type: Python type for the column
-        default_value: Default value for all rows (optional)
-        key_mapping_col_names: List of column names to use for key mapping (optional)
-        specific_key_mapping_values: Dict mapping e.g. (dataset_name, path) tuples to values (optional)
+    If column already exists, just updates the values.
     """
     with engine.begin() as conn:
-        # Add the new column
-        sql_type = get_sql_type(python_type)
-        conn.execute(
-            text(f"ALTER TABLE rollout ADD COLUMN {new_column_name} {sql_type}")
-        )
+        # Check if column exists
+        inspector = inspect(engine)
+        existing_columns = {col["name"] for col in inspector.get_columns("rollout")}
+
+        # Only add column if it doesn't exist
+        if new_column_name not in existing_columns:
+            sql_type = get_sql_type(python_type)
+            conn.execute(
+                text(f"ALTER TABLE rollout ADD COLUMN {new_column_name} {sql_type}")
+            )
 
         # Set default value if provided
         if default_value is not None:

@@ -27,10 +27,12 @@ from ares.databases.structured_database import (
     SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
     RolloutSQLModel,
+    add_column_with_vals_and_defaults,
     add_rollout,
     setup_database,
 )
 from ares.models.extractor import RandomInformationExtractor
+from ares.models.shortcuts import get_nomic_embedder
 from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
 
 
@@ -43,22 +45,10 @@ def build_dataset(
     return builder, dataset_dict
 
 
-def get_df_from_db(
-    engine: Engine, RolloutSQLModel: SQLModel, columns: list[str]
-) -> pd.DataFrame:
-    df = pd.read_sql(
-        select(*[getattr(RolloutSQLModel, col) for col in columns]),
-        engine,
-    )
-    return df
-
-
 TEST_TIME_STEPS = 100
 
 
 if __name__ == "__main__":
-
-    from ares.models.shortcuts import get_nomic_embedder
 
     # EMBEDDER = get_nomic_embedder()
 
@@ -67,27 +57,26 @@ if __name__ == "__main__":
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
     for dataset_name in [
-        # "ucsd_kitchen_dataset_converted_externally_to_rlds",
-        # dataset_name = "cmu_play_fusion"
-        # "cmu_franka_exploration_dataset_converted_externally_to_rlds",
-        # # dataset_name = "utokyo_saytap_converted_externally_to_rlds" --> dont actually want i dont think
+        "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        "cmu_franka_exploration_dataset_converted_externally_to_rlds",
         # "asu_table_top_converted_externally_to_rlds",
-        # "berkeley_fanuc_manipulation",
-        # "cmu_stretch",
-        # ones that failed
-        # "jaco_play",
-        # "nyu_rot_dataset_converted_externally_to_rlds",
-        "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
-        # "dlr_edan_shared_control_converted_externally_to_rlds"
-        # "imperialcollege_sawyer_wrist_cam"
-        # "tokyo_u_lsmo_converted_externally_to_rlds"
+        "berkeley_fanuc_manipulation",
+        "cmu_stretch",
+        "jaco_play",
+        "nyu_rot_dataset_converted_externally_to_rlds",
+        # "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
+        "dlr_edan_shared_control_converted_externally_to_rlds"
+        "imperialcollege_sawyer_wrist_cam"
+        "tokyo_u_lsmo_converted_externally_to_rlds",
         # ---> below not found by new oxe-downloader script
         # dataset_name = "conq_hose_manipulation"
         # dataset_name = "tidybot"
         # dataset_name = "plex_robosuite"
+        # dont actually want
+        # dataset_name = "utokyo_saytap_converted_externally_to_rlds"
     ]:
         # going to try oxe-downloader?
-        # oxe-download --dataset "name"
+        # oxe-download --dataset "name" !!!
 
         data_dir = "/workspaces/ares/data/oxe/"
         builder, dataset_dict = build_dataset(dataset_name, data_dir)
@@ -107,6 +96,12 @@ if __name__ == "__main__":
         rollouts: list[Rollout] = []
         all_times = []
         tic = time.time()
+
+        # STUFF TO ADD ON THIS GOING FORWARD
+        # 1. add FORMAL/INFORMAL to the rollout table
+        # 2. strip path name to stem
+        # 3. get success, rewards, reward_step
+
         for i, ep in tqdm(enumerate(ds)):
             try:
                 raw_steps = list(ep["steps"])
@@ -124,11 +119,10 @@ if __name__ == "__main__":
                 rollout = random_extractor.extract(
                     episode=episode, dataset_info=dataset_info
                 )
+                rollouts.append(rollout)
                 # print(episode.episode_metadata)
                 # rewards = [step.reward for step in steps]
                 # print(rewards)
-                breakpoint()
-                print(rollout.trajectory.rewards_array, rollout.trajectory.reward_step)
 
                 # video = [step.observation.image for step in episode.steps]
                 # fname = os.path.splitext(episode.episode_metadata.file_path)[0]
@@ -186,8 +180,43 @@ if __name__ == "__main__":
         print(f"Total time: {time.time() - tic}")
         print(f"Mean time: {np.mean(all_times)}")
 
-        print(index_manager.metadata)
-        index_manager.save()
+        # breakpoint()
+        id_keys = ["dataset_name", "path"]
+        new_col_key_stem = ["success", "rewards", "reward_step"]
+        new_cols_flat_names = [
+            "task_success",
+            "trajectory_rewards",
+            "trajectory_reward_step",
+        ]
+        new_cols_flat_types = [bool, str, int]
+        default_vals = [None, None, None]
+
+        engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+        for i in range(len(new_cols_flat_names)):
+
+            input_mapping = dict()
+            for rollout in rollouts:
+                input_mapping[tuple(getattr(rollout, k) for k in id_keys)] = getattr(
+                    (
+                        rollout.trajectory
+                        if "trajectory" in new_cols_flat_names[i]
+                        else rollout.task
+                    ),
+                    new_col_key_stem[i],
+                )
+
+            add_column_with_vals_and_defaults(
+                engine=engine,
+                new_column_name=new_cols_flat_names[i],
+                python_type=new_cols_flat_types[i],
+                default_value=default_vals[i],
+                key_mapping_col_names=id_keys,
+                specific_key_mapping_values=input_mapping,
+            )
+            print(f"added {new_cols_flat_names[i]}")
+
+        # print(index_manager.metadata)
+        # index_manager.save()
 
         # sess = Session(engine)
         # # get a df.head() basically
