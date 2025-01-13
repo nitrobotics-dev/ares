@@ -140,6 +140,9 @@ def initialize_data(tmp_dump_dir: str) -> None:
     st.session_state.annotations_db = AnnotationDatabase(
         connection_string=TEST_ANNOTATION_DB_PATH
     )
+    st.session_state.annotation_db_stats = (
+        st.session_state.annotations_db.get_database_stats()
+    )
 
 
 def display_state_info() -> None:
@@ -158,26 +161,41 @@ def display_state_info() -> None:
             "- SESSION:",
             "Connected" if "SESSION" in st.session_state else "Not Connected",
         )
-
+        st.write(
+            "- ANNOTATIONS DB",
+            "Connected" if "annotations_db" in st.session_state else "Not Connected",
+        )
         # Index Manager Info
         st.subheader("Index Manager")
         if "INDEX_MANAGER" in st.session_state:
             index_manager = st.session_state.INDEX_MANAGER
-            st.write("Available indices:", list(index_manager.indices.keys()))
-            for name, index in index_manager.indices.items():
-                st.write(f"\n**{name} Index:**")
-                st.write(f"- Feature dimension: {index.feature_dim}")
-                st.write(f"- Time steps: {index.time_steps}")
-                st.write(f"- Total entries: {index.n_entries}")
+            st.write("Available ind " + ", ".join(list(index_manager.indices.keys())))
+            with st.popover("Index Details"):
+                for name, index in index_manager.indices.items():
+                    st.write(f"\n**{name} Index:**")
+                    st.write(f"- Feature dimension: {index.feature_dim}")
+                    st.write(f"- Time steps: {index.time_steps}")
+                    st.write(f"- Total entries: {index.n_entries}")
 
         # Vectors and IDs
         st.subheader("Stored Vectors and IDs")
         if "all_vecs" in st.session_state:
-            for name, vecs in st.session_state.all_vecs.items():
-                if vecs is not None:
-                    st.write(f"\n**{name}:**")
-                    st.write(f"- Vector shape: {vecs.shape}")
-                    st.write(f"- Number of IDs: {len(st.session_state.all_ids[name])}")
+            with st.popover("Vector Details"):
+                for name, vecs in st.session_state.all_vecs.items():
+                    if vecs is not None:
+                        st.write(f"\n**{name}:**")
+                        st.write(f"- Vector shape: {vecs.shape}")
+                        st.write(
+                            f"- Number of IDs: {len(st.session_state.all_ids[name])}"
+                        )
+
+        st.subheader("Annotations DB")
+        if "annotations_db" in st.session_state:
+            if "annotation_db_stats" not in st.session_state:
+                st.session_state.annotation_db_stats = (
+                    st.session_state.annotations_db.get_database_stats()
+                )
+            st.json(st.session_state.annotation_db_stats)
 
         # Embeddings Info
         st.subheader("Embedding Data")

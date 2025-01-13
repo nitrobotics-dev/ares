@@ -127,6 +127,7 @@ class AnnotationDatabase:
             - Total number of unique annotated frames (across all videos)
             - Total number of annotations
             - Annotations per type
+            - Stats per dataset (videos, frames, annotations)
         """
         tic = time.time()
         pipeline = [
@@ -147,6 +148,7 @@ class AnnotationDatabase:
             "total_annotated_frames": total_frames,
             "total_annotations": self.annotations.count_documents({}),
             "annotations_by_type": {},
+            "per_dataset": {},
         }
 
         # Get counts per annotation type
@@ -154,8 +156,40 @@ class AnnotationDatabase:
         for type_stat in self.annotations.aggregate(pipeline):
             stats["annotations_by_type"][type_stat["_id"]] = type_stat["count"]
 
+        # Add per-dataset statistics
+        pipeline = [
+            {
+                "$lookup": {
+                    "from": "videos",
+                    "localField": "video_id",
+                    "foreignField": "_id",
+                    "as": "video_info",
+                }
+            },
+            {"$unwind": "$video_info"},
+            {
+                "$group": {
+                    "_id": "$video_info.metadata.dataset_name",
+                    "total_annotations": {"$sum": 1},
+                    "unique_videos": {"$addToSet": "$video_id"},
+                    "unique_frames": {
+                        "$addToSet": {"video": "$video_id", "frame": "$frame"}
+                    },
+                }
+            },
+        ]
+
+        for dataset_stat in self.annotations.aggregate(pipeline):
+            dataset_name = dataset_stat["_id"]
+            if dataset_name:  # Skip if dataset_name is None
+                stats["per_dataset"][dataset_name] = {
+                    "total_videos": len(dataset_stat["unique_videos"]),
+                    "total_frames": len(dataset_stat["unique_frames"]),
+                    "total_annotations": dataset_stat["total_annotations"],
+                }
+
         toc = time.time()
-        print(f"Time to get annotationdatabase stats: {toc - tic:.2f} seconds")
+        print(f"Time to get annotation database stats: {toc - tic:.2f} seconds")
         return stats
 
     def delete_annotations(

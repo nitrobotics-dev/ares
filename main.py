@@ -57,7 +57,7 @@ if __name__ == "__main__":
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
     for dataset_name in [
-        "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        # "ucsd_kitchen_dataset_converted_externally_to_rlds",
         "cmu_franka_exploration_dataset_converted_externally_to_rlds",
         # "asu_table_top_converted_externally_to_rlds",
         "berkeley_fanuc_manipulation",

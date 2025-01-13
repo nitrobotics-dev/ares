@@ -539,7 +539,9 @@ def total_statistics(df: pd.DataFrame) -> None:
 
 
 def annotation_statistics(ann_db: AnnotationDatabase) -> None:
-    stats = ann_db.get_database_stats()
+    if "annotation_db_stats" not in st.session_state:
+        st.session_state.annotation_db_stats = ann_db.get_database_stats()
+    stats = st.session_state.annotation_db_stats
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.subheader(f"Total videos:")
