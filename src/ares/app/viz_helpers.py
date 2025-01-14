@@ -297,6 +297,15 @@ def show_hero_display(
     with col2:
         if row.task_language_instruction:
             st.write(f"**Task:** {row.task_language_instruction}")
+        if not np.isnan(row.task_success) and row.task_success:
+            st.write(f"**Success:** {row.task_success:.2f}")
+        if isinstance(row.trajectory_reward_step, str):
+            if int(row.trajectory_reward_step) >= 0:
+                st.write(
+                    f"**Reward Step:** {row.trajectory_reward_step} ({100*int(row.trajectory_reward_step) / int(row.length):.2f}% through rollout)"
+                )
+            else:
+                st.write(f"Failure episode!")
         with st.expander("Row Details", expanded=False):
             st.json(row.to_dict())
 

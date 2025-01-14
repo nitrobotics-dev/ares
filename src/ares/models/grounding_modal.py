@@ -48,7 +48,7 @@ async def run_annotation_parallel(
     db: "AnnotationDatabase",
     rollouts: list["Rollout"],
     dataset_file_name: str,
-) -> dict[str, int]:
+) -> tuple[dict[str, int], list[dict]]:
     id_to_rollout = {r.id: r for r in rollouts}
     id_to_annotation_inputs = dict()
 

@@ -142,6 +142,9 @@ def main() -> None:
         general_visualizations = generate_automatic_visualizations(
             filtered_df, time_column="ingestion_time"
         )
+        general_visualizations = sorted(
+            general_visualizations, key=lambda x: x["title"]
+        )
         create_tabbed_visualizations(
             general_visualizations, [viz["title"] for viz in general_visualizations]
         )
@@ -178,9 +181,8 @@ def main() -> None:
     section_plot_hero = "plot hero display"
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
         st.header("Rollout Display")
-        if st.button("button"):
-            breakpoint()
         # initialize or persist selected row in state
+        # NOTE: SELECT ROW FROM FILTERED DF!
         select_row_from_df_user(filtered_df)
         selected_row = st.session_state.get("selected_row")
 
@@ -188,7 +190,7 @@ def main() -> None:
             show_dataframe(pd.DataFrame([selected_row]), title="Selected Row")
             st.write(f"Selected row ID: {selected_row.id}")
             hero_visualizations = show_hero_display(
-                filtered_df,
+                df,  # NOTE: compare SELECTED ROW to ENTIRE DF!
                 selected_row,
                 st.session_state.all_vecs,
                 index_manager=st.session_state.INDEX_MANAGER,

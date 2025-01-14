@@ -12,9 +12,15 @@ from ares.utils.clustering import visualize_clusters
 
 
 def create_structured_data_filters(
-    df: pd.DataFrame, max_options: int = 25, n_cols: int = 3, debug: bool = False
+    df: pd.DataFrame,
+    max_options: int = 25,
+    n_cols: int = 3,
+    ignore_cols: list[str] | None = None,
+    debug: bool = False,
 ) -> tuple[pd.DataFrame, list]:
     """Create filter controls for dataframe columns based on their types."""
+
+    ignore_cols = ignore_cols or ["dataset_filename", "dataset_formalname"]
     filtered_df = df.copy()
     skipped_cols = []
 
@@ -26,12 +32,6 @@ def create_structured_data_filters(
             "Initial active filters:", st.session_state.get("active_filter_values", {})
         )
 
-    # Add debug print to see actual values in the DataFrame
-    if debug:
-        print("\nActual unique values in key columns:")
-        for col in ["robot_embodiment", "robot_rgb_cams"]:
-            print(f"{col} unique values:", filtered_df[col].unique())
-
     # Initialize temporary filter values if not exists
     if "temp_filter_values" not in st.session_state:
         st.session_state.temp_filter_values = {}
@@ -42,16 +42,22 @@ def create_structured_data_filters(
 
     for idx, col in enumerate(df.columns):
         viz_info = infer_visualization_type(col, df)
-        if viz_info["viz_type"] is None:
+        if viz_info["viz_type"] is None or col.lower() in ignore_cols:
             skipped_cols.append(col)
             continue
         with filter_cols[idx % n_cols]:
             if (
                 pd.api.types.is_numeric_dtype(df[col])
-                and viz_info["nunique"] > max_options
-            ):
-                min_val = float(df[col].dropna().min())
-                max_val = float(df[col].dropna().max())
+                or (
+                    str(df[col].dtype) == "object"
+                    and len(df[col].dropna()) > 0
+                    and pd.to_numeric(df[col].dropna(), errors="coerce").notna().all()
+                )
+            ) and viz_info["nunique"] > max_options:
+                # Convert to numeric if object type
+                numeric_col = pd.to_numeric(df[col], errors="coerce")
+                min_val = float(numeric_col.dropna().min())
+                max_val = float(numeric_col.dropna().max())
 
                 # Add checkbox for including None values
                 checkbox_key = f"{col}_include_none"
@@ -113,9 +119,11 @@ def create_structured_data_filters(
 
                 if active_values:
                     old_shape = filtered_df.shape[0]
+                    # Convert column to numeric before comparison
+                    numeric_col = pd.to_numeric(filtered_df[col], errors="coerce")
                     mask = (
-                        (filtered_df[col] >= active_values[0])
-                        & (filtered_df[col] <= active_values[1])
+                        (numeric_col >= active_values[0])
+                        & (numeric_col <= active_values[1])
                     ) | (filtered_df[col].isna() if active_include_none else False)
                     filtered_df = filtered_df[mask]
                     if debug:
@@ -124,13 +132,6 @@ def create_structured_data_filters(
                         )
 
             elif viz_info["viz_type"] == "bar":
-                # Add debug print before filtering
-                if col in ["robot_rgb_cams"]:
-                    if debug:
-                        print(f"\nDEBUG {col} before filtering:")
-                        print(f"Unique values in df: {filtered_df[col].unique()}")
-                        print(f"Type of values in df: {filtered_df[col].dtype}")
-
                 # Convert None to "(None)" for display, but keep other values as is
                 options = [
                     str(x) if x is not None else "(None)" for x in df[col].unique()
@@ -209,10 +210,12 @@ def create_structured_data_filters(
                         print(
                             f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
                         )
+            else:
+                skipped_cols.append(col)
 
     if debug:
         print("\nFinal df shape:", filtered_df.shape)
-    # check if len(filtered_df) == 0
+    # check if len(filtered_df) == 0! something wrong
     if len(filtered_df) == 0:
         breakpoint()
     return filtered_df, skipped_cols

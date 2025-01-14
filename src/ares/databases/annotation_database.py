@@ -143,7 +143,7 @@ class AnnotationDatabase:
         total_frames_result = list(self.annotations.aggregate(pipeline))
         total_frames = total_frames_result[0]["total"] if total_frames_result else 0
 
-        stats = {
+        stats: dict[str, Any] = {
             "total_videos": self.videos.count_documents({}),
             "total_annotated_frames": total_frames,
             "total_annotations": self.annotations.count_documents({}),
