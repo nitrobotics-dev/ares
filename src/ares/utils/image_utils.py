@@ -98,7 +98,7 @@ def get_video_frames(
 ) -> list[np.ndarray | str]:
     """Get video as a list of frames from the frames directory."""
 
-    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, base_filename)
+    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, filename)
 
     if not os.path.exists(frames_dir):
         raise FileNotFoundError(f"Frames directory not found: {frames_dir}")

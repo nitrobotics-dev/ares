@@ -56,28 +56,6 @@ if __name__ == "__main__":
 
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
-    names = [
-        ("ucsd_kitchen_dataset_converted_externally_to_rlds", "UCSD Kitchen"),
-        (
-            "cmu_franka_exploration_dataset_converted_externally_to_rlds",
-            "CMU Franka Exploration",
-        ),
-        ("berkeley_fanuc_manipulation", "Berkeley Fanuc Manipulation"),
-        ("cmu_stretch", "CMU Stretch"),
-        ("jaco_play", "Jaco Play"),
-        ("nyu_rot_dataset_converted_externally_to_rlds", "NYU ROT"),
-        (
-            "dlr_edan_shared_control_converted_externally_to_rlds",
-            "DLR EDAN Shared Control",
-        ),
-        ("imperialcollege_sawyer_wrist_cam", "Imperial College Sawyer Wrist Cam"),
-        ("tokyo_u_lsmo_converted_externally_to_rlds", "Tokyo U LSMO"),
-        (
-            "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
-            "UCSD Pick and Place",
-        ),
-        ("asu_table_top_converted_externally_to_rlds", "ASU Table Top"),
-    ]
     for dataset_filename, dataset_formalname in []:
         # going to try oxe-downloader?
         # oxe-download --dataset "name" !!!
@@ -135,7 +113,7 @@ if __name__ == "__main__":
                     )
                 ):
                     continue
-                out = save_video(video, dataset_name, rollout.filename)
+                out = save_video(video, rollout.dataset_filename, rollout.filename)
 
                 # rollouts.append(rollout)
                 # # just track this

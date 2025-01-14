@@ -218,39 +218,8 @@ def test() -> None:
         )
         return stats, failures
 
-    # dataset_formalname = "CMU Stretch"
-    # dataset_filename = "cmu_stretch"
-    # dataset_formalname, dataset_filename = (
-    #     "LSMO Dataset",
-    #     "tokyo_u_lsmo_converted_externally_to_rlds",
-    # )
-    # dataset_formalname, dataset_filename = (
-    #     "Berkeley Fanuc Manipulation",
-    #     "berkeley_fanuc_manipulation",
-    # )
-    # dataset_formalname, dataset_filename = (
-    #     "CMU Franka Exploration",
-    #     "cmu_franka_exploration_dataset_converted_externally_to_rlds",
-    # )
-    # dataset_formalname, dataset_filename = (
-    #     "CMU Play Fusion",
-    #     "cmu_play_fusion",
-    # )
-    # dataset_formalname, dataset_filename = (
-    #     "NYU ROT",
-    #     "nyu_rot",
-    # )
-    # dataset_formalname, dataset_filename = (
-    #     "UCSD Pick Place",
-    #     "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
-    # )
-    dataset_formalname, dataset_filename = (
-        "USC Jaco Play",
-        "usc_jaco_play",
-    )
-
+    dataset_filename = ""
     target_fps = 5
-
     retry_failed = None  # path to pickle file with failures
     # retry_failed = "failures.pkl"
 
