@@ -113,6 +113,8 @@ class Rollout(BaseConfig):
     path: str
     filename: str
     dataset_name: str
+    dataset_filename: str
+    dataset_formalname: str
     description: str | None = Field(
         description="A detailed description of the input video. Include analysis of the task the robot is completing, including success criteria and performance.",
         default=None,

@@ -116,11 +116,11 @@ def get_rollouts_as_df(engine: Engine) -> pd.DataFrame:
 
 
 def get_rollout_by_name(
-    engine: Engine, formal_dataset_name: str, path: str
+    engine: Engine, dataset_formalname: str, path: str
 ) -> t.Optional[Rollout]:
     with Session(engine) as session:
         query = select(RolloutSQLModel).where(
-            RolloutSQLModel.dataset_name == formal_dataset_name,
+            RolloutSQLModel.dataset_formalname == dataset_formalname,
             RolloutSQLModel.path == path,
         )
         row = session.exec(query).first()
@@ -129,10 +129,10 @@ def get_rollout_by_name(
         return recreate_model(row[0], Rollout)
 
 
-def get_dataset_rollouts(engine: Engine, formal_dataset_name: str) -> list[Rollout]:
+def get_dataset_rollouts(engine: Engine, dataset_formalname: str) -> list[Rollout]:
     with Session(engine) as session:
         query = select(RolloutSQLModel).where(
-            RolloutSQLModel.dataset_name == formal_dataset_name,
+            RolloutSQLModel.dataset_formalname == dataset_formalname,
         )
         rows = session.exec(query).all()
         rollouts = []
@@ -159,15 +159,15 @@ def db_to_df(engine: Engine) -> pd.DataFrame:
 
 def setup_rollouts(
     engine: Engine,
-    format_dataset_name: str,
+    dataset_formalname: str,
     filenames: list[str] | None = None,
 ) -> list[Rollout]:
     # either get filenames from db or filenames for specific ones
     if filenames is None:
-        rollouts = get_dataset_rollouts(engine, format_dataset_name)
+        rollouts = get_dataset_rollouts(engine, dataset_formalname)
     else:
         rollout_attempts = [
-            get_rollout_by_name(engine, format_dataset_name, fname)
+            get_rollout_by_name(engine, dataset_formalname, fname)
             for fname in filenames
         ]
         rollouts = [r for r in rollout_attempts if r is not None]

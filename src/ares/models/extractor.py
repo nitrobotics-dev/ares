@@ -49,6 +49,8 @@ def hard_coded_dataset_info_extraction_spreadsheet(dataset_info: dict) -> dict:
     return {
         "rollout": {
             "dataset_name": dataset_info["Dataset"],
+            "dataset_formalname": dataset_info["Registered Dataset Name"],
+            "dataset_filename": dataset_info["Dataset Filename"],
             "creation_time": year,
             "ingestion_time": datetime.now(),
         },

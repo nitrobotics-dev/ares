@@ -4,6 +4,7 @@ import os
 import random
 import tempfile
 import typing as t
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -11,8 +12,6 @@ import pandas as pd
 import requests
 from moviepy.editor import ImageSequenceClip
 from PIL import Image
-
-from ares.name_remapper import DATASET_NAMES
 
 ARES_DATASET_VIDEO_PATH = "/workspaces/ares/data/videos"
 
@@ -28,8 +27,6 @@ def get_video_from_path(
     dataset: str, path: str
 ) -> str | bytes | io.BytesIO | np.ndarray:
     # TODO: implement
-    if dataset in DATASET_NAMES:
-        dataset = DATASET_NAMES[dataset]["file_name"]
     return os.path.join(ARES_DATASET_VIDEO_PATH, dataset, path)
 
 
@@ -51,9 +48,10 @@ def save_video(
         tuple[str, str]: (mp4_path, frames_dir)
     """
     # Remove .mp4 extension if present and create paths
-    base_filename = filename.replace(".mp4", "")
-    mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, f"{base_filename}.mp4")
-    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
+    if "mp4" in filename:
+        raise ValueError("Base filename should not contain .mp4; received: ", filename)
+    mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, f"{filename}.mp4")
+    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, filename)
 
     # Create frames directory if it doesn't exist
     os.makedirs(frames_dir, exist_ok=True)
@@ -93,21 +91,14 @@ def save_video(
 
 
 def get_video_frames(
-    dataset: str, filename: str, n_frames: int | None = None, just_path: bool = False
+    dataset_filename: str,
+    filename: str,
+    n_frames: int | None = None,
+    just_path: bool = False,
 ) -> list[np.ndarray | str]:
     """Get video as a list of frames from the frames directory."""
-    # HACK FOR NOW
-    if dataset in DATASET_NAMES:
-        dataset = DATASET_NAMES[dataset]["file_name"]
 
-    # .replace(".npy")
-    base_filename = (
-        filename.removesuffix(".mp4")
-        .removesuffix(".npy")
-        .removesuffix(".npz")
-        .removesuffix(".p")
-    )
-    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, base_filename)
+    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, base_filename)
 
     if not os.path.exists(frames_dir):
         raise FileNotFoundError(f"Frames directory not found: {frames_dir}")
@@ -123,16 +114,12 @@ def get_video_frames(
     return frames
 
 
-def get_video_mp4(dataset: str, filename: str) -> str:
+def get_video_mp4(dataset_filename: str, filename: str) -> str:
     """Get path to the MP4 video file."""
     if not filename.endswith(".mp4"):
         filename += ".mp4"
-    # HACK FOR NOW
-    if dataset in DATASET_NAMES:
-        dataset = DATASET_NAMES[dataset]["file_name"]
-    print("mp4: ", dataset, filename)
-    mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, filename)
-
+    print("mp4: ", dataset_filename, filename)
+    mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, filename)
     if not os.path.exists(mp4_path):
         raise FileNotFoundError(f"MP4 file not found: {mp4_path}")
     return mp4_path
@@ -245,12 +232,14 @@ def get_frame_indices_for_fps(
 
 
 def load_video_frames(
-    dataset_name: str, fname: str, target_fps: int | float = 1
+    dataset_filename: str, fname: str, target_fps: int | float = 1
 ) -> tuple[t.List[np.ndarray], t.List[int]]:
     """Load video frames at specified FPS."""
-    video_path = get_video_from_path(dataset_name, fname)
+    video_path = get_video_from_path(dataset_filename, fname)
     frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
-    all_frames = get_video_frames(dataset_name, fname, n_frames=None, just_path=True)
+    all_frames = get_video_frames(
+        dataset_filename, fname, n_frames=None, just_path=True
+    )
     frames_to_process = choose_and_preprocess_frames(
         all_frames, specified_frames=frame_indices
     )
@@ -263,17 +252,17 @@ if __name__ == "__main__":
 
     # load mp4, break to frames, and save to disk using the helpers
     # dataset = "pi_demos"
-    dataset = "cmu_play_fusion"
+    dataset_filename = "cmu_play_fusion"
 
     # for _, info in PI_DEMO_TASKS.items():
     #     for attempt in ["success", "fail"]:
     # fname = info["filename_prefix"] + f"_{attempt}.mp4"
-    fname = "data/train/episode_212.mp4"
-    mp4_path = get_video_from_path(dataset, fname)
-
+    fname = "data/train/episode_212"
+    mp4_path = get_video_from_path(dataset_filename, fname + ".mp4")
     dirpath = mp4_path.replace(".mp4", "")
+
     if not os.path.exists(dirpath) or not len(os.listdir(dirpath)):
         frames = split_video_to_frames(mp4_path)
-        save_video(frames, dataset, fname)
+        save_video(frames, dataset, str(Path(fname).with_suffix("")))
     else:
         print(f"Folder already exists for {fname}, skipping...")

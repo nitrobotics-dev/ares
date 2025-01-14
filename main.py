@@ -56,37 +56,40 @@ if __name__ == "__main__":
 
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
-    worked = [
-        "ucsd_kitchen_dataset_converted_externally_to_rlds",
-        "cmu_franka_exploration_dataset_converted_externally_to_rlds",
-        "berkeley_fanuc_manipulation",
-        "cmu_stretch",
-        "jaco_play",
-        "nyu_rot_dataset_converted_externally_to_rlds",
-        "dlr_edan_shared_control_converted_externally_to_rlds",
-        "imperialcollege_sawyer_wrist_cam",
-        "tokyo_u_lsmo_converted_externally_to_rlds",
-        "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
-        "asu_table_top_converted_externally_to_rlds",
+    names = [
+        ("ucsd_kitchen_dataset_converted_externally_to_rlds", "UCSD Kitchen"),
+        (
+            "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+            "CMU Franka Exploration",
+        ),
+        ("berkeley_fanuc_manipulation", "Berkeley Fanuc Manipulation"),
+        ("cmu_stretch", "CMU Stretch"),
+        ("jaco_play", "Jaco Play"),
+        ("nyu_rot_dataset_converted_externally_to_rlds", "NYU ROT"),
+        (
+            "dlr_edan_shared_control_converted_externally_to_rlds",
+            "DLR EDAN Shared Control",
+        ),
+        ("imperialcollege_sawyer_wrist_cam", "Imperial College Sawyer Wrist Cam"),
+        ("tokyo_u_lsmo_converted_externally_to_rlds", "Tokyo U LSMO"),
+        (
+            "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+            "UCSD Pick and Place",
+        ),
+        ("asu_table_top_converted_externally_to_rlds", "ASU Table Top"),
     ]
-    for dataset_name in [
-        # ---> below not found by new oxe-downloader script
-        # dataset_name = "conq_hose_manipulation"
-        # dataset_name = "tidybot"
-        # dataset_name = "plex_robosuite"
-        # dont actually want
-        # dataset_name = "utokyo_saytap_converted_externally_to_rlds"
-    ]:
+    for dataset_filename, dataset_formalname in []:
         # going to try oxe-downloader?
         # oxe-download --dataset "name" !!!
 
         data_dir = "/workspaces/ares/data/oxe/"
-        builder, dataset_dict = build_dataset(dataset_name, data_dir)
+        builder, dataset_dict = build_dataset(dataset_filename, data_dir)
         # dataset_info = builder.info
-        print(f"working on {dataset_name}")
+        print(f"working on {dataset_formalname}")
         ds = dataset_dict["train"]
         print(f"working on 'train' out of {list(dataset_dict.keys())}")
-        dataset_info = get_dataset_information(dataset_name)
+        dataset_info = get_dataset_information(dataset_formalname)
+        dataset_info["Dataset Filename"] = dataset_filename
 
         print(len(ds))
 
@@ -132,7 +135,7 @@ if __name__ == "__main__":
                     )
                 ):
                     continue
-                out = save_video(video, dataset_name, fname)
+                out = save_video(video, dataset_name, rollout.filename)
 
                 # rollouts.append(rollout)
                 # # just track this

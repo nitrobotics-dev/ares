@@ -25,13 +25,13 @@ from ares.utils.image_utils import load_video_frames
 
 
 async def setup_query(
-    dataset_name: str,
+    dataset_filename: str,
     rollout: Rollout,
     vlm: VLM,
     target_fps: int = 5,
 ) -> tuple[list[np.ndarray], list[int], str]:
     frames, frame_indices = load_video_frames(
-        dataset_name,
+        dataset_filename,
         rollout.path,
         target_fps,
     )
@@ -45,7 +45,7 @@ async def setup_query(
 
 def run_local(
     engine: Engine,
-    dataset_name: str,
+    dataset_filename: str,
     rollouts: list[Rollout],
     vlm: VLM,
     target_fps: int = 5,
@@ -57,7 +57,7 @@ def run_local(
 
     for rollout in tqdm(rollouts):
         frames, frame_indices, label_str = asyncio.run(
-            setup_query(dataset_name, rollout, vlm, target_fps)
+            setup_query(dataset_filename, rollout, vlm, target_fps)
         )
         # Pass description to annotate_video
         video_detection_results = annotator.annotate_video(frames, label_str)
@@ -66,8 +66,8 @@ def run_local(
         total_frames += len(frames)
 
         video_id = ann_db.add_video_with_annotations(
-            dataset_name=dataset_name,
-            video_path=rollout.path,
+            dataset_filename=dataset_filename,
+            video_path=rollout.filename + ".mp4",
             frames=frames,
             frame_indices=frame_indices,
             annotations=video_annotations,
@@ -98,13 +98,13 @@ if __name__ == "__main__":
     )
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
-    # dataset_name = "cmu_play_fusion"
-    # fname = "data/train/episode_208.mp4"
-    formal_dataset_name = "UCSD Kitchen"
-    dataset_name = "ucsd_kitchen_dataset_converted_externally_to_rlds"
+    # dataset_filename = "cmu_play_fusion"
+    # fname = "data/train/episode_208"
+    dataset_formalname = "UCSD Kitchen"
+    dataset_filename = "ucsd_kitchen_dataset_converted_externally_to_rlds"
     target_fps = 5
 
-    rollouts = setup_rollouts(engine, formal_dataset_name)
+    rollouts = setup_rollouts(engine, dataset_formalname)
 
     # vlm = get_gemini_2_flash()
     vlm = get_gpt_4o()
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     tic = time.time()
 
     total_anns, total_processed, total_frames = run_local(
-        engine, dataset_name, rollouts, vlm, target_fps
+        engine, dataset_filename, rollouts, vlm, target_fps
     )
 
     toc = time.time()

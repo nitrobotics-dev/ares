@@ -215,15 +215,15 @@ def create_robot_array_plot(
 def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -> None:
     if not pd.isna(row["path"]):
         try:
-            dataset, fname = (
-                row["dataset_name"].lower().replace(" ", "_"),
-                os.path.splitext(row["path"])[0],
+            dataset_filename, fname = (
+                row["dataset_filename"],
+                row["filename"],
             )
             if not lazy_load:
-                st.video(get_video_mp4(dataset, fname))
+                st.video(get_video_mp4(dataset_filename, fname))
             else:
                 # show placeholder image (along the same path), then button to load and play video
-                frame = get_video_frames(dataset, fname, n_frames=1)[0]
+                frame = get_video_frames(dataset_filename, fname, n_frames=1)[0]
                 st.image(frame)
                 this_key = f"video_button_{row['id']}_{key}"
                 persist_key = f"video_button_persist_{row['id']}_{key}"
@@ -234,7 +234,7 @@ def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -
                 if st.button("Load Video", key=this_key):
                     st.session_state[persist_key] = True
                 if st.session_state[persist_key]:
-                    st.video(get_video_mp4(dataset, fname))
+                    st.video(get_video_mp4(dataset_filename, fname))
 
             st.write(f"**{row['id']}**")
             st.write(f"Task: {row['task_language_instruction']}")

@@ -10,6 +10,7 @@ from ares.databases.structured_database import (
     get_all_rollouts,
     setup_database,
 )
+from ares.name_remapper import DATASET_NAMES
 
 engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 rollouts = get_all_rollouts(engine)
@@ -17,21 +18,21 @@ rollouts = get_all_rollouts(engine)
 
 if __name__ == "__main__":
     id_keys = ["dataset_name", "path"]
-    # new_col_key_stem = ["success", "rewards", "reward_step"]
-    # new_cols_flat_types = [bool, str, int]
-    # default_vals = [None, None, None]
-    new_col_key_stem = ["filename"]
-    new_cols_flat_names = ["filename"]
-    new_cols_flat_types = [str]
-    default_vals = [None]
+
+    new_col_key_stem = ["dataset_filename", "dataset_formalname"]
+    new_cols_flat_names = ["dataset_filename", "dataset_formalname"]
+    new_cols_flat_types = [str, str]
+    default_vals = [None, None]
 
     for i in range(len(new_cols_flat_names)):
         input_mapping = dict()
         for rollout in rollouts:
-            input_mapping[tuple(getattr(rollout, k) for k in id_keys)] = getattr(
+            new_val = getattr(
                 rollout,
-                new_col_key_stem[i],
+                "dataset_name",
             )
+            new_val = DATASET_NAMES[new_val][new_col_key_stem[i]]
+            input_mapping[tuple(getattr(rollout, k) for k in id_keys)] = new_val
 
         add_column_with_vals_and_defaults(
             engine=engine,

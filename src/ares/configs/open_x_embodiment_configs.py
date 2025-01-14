@@ -126,6 +126,6 @@ def get_oxe_dataframe() -> pd.DataFrame:
     return pd.read_csv(PATH_TO_SPREADSHEET, header=HEADER_ROW)
 
 
-def get_dataset_information(dataset_name: str) -> pd.DataFrame:
+def get_dataset_information(dataset_formalname: str) -> pd.DataFrame:
     df = get_oxe_dataframe()
-    return dict(df[df["Registered Dataset Name"] == dataset_name].iloc[0])
+    return dict(df[df["Registered Dataset Name"] == dataset_formalname].iloc[0])

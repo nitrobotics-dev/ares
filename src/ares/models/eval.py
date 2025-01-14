@@ -36,12 +36,12 @@ def save_frames_to_mp4(frames: list[np.ndarray], fname: str) -> None:
 
 
 def easy_get_frames(
-    dataset_name: str, task: str, success_flag: str, fps: int | float
+    dataset_filename: str, task: str, success_flag: str, fps: int | float
 ) -> list[np.ndarray]:
     # small hack -- if FPS is 0, just access first and last frame!
     fname = f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success_flag}.mp4"
     frames, frame_indices = load_video_frames(
-        dataset_name, fname, target_fps=fps if fps != 0 else 1
+        dataset_filename, fname, target_fps=fps if fps != 0 else 1
     )
     if fps == 0:
         frames = [frames[0], frames[-1]]
@@ -150,14 +150,14 @@ def parse_responses(res: t.Any) -> dict:
 
 async def process_task_async(
     vlm: VLM,
-    dataset_name: str,
+    dataset_filename: str,
     task: str,
     fps: float,
     success_flag: str,
     method: str,
 ) -> dict:
     try:
-        frames = easy_get_frames(dataset_name, task, success_flag, fps)
+        frames = easy_get_frames(dataset_filename, task, success_flag, fps)
         success_constraints_str = await dynamic_constraint_generation_async(
             vlm, task, frames
         )
@@ -192,7 +192,7 @@ async def process_task_async(
 
 
 if __name__ == "__main__":
-    dataset_name = "pi_demos"
+    dataset_filename = "pi_demos"
 
     # fps_options = [1]
     fps_options = [0, 0.25, 0.5, 1, 2]
@@ -261,7 +261,7 @@ if __name__ == "__main__":
                             tasks_to_process.append(
                                 process_task_async(
                                     vlm,
-                                    dataset_name,
+                                    dataset_filename,
                                     task,
                                     fps,
                                     success_flag,

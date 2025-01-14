@@ -27,7 +27,6 @@ from ares.app.plot_primitives import (
 from ares.configs.annotations import Annotation
 from ares.databases.annotation_database import AnnotationDatabase
 from ares.databases.embedding_database import IndexManager, rollout_to_index_name
-from ares.name_remapper import DATASET_NAMES
 from ares.utils.image_utils import (
     choose_and_preprocess_frames,
     get_video_frames,
@@ -280,13 +279,14 @@ def show_hero_display(
     Returns:
         List of visualization figures to be included in export
     """
-    # video card
+
+    dataset, fname = (
+        row["dataset_filename"],
+        row["filename"],
+    )
+
     col1, col2 = st.columns(2)
     with col1:
-        dataset, fname = (
-            row["dataset_name"].lower().replace(" ", "_"),
-            os.path.splitext(row["path"])[0],
-        )
         if lazy_load:
             frame = get_video_frames(dataset, fname, n_frames=1)[0]
             st.image(frame)
@@ -310,16 +310,8 @@ def show_hero_display(
     # Add annotation data retrieval button
     if st.button("Retrieve Annotation Data"):
         try:
-            dataset_name = row["dataset_name"]
-            if dataset_name in DATASET_NAMES:
-                # HACK FOR NOW
-                dataset_name = DATASET_NAMES[dataset_name]["file_name"]
-
-            video_id = (
-                f"{dataset_name}/{row['path']}".replace(".npy", ".mp4")
-                .replace(".npz", ".mp4")
-                .replace(".p", ".mp4")
-            )
+            dataset_filename = row["dataset_filename"]
+            video_id = f"{dataset_filename}/{row['filename']}" + ".mp4"
             db_data = get_video_annotation_data(video_id)
             if db_data is not None:
                 annotation_data = db_data.get("annotations")

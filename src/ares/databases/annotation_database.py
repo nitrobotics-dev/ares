@@ -169,7 +169,7 @@ class AnnotationDatabase:
             {"$unwind": "$video_info"},
             {
                 "$group": {
-                    "_id": "$video_info.metadata.dataset_name",
+                    "_id": "$video_info.metadata.dataset_filename",
                     "total_annotations": {"$sum": 1},
                     "unique_videos": {"$addToSet": "$video_id"},
                     "unique_frames": {
@@ -180,9 +180,9 @@ class AnnotationDatabase:
         ]
 
         for dataset_stat in self.annotations.aggregate(pipeline):
-            dataset_name = dataset_stat["_id"]
-            if dataset_name:  # Skip if dataset_name is None
-                stats["per_dataset"][dataset_name] = {
+            dataset_filename = dataset_stat["_id"]
+            if dataset_filename:  # Skip if dataset_filename is None
+                stats["per_dataset"][dataset_filename] = {
                     "total_videos": len(dataset_stat["unique_videos"]),
                     "total_frames": len(dataset_stat["unique_frames"]),
                     "total_annotations": dataset_stat["total_annotations"],
@@ -224,7 +224,7 @@ class AnnotationDatabase:
 
     def add_video_with_annotations(
         self,
-        dataset_name: str,
+        dataset_filename: str,
         video_path: str,
         frames: List[np.ndarray],
         frame_indices: List[int],
@@ -234,7 +234,7 @@ class AnnotationDatabase:
         """Add a video and its frame annotations to the database.
 
         Args:
-            dataset_name: Name of the dataset
+            dataset_filename: Name of the dataset
             video_path: Path to the video file
             frames: List of video frames
             frame_indices: List of frame indices
@@ -250,9 +250,9 @@ class AnnotationDatabase:
             .replace(".npz", ".mp4")
             .replace(".p", ".mp4")
         )  # HACK
-        video_id = f"{dataset_name}/{video_path}"
+        video_id = f"{dataset_filename}/{video_path}"
         metadata = {
-            "dataset_name": dataset_name,
+            "dataset_filename": dataset_filename,
             "video_path": video_path,
             "num_frames": len(frames),
             "frame_indices": frame_indices,

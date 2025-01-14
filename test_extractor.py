@@ -9,14 +9,14 @@ from ares.models.extractor import RandomInformationExtractor, VLMInformationExtr
 from ares.models.shortcuts import get_gemini_2_flash, get_gemini_15_flash
 from main import build_dataset
 
-dataset_name = "jaco_play"
+dataset_filename = "jaco_play"
 data_dir = "/workspaces/ares/data/oxe/"
-builder, dataset_dict = build_dataset(dataset_name, data_dir)
+builder, dataset_dict = build_dataset(dataset_filename, data_dir)
 # extractor = VLMInformationExtractor(get_gemini_2_flash())
 extractor = VLMInformationExtractor(get_gemini_15_flash())
 ds = dataset_dict["train"]
 print(f"working on 'train' out of {list(dataset_dict.keys())}")
-dataset_info = get_dataset_information(dataset_name)
+dataset_info = get_dataset_information(dataset_filename)
 
 print(len(ds))
 

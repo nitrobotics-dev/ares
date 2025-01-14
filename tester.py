@@ -10,14 +10,14 @@
 
 # # vlm = get_claude_3_5_sonnet()
 # vlm = get_gpt_o1_mini()
-dataset_name = "cmu_play_fusion"
+dataset_filename = "cmu_play_fusion"
 fname = "data/train/episode_212.npy"
 
 from ares.utils.image_utils import load_video_frames, split_video_to_frames
 
 split_video_to_frames()
 
-# frames, frame_indices = load_video_frames(dataset_name, fname, target_fps=10)
+# frames, frame_indices = load_video_frames(dataset_filename, fname, target_fps=10)
 
 
 # out = vlm.ask(info=dict(prompt="Describe the image"), images=[frames[0]])

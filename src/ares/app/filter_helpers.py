@@ -229,14 +229,14 @@ def structured_data_filters_display(
             # Clear all filter states
             st.session_state.temp_filter_values = {}
             st.session_state.active_filter_values = {}
-            st.experimental_rerun()
+            st.rerun()
     with col3:
         if st.button("Apply Filters", type="primary"):
             # Copy temporary values to active values
             st.session_state.active_filter_values = (
                 st.session_state.temp_filter_values.copy()
             )
-            st.experimental_rerun()
+            st.rerun()
 
     with st.expander("Filter Data", expanded=False):
         value_filtered_df, skipped_cols = create_structured_data_filters(
@@ -305,7 +305,7 @@ def select_row_from_df_user(df: pd.DataFrame) -> None:
     # Option 3: Select by Dataset Name + Path
     with col3:
         path_options = pd.Series(
-            [f"{name}/{path}" for name, path in zip(df.dataset_name, df.path)]
+            [f"{name}/{path}" for name, path in zip(df.dataset_filename, df.path)]
         )
         selected_path: str | None = st.selectbox(
             "Select by Path",
@@ -323,8 +323,9 @@ def select_row_from_df_user(df: pd.DataFrame) -> None:
             random_idx = np.random.randint(len(df))
             st.session_state["selected_row"] = df.iloc[random_idx]
 
-    if st.session_state.get("selected_row") is None:
-        st.warning("No row selected, defaulting to first row")
+    selected_row = st.session_state.get("selected_row")
+    if selected_row is None or selected_row.id not in df.id.values:
+        st.warning("No valid row selected, defaulting to first row")
         st.session_state["selected_row"] = df.iloc[0]
 
 

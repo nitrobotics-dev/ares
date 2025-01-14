@@ -106,7 +106,7 @@ async def run_annotation_parallel(
             )
             # add to database
             video_id = db.add_video_with_annotations(
-                dataset_name=dataset_file_name,
+                dataset_filename=dataset_file_name,
                 video_path=rollout.path,
                 frames=frames,
                 frame_indices=frame_indices,
@@ -149,7 +149,7 @@ def test() -> None:
     from ares.utils.image_utils import load_video_frames
 
     async def setup_query(
-        dataset_name: str,
+        dataset_filename: str,
         rollout: Rollout,
         vlm: VLM,
         target_fps: int = 5,
@@ -157,7 +157,7 @@ def test() -> None:
     ) -> tuple[str, list[np.ndarray], list[int], str] | dict[str, Rollout | str]:
         try:
             frames, frame_indices = load_video_frames(
-                dataset_name,
+                dataset_filename,
                 rollout.path,
                 target_fps,
             )
@@ -191,7 +191,7 @@ def test() -> None:
         return rollout.id, frames, frame_indices, label_str
 
     async def run_ground_and_annotate(
-        dataset_file_name: str,
+        dataset_filename: str,
         rollouts: list[Rollout],
         vlm: VLM,
         ann_db: AnnotationDatabase,
@@ -218,33 +218,33 @@ def test() -> None:
         )
         return stats, failures
 
-    # formal_dataset_name = "CMU Stretch"
-    # dataset_file_name = "cmu_stretch"
-    # formal_dataset_name, dataset_file_name = (
+    # dataset_formalname = "CMU Stretch"
+    # dataset_filename = "cmu_stretch"
+    # dataset_formalname, dataset_filename = (
     #     "LSMO Dataset",
     #     "tokyo_u_lsmo_converted_externally_to_rlds",
     # )
-    # formal_dataset_name, dataset_file_name = (
+    # dataset_formalname, dataset_filename = (
     #     "Berkeley Fanuc Manipulation",
     #     "berkeley_fanuc_manipulation",
     # )
-    # formal_dataset_name, dataset_file_name = (
+    # dataset_formalname, dataset_filename = (
     #     "CMU Franka Exploration",
     #     "cmu_franka_exploration_dataset_converted_externally_to_rlds",
     # )
-    # formal_dataset_name, dataset_file_name = (
+    # dataset_formalname, dataset_filename = (
     #     "CMU Play Fusion",
     #     "cmu_play_fusion",
     # )
-    # formal_dataset_name, dataset_file_name = (
+    # dataset_formalname, dataset_filename = (
     #     "NYU ROT",
     #     "nyu_rot",
     # )
-    # formal_dataset_name, dataset_file_name = (
+    # dataset_formalname, dataset_filename = (
     #     "UCSD Pick Place",
     #     "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
     # )
-    formal_dataset_name, dataset_file_name = (
+    dataset_formalname, dataset_filename = (
         "USC Jaco Play",
         "usc_jaco_play",
     )
@@ -256,7 +256,7 @@ def test() -> None:
 
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    rollouts = setup_rollouts(engine, formal_dataset_name)[700:900]
+    rollouts = setup_rollouts(engine, dataset_formalname)
 
     if retry_failed:
         with open(retry_failed, "rb") as f:
@@ -271,7 +271,7 @@ def test() -> None:
 
     stats, failures = asyncio.run(
         run_ground_and_annotate(
-            dataset_file_name,
+            dataset_filename,
             rollouts,
             vlm,
             ann_db,

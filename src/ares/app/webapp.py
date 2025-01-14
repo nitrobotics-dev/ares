@@ -93,13 +93,14 @@ def main() -> None:
     with filter_error_context(section_filters), timer_context(section_filters):
         # Structured data filters
         st.header(f"Data Filters")
-        value_filtered_df = structured_data_filters_display(df)
+        value_filtered_df = structured_data_filters_display(df, debug=True)
         kept_ids = value_filtered_df["id"].apply(str).tolist()
         st.write(
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
         filtered_df = value_filtered_df
         cluster_fig = None
+
         # print(kept_ids[:10])
         if len(kept_ids) == 0:
             breakpoint()
@@ -177,7 +178,8 @@ def main() -> None:
     section_plot_hero = "plot hero display"
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
         st.header("Rollout Display")
-
+        if st.button("button"):
+            breakpoint()
         # initialize or persist selected row in state
         select_row_from_df_user(filtered_df)
         selected_row = st.session_state.get("selected_row")

@@ -1,68 +1,74 @@
 DATASET_NAMES = {
     "LSMO Dataset": {
-        "formal_name": "LSMO Dataset",
-        "file_name": "tokyo_u_lsmo_converted_externally_to_rlds",
+        "dataset_formalname": "LSMO Dataset",
+        "dataset_filename": "tokyo_u_lsmo_converted_externally_to_rlds",
     },
     "lsmo_dataset": {
-        "formal_name": "LSMO Dataset",
-        "file_name": "tokyo_u_lsmo_converted_externally_to_rlds",
+        "dataset_formalname": "LSMO Dataset",
+        "dataset_filename": "tokyo_u_lsmo_converted_externally_to_rlds",
     },
     "UCSD Kitchen": {
-        "formal_name": "UCSD Kitchen",
-        "file_name": "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "UCSD Kitchen",
+        "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",
     },
     "ucsd_kitchen_dataset": {
-        "formal_name": "UCSD Kitchen",
-        "file_name": "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "UCSD Kitchen",
+        "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",
     },
     "CMU Stretch": {
-        "formal_name": "CMU Stretch",
-        "file_name": "cmu_stretch",
+        "dataset_formalname": "CMU Stretch",
+        "dataset_filename": "cmu_stretch",
     },
     "Berkeley Fanuc Manipulation": {
-        "formal_name": "Berkeley Fanuc Manipulation",
-        "file_name": "berkeley_fanuc_manipulation",
+        "dataset_formalname": "Berkeley Fanuc Manipulation",
+        "dataset_filename": "berkeley_fanuc_manipulation",
     },
     "CMU Franka Exploration": {
-        "formal_name": "CMU Franka Exploration",
-        "file_name": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "CMU Franka Exploration",
+        "dataset_filename": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
     },
     "cmu_franka_exploration": {
-        "formal_name": "CMU Franka Exploration",
-        "file_name": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "CMU Franka Exploration",
+        "dataset_filename": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
     },
     "CMU Play Fusion": {
-        "formal_name": "CMU Play Fusion",
-        "file_name": "cmu_play_fusion",
+        "dataset_formalname": "CMU Play Fusion",
+        "dataset_filename": "cmu_play_fusion",
     },
-    # DLR wheelchair
-    # imperial
     "NYU ROT": {
-        "formal_name": "NYU ROT",
-        "file_name": "nyu_rot",
+        "dataset_formalname": "NYU ROT",
+        "dataset_filename": "nyu_rot",
     },
     "UCSD Pick Place": {
-        "formal_name": "UCSD Pick Place",
-        "file_name": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "UCSD Pick Place",
+        "dataset_filename": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
     },
     "ucsd_pick_place_dataset": {
-        "formal_name": "UCSD Pick Place",
-        "file_name": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "UCSD Pick Place",
+        "dataset_filename": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
     },
     "ucsd_pick_place_dataset_converted_externally_to_rlds": {
-        "formal_name": "UCSD Pick Place",
-        "file_name": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "UCSD Pick Place",
+        "dataset_filename": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
     },
     "USC Jaco Play": {
-        "formal_name": "USC Jaco Play",
-        "file_name": "usc_jaco_play",
+        "dataset_formalname": "USC Jaco Play",
+        "dataset_filename": "usc_jaco_play",
     },
     "dlr_wheelchair_shared_control": {
-        "formal_name": "DLR Wheelchair Shared Control",
-        "file_name": "dlr_edan_shared_control_converted_externally_to_rlds",
+        "dataset_formalname": "DLR Wheelchair Shared Control",
+        "dataset_filename": "dlr_edan_shared_control_converted_externally_to_rlds",
     },
     "DLR Wheelchair Shared Control": {
-        "formal_name": "DLR Wheelchair Shared Control",
-        "file_name": "dlr_edan_shared_control_converted_externally_to_rlds",
+        "dataset_formalname": "DLR Wheelchair Shared Control",
+        "dataset_filename": "dlr_edan_shared_control_converted_externally_to_rlds",
+    },
+    "Imperial Wrist Cam": {
+        "dataset_formalname": "Imperial Wrist Cam",
+        "dataset_filename": "imperialcollege_sawyer_wrist_cam",
+    },
+    "ASU TableTop Manipulation": {
+        "dataset_formalname": "ASU TableTop Manipulation",
+        "dataset_filename": "asu_table_top_converted_externally_to_rlds",
     },
 }
