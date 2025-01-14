@@ -2,6 +2,7 @@ import json
 import typing as t
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 from pydantic import BaseModel, Field, model_validator
@@ -110,6 +111,7 @@ class Rollout(BaseConfig):
     creation_time: datetime | None
     ingestion_time: datetime
     path: str
+    filename: str
     dataset_name: str
     description: str | None = Field(
         description="A detailed description of the input video. Include analysis of the task the robot is completing, including success criteria and performance.",

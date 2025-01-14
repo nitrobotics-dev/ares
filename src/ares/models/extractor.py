@@ -3,6 +3,7 @@ import re
 import string
 import typing as t
 from datetime import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -104,9 +105,11 @@ def hard_coded_episode_info_extraction(episode: OpenXEmbodimentEpisode) -> dict:
     # gather trajectory data
     actions = np.stack([step.action for step in steps]).tolist()
     states = np.stack([step.observation.state for step in steps]).tolist()
+    path = episode.episode_metadata.file_path
     return {
         "rollout": {
-            "path": episode.episode_metadata.file_path,
+            "path": path,
+            "filename": str(Path(path).with_suffix("")),
             "length": len(steps),
         },
         "trajectory": {

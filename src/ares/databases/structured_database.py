@@ -93,7 +93,7 @@ def add_rollouts(engine: Engine, rollouts: t.List[Rollout]) -> None:
 
 # query helpers
 # Database queries
-def get_rollouts(engine: Engine) -> pd.DataFrame:
+def get_rollouts_as_df(engine: Engine) -> pd.DataFrame:
     """Get all rollouts from the database as a pandas DataFrame."""
     with Session(engine) as session:
         query = text(
@@ -142,6 +142,13 @@ def get_dataset_rollouts(engine: Engine, formal_dataset_name: str) -> list[Rollo
             except Exception as e:
                 print(f"Error recreating model: {e}")
         return rollouts
+
+
+def get_all_rollouts(engine: Engine) -> list[Rollout]:
+    with Session(engine) as session:
+        query = select(RolloutSQLModel)
+        rows = session.exec(query).all()
+        return [recreate_model(row[0], Rollout) for row in rows]
 
 
 def db_to_df(engine: Engine) -> pd.DataFrame:

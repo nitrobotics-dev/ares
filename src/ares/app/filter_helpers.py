@@ -54,61 +54,61 @@ def create_structured_data_filters(
                 max_val = float(df[col].dropna().max())
 
                 # Add checkbox for including None values
-                if f"{col}_include_none" not in st.session_state.temp_filter_values:
-                    st.session_state.temp_filter_values[f"{col}_include_none"] = (
-                        st.session_state.active_filter_values.get(
-                            f"{col}_include_none", True
-                        )
+                checkbox_key = f"{col}_include_none"
+                if checkbox_key not in st.session_state.temp_filter_values:
+                    st.session_state.temp_filter_values[checkbox_key] = (
+                        st.session_state.active_filter_values.get(checkbox_key, True)
                     )
 
                 include_none = st.checkbox(
                     f"Include None values for {col}",
-                    value=st.session_state.temp_filter_values[f"{col}_include_none"],
+                    value=st.session_state.temp_filter_values[checkbox_key],
                     key=f"{col}_none_checkbox",
                 )
-                st.session_state.temp_filter_values[f"{col}_include_none"] = (
-                    include_none
-                )
+                st.session_state.temp_filter_values[checkbox_key] = include_none
 
                 # Initialize with current active values or defaults
-                if f"{col}_range" not in st.session_state.temp_filter_values:
-                    st.session_state.temp_filter_values[f"{col}_range"] = (
+                range_key = f"{col}_range"
+                if range_key not in st.session_state.temp_filter_values:
+                    st.session_state.temp_filter_values[range_key] = (
                         st.session_state.active_filter_values.get(
-                            f"{col}_range", (min_val, max_val)
+                            range_key, (min_val, max_val)
                         )
                     )
 
-                # Update temporary values without filtering
+                # Unique key for the slider
+                slider_key = f"slider_{col}"
+
+                # Create slider widget with unique key
                 values = st.slider(
                     f"Filter {col}",
                     min_value=min_val,
                     max_value=max_val,
-                    value=st.session_state.temp_filter_values[f"{col}_range"],
+                    value=st.session_state.temp_filter_values[range_key],
+                    key=slider_key,
                 )
-                st.session_state.temp_filter_values[f"{col}_range"] = values
+                st.session_state.temp_filter_values[range_key] = values
 
                 # Debug prints for numeric filters
                 if debug:
                     print(f"\nNumeric filter for {col}:")
                     print(
-                        f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_range')}"
+                        f"Temp value: {st.session_state.temp_filter_values.get(range_key)}"
                     )
                     print(
-                        f"Active value: {st.session_state.active_filter_values.get(f'{col}_range')}"
+                        f"Active value: {st.session_state.active_filter_values.get(range_key)}"
                     )
                     print(
-                        f"Include None - Temp: {st.session_state.temp_filter_values.get(f'{col}_include_none')}"
+                        f"Include None - Temp: {st.session_state.temp_filter_values.get(checkbox_key)}"
                     )
                     print(
-                        f"Include None - Active: {st.session_state.active_filter_values.get(f'{col}_include_none')}"
+                        f"Include None - Active: {st.session_state.active_filter_values.get(checkbox_key)}"
                     )
 
                 # Only apply active filters
-                active_values = st.session_state.active_filter_values.get(
-                    f"{col}_range"
-                )
+                active_values = st.session_state.active_filter_values.get(range_key)
                 active_include_none = st.session_state.active_filter_values.get(
-                    f"{col}_include_none"
+                    checkbox_key
                 )
 
                 if active_values:
@@ -143,35 +143,36 @@ def create_structured_data_filters(
                     continue
 
                 # Initialize with current active values or defaults
-                if f"{col}_select" not in st.session_state.temp_filter_values:
-                    st.session_state.temp_filter_values[f"{col}_select"] = (
-                        st.session_state.active_filter_values.get(
-                            f"{col}_select", options
-                        )
+                select_key = f"{col}_select"
+                if select_key not in st.session_state.temp_filter_values:
+                    st.session_state.temp_filter_values[select_key] = (
+                        st.session_state.active_filter_values.get(select_key, options)
                     )
 
-                # Update temporary values without filtering
+                # Unique key for the multiselect
+                multiselect_key = f"multiselect_{col}"
+
+                # Create multiselect widget with unique key
                 selected = st.multiselect(
                     f"Filter {col}",
                     options=options,
-                    default=st.session_state.temp_filter_values[f"{col}_select"],
+                    default=st.session_state.temp_filter_values[select_key],
+                    key=multiselect_key,
                 )
-                st.session_state.temp_filter_values[f"{col}_select"] = selected
+                st.session_state.temp_filter_values[select_key] = selected
 
                 # Debug prints for categorical filters
                 if debug:
                     print(f"\nCategory filter for {col}:")
                     print(
-                        f"Temp value: {st.session_state.temp_filter_values.get(f'{col}_select')}"
+                        f"Temp value: {st.session_state.temp_filter_values.get(select_key)}"
                     )
                     print(
-                        f"Active value: {st.session_state.active_filter_values.get(f'{col}_select')}"
+                        f"Active value: {st.session_state.active_filter_values.get(select_key)}"
                     )
 
                 # Only apply active filters
-                active_selected = st.session_state.active_filter_values.get(
-                    f"{col}_select"
-                )
+                active_selected = st.session_state.active_filter_values.get(select_key)
                 if active_selected:
                     old_shape = filtered_df.shape[0]
                     # Convert values based on column type
@@ -217,8 +218,10 @@ def create_structured_data_filters(
     return filtered_df, skipped_cols
 
 
-def structured_data_filters_display(df: pd.DataFrame) -> pd.DataFrame:
-    col1, col2, col3 = st.columns([5, 1, 1])
+def structured_data_filters_display(
+    df: pd.DataFrame, debug: bool = False
+) -> pd.DataFrame:
+    col1, col2, col3, _ = st.columns([5, 1, 1, 3])
     with col1:
         st.subheader("Structured Data Filters")
     with col2:
@@ -226,17 +229,19 @@ def structured_data_filters_display(df: pd.DataFrame) -> pd.DataFrame:
             # Clear all filter states
             st.session_state.temp_filter_values = {}
             st.session_state.active_filter_values = {}
-            st.rerun()
+            st.experimental_rerun()
     with col3:
         if st.button("Apply Filters", type="primary"):
             # Copy temporary values to active values
             st.session_state.active_filter_values = (
                 st.session_state.temp_filter_values.copy()
             )
-            st.rerun()
+            st.experimental_rerun()
 
     with st.expander("Filter Data", expanded=False):
-        value_filtered_df, skipped_cols = create_structured_data_filters(df)
+        value_filtered_df, skipped_cols = create_structured_data_filters(
+            df, debug=debug
+        )
         if skipped_cols:
             st.warning(
                 f"Skipped columns: {skipped_cols} due to high cardinality or lack of unique values"

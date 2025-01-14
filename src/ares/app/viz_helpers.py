@@ -231,7 +231,6 @@ def create_similarity_tabs(
                     )
                     found_rows = df[df["id"] == search_id]
                     if len(found_rows) == 0:
-                        breakpoint()
                         st.write(f"No row found for id: {id_str}")
                     else:
                         display_video_card(

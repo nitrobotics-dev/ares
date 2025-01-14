@@ -61,17 +61,16 @@ class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
     @model_validator(mode="before")
     def concat_state(cls, data: dict) -> dict:
         if "state" not in data:
-            # HACK/TODO: handle error in null state???
-            data["state"] = np.concatenate(
-                [
-                    data[k]
-                    for k in [
-                        "end_effector_cartesian_pos",
-                        "end_effector_cartesian_velocity",
-                        "joint_pos",
-                    ]
-                ]
-            )
+            extra_state_keys = [
+                "end_effector_cartesian_pos",
+                "end_effector_cartesian_velocity",
+                "joint_pos",
+            ]
+            state_arrays = [data[k] for k in extra_state_keys if k in data]
+            if state_arrays:
+                data["state"] = np.concatenate(state_arrays)
+            else:
+                data["state"] = None
         return data
 
 

@@ -57,4 +57,12 @@ DATASET_NAMES = {
         "formal_name": "USC Jaco Play",
         "file_name": "usc_jaco_play",
     },
+    "dlr_wheelchair_shared_control": {
+        "formal_name": "DLR Wheelchair Shared Control",
+        "file_name": "dlr_edan_shared_control_converted_externally_to_rlds",
+    },
+    "DLR Wheelchair Shared Control": {
+        "formal_name": "DLR Wheelchair Shared Control",
+        "file_name": "dlr_edan_shared_control_converted_externally_to_rlds",
+    },
 }

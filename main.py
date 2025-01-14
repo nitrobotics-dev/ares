@@ -50,24 +50,26 @@ TEST_TIME_STEPS = 100
 
 if __name__ == "__main__":
 
-    # EMBEDDER = get_nomic_embedder()
+    EMBEDDER = get_nomic_embedder()
 
     index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
 
     hf_base = "jxu124/OpenX-Embodiment"
     # ones that worked
-    for dataset_name in [
-        # "ucsd_kitchen_dataset_converted_externally_to_rlds",
+    worked = [
+        "ucsd_kitchen_dataset_converted_externally_to_rlds",
         "cmu_franka_exploration_dataset_converted_externally_to_rlds",
-        # "asu_table_top_converted_externally_to_rlds",
         "berkeley_fanuc_manipulation",
         "cmu_stretch",
         "jaco_play",
         "nyu_rot_dataset_converted_externally_to_rlds",
-        # "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
-        "dlr_edan_shared_control_converted_externally_to_rlds"
-        "imperialcollege_sawyer_wrist_cam"
+        "dlr_edan_shared_control_converted_externally_to_rlds",
+        "imperialcollege_sawyer_wrist_cam",
         "tokyo_u_lsmo_converted_externally_to_rlds",
+        "ucsd_pick_and_place_dataset_converted_externally_to_rlds"
+        "asu_table_top_converted_externally_to_rlds",
+    ]
+    for dataset_name in [
         # ---> below not found by new oxe-downloader script
         # dataset_name = "conq_hose_manipulation"
         # dataset_name = "tidybot"
@@ -100,7 +102,6 @@ if __name__ == "__main__":
         # STUFF TO ADD ON THIS GOING FORWARD
         # 1. add FORMAL/INFORMAL to the rollout table
         # 2. strip path name to stem
-        # 3. get success, rewards, reward_step
 
         for i, ep in tqdm(enumerate(ds)):
             try:
@@ -120,56 +121,54 @@ if __name__ == "__main__":
                     episode=episode, dataset_info=dataset_info
                 )
                 rollouts.append(rollout)
-                # print(episode.episode_metadata)
-                # rewards = [step.reward for step in steps]
                 # print(rewards)
 
-                # video = [step.observation.image for step in episode.steps]
-                # fname = os.path.splitext(episode.episode_metadata.file_path)[0]
-                # # check if the file exists
-                # if os.path.exists(
-                #     os.path.join(
-                #         ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
-                #     )
-                # ):
-                #     continue
-                # out = save_video(video, dataset_name, fname)
+                video = [step.observation.image for step in episode.steps]
+                fname = os.path.splitext(episode.episode_metadata.file_path)[0]
+                # check if the file exists
+                if os.path.exists(
+                    os.path.join(
+                        ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
+                    )
+                ):
+                    continue
+                out = save_video(video, dataset_name, fname)
 
                 # rollouts.append(rollout)
                 # # just track this
                 # start_time = time.time()
-                # add_rollout(engine, rollout, RolloutSQLModel)
+                add_rollout(engine, rollout, RolloutSQLModel)
                 # all_times.append(time.time() - start_time)
 
-                # # add the non-robot specific embeddings
-                # for name in ["task", "description"]:
-                #     inp = (
-                #         rollout.task.language_instruction
-                #         if name == "description"
-                #         else rollout.task.success_criteria
-                #     )
-                #     if inp is None:
-                #         continue
-                #     embedding = EMBEDDER.embed(inp)
-                #     index_manager.add_vector(name, embedding, str(rollout.id))
+                # add the non-robot specific embeddings
+                for name in ["task", "description"]:
+                    inp = (
+                        rollout.task.language_instruction
+                        if name == "description"
+                        else rollout.task.success_criteria
+                    )
+                    if inp is None:
+                        continue
+                    embedding = EMBEDDER.embed(inp)
+                    index_manager.add_vector(name, embedding, str(rollout.id))
 
-                # embedding_pack = rollout_to_embedding_pack(rollout)
+                embedding_pack = rollout_to_embedding_pack(rollout)
 
-                # for index_name, matrix in embedding_pack.items():
-                #     if index_name not in index_manager.indices.keys():
-                #         index_manager.init_index(
-                #             index_name,
-                #             matrix.shape[1],
-                #             TEST_TIME_STEPS,
-                #             norm_means=None,
-                #             norm_stds=None,
-                #         )
-                #     if not (
-                #         matrix is None
-                #         or (isinstance(matrix, list) and all(x is None for x in matrix))
-                #         or len(matrix.shape) != 2
-                #     ):
-                #         index_manager.add_matrix(index_name, matrix, str(rollout.id))
+                for index_name, matrix in embedding_pack.items():
+                    if index_name not in index_manager.indices.keys():
+                        index_manager.init_index(
+                            index_name,
+                            matrix.shape[1],
+                            TEST_TIME_STEPS,
+                            norm_means=None,
+                            norm_stds=None,
+                        )
+                    if not (
+                        matrix is None
+                        or (isinstance(matrix, list) and all(x is None for x in matrix))
+                        or len(matrix.shape) != 2
+                    ):
+                        index_manager.add_matrix(index_name, matrix, str(rollout.id))
 
             except Exception as e:
                 print(f"Error processing episode {i}: {e}")
@@ -181,42 +180,9 @@ if __name__ == "__main__":
         print(f"Mean time: {np.mean(all_times)}")
 
         # breakpoint()
-        id_keys = ["dataset_name", "path"]
-        new_col_key_stem = ["success", "rewards", "reward_step"]
-        new_cols_flat_names = [
-            "task_success",
-            "trajectory_rewards",
-            "trajectory_reward_step",
-        ]
-        new_cols_flat_types = [bool, str, int]
-        default_vals = [None, None, None]
 
-        engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-        for i in range(len(new_cols_flat_names)):
-
-            input_mapping = dict()
-            for rollout in rollouts:
-                input_mapping[tuple(getattr(rollout, k) for k in id_keys)] = getattr(
-                    (
-                        rollout.trajectory
-                        if "trajectory" in new_cols_flat_names[i]
-                        else rollout.task
-                    ),
-                    new_col_key_stem[i],
-                )
-
-            add_column_with_vals_and_defaults(
-                engine=engine,
-                new_column_name=new_cols_flat_names[i],
-                python_type=new_cols_flat_types[i],
-                default_value=default_vals[i],
-                key_mapping_col_names=id_keys,
-                specific_key_mapping_values=input_mapping,
-            )
-            print(f"added {new_cols_flat_names[i]}")
-
-        # print(index_manager.metadata)
-        # index_manager.save()
+        print(index_manager.metadata)
+        index_manager.save()
 
         # sess = Session(engine)
         # # get a df.head() basically
