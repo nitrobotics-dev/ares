@@ -53,6 +53,7 @@ def hard_coded_dataset_info_extraction_spreadsheet(dataset_info: dict) -> dict:
             "dataset_filename": dataset_info["Dataset Filename"],
             "creation_time": year,
             "ingestion_time": datetime.now(),
+            "split": dataset_info["Split"],
         },
         "robot": {
             "embodiment": dataset_info["Robot"],
@@ -70,6 +71,7 @@ def hard_coded_dataset_info_extraction_spreadsheet(dataset_info: dict) -> dict:
         "environment": {
             "name": dataset_info["Scene Type"],
             "simulation": dataset_info["Data Collect Method"] == "Human VR",
+            "data_collection_method": dataset_info["Data Collect Method"],
         },
         "task": {
             "language_instruction_type": dataset_info["Language Annotations"],

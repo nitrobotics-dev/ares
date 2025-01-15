@@ -40,14 +40,10 @@ class Environment(BaseConfig):
         description="Lighting conditions in the environment",
         # pattern="^(dim|normal|bright)$",
     )
-    # background: str = Field(description="Description of the setting or background")
     simulation: bool = Field(
         description="Whether the input is from a simulation (True) or the real world (False)"
     )
-    # object: str = Field(
-    #     description="Description of the object the robot is interacting with"
-    # )
-    # object_shape_color ??
+    data_collection_method: str | None = None
 
 
 class Task(BaseConfig):
@@ -124,6 +120,7 @@ class Rollout(BaseConfig):
     environment: Environment
     task: Task
     trajectory: Trajectory
+    split: str | None = None
 
 
 def pydantic_to_field_instructions(

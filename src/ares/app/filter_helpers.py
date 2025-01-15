@@ -307,16 +307,19 @@ def select_row_from_df_user(df: pd.DataFrame) -> None:
 
     # Option 3: Select by Dataset Name + Path
     with col3:
+        # Create path_options with the same index as df
         path_options = pd.Series(
-            [f"{name}/{path}" for name, path in zip(df.dataset_filename, df.path)]
+            [f"{name}/{path}" for name, path in zip(df.dataset_filename, df.path)],
+            index=df.index,
         )
         selected_path: str | None = st.selectbox(
             "Select by Path",
-            options=["Choose an option"] + path_options.tolist(),
+            options=["Choose an option"] + sorted(path_options.tolist()),
             key="path_select",
         )
         if st.button("Select by Path"):
             if selected_path != "Choose an option":
+                # Use boolean indexing with aligned indices
                 st.session_state["selected_row"] = df[
                     path_options == selected_path
                 ].iloc[0]

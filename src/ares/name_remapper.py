@@ -21,7 +21,7 @@ DATASET_NAMES = [
     # {"dataset_filename": "cmu_play_fusion", "dataset_formalname": "CMU Play Fusion"},
     # {
     #     "dataset_filename": "jaco_play",
-    #     "dataset_formalname": "Jaco Play",
+    #     "dataset_formalname": "USC Jaco Play",
     # },
     # {
     #     "dataset_filename": "dlr_edan_shared_control_converted_externally_to_rlds",
@@ -33,7 +33,7 @@ DATASET_NAMES = [
     # },
     # {
     #     "dataset_filename": "tokyo_u_lsmo_converted_externally_to_rlds",
-    #     "dataset_formalname": "Tokyo U LSMO",
+    #     "dataset_formalname": "LSMO Dataset",
     # },
     # {
     #     "dataset_filename": "nyu_rot_dataset_converted_externally_to_rlds",
@@ -41,7 +41,7 @@ DATASET_NAMES = [
     # },
     # {
     #     "dataset_filename": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
-    #     "dataset_formalname": "UCSD Pick and Place",
+    #     "dataset_formalname": "UCSD Pick Place",
     # },
     # {
     #     "dataset_filename": "asu_table_top_converted_externally_to_rlds",
@@ -51,14 +51,14 @@ DATASET_NAMES = [
     #     "dataset_filename": "utokyo_saytap_converted_externally_to_rlds",
     #     "dataset_formalname": "Saytap",
     # },
-    # {
-    #     "dataset_filename": "viola",
-    #     "dataset_formalname": "Austin VIOLA",
-    # },
-    # {
-    #     "dataset_filename": "kaist_nonprehensile_converted_externally_to_rlds",
-    #     "dataset_formalname": "KAIST Nonprehensile Objects",
-    # },
+    {
+        "dataset_filename": "viola",
+        "dataset_formalname": "Austin VIOLA",
+    },
+    {
+        "dataset_filename": "kaist_nonprehensile_converted_externally_to_rlds",
+        "dataset_formalname": "KAIST Nonprehensile Objects",
+    },
     {
         "dataset_filename": "berkeley_mvp_converted_externally_to_rlds",
         "dataset_formalname": "Berkeley MVP Data",

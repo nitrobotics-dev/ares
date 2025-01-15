@@ -220,7 +220,7 @@ def test() -> None:
         )
         return stats, failures
 
-    dataset_info = DATASET_NAMES[1]
+    dataset_info = DATASET_NAMES[0]
     dataset_filename = dataset_info["dataset_filename"]
     dataset_formalname = dataset_info["dataset_formalname"]
 

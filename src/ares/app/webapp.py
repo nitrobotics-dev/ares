@@ -137,10 +137,13 @@ def main() -> None:
 
     section_display = "data distributions"
     with filter_error_context(section_display), timer_context(section_display):
+        max_x_bar_options = 100
         # Create overview of all data
         st.header("Distribution Analytics")
         general_visualizations = generate_automatic_visualizations(
-            filtered_df, time_column="ingestion_time"
+            filtered_df,
+            time_column="ingestion_time",
+            max_x_bar_options=max_x_bar_options,
         )
         general_visualizations = sorted(
             general_visualizations, key=lambda x: x["title"]
@@ -148,6 +151,7 @@ def main() -> None:
         create_tabbed_visualizations(
             general_visualizations, [viz["title"] for viz in general_visualizations]
         )
+
     # section_success_rate = "success rate analytics"
     # with (
     #     filter_error_context(section_success_rate),

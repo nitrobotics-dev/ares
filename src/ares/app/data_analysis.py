@@ -51,6 +51,7 @@ def generate_automatic_visualizations(
     df: pd.DataFrame,
     time_column: str = "creation_time",
     ignore_cols: list[str] | None = None,
+    max_x_bar_options: int = 100,
 ) -> list[dict]:
     ignore_cols = ignore_cols or ["dataset_filename", "dataset_formalname"]
     visualizations = []
@@ -66,6 +67,10 @@ def generate_automatic_visualizations(
     histogram_cols = []
     bar_cols = []
     for col, info in viz_infos.items():
+        if not info["nunique"] or (
+            info["viz_type"] == "bar" and info["nunique"] > max_x_bar_options
+        ):
+            continue
         if info["viz_type"] == "histogram":
             histogram_cols.append(col)
         elif info["viz_type"] == "bar":
@@ -104,5 +109,4 @@ def generate_automatic_visualizations(
                 "title": f"{col_title} Distribution",
             }
         )
-
     return visualizations

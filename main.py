@@ -151,82 +151,90 @@ if __name__ == "__main__":
         data_dir = "/workspaces/ares/data/oxe/"
         builder, dataset_dict = build_dataset(dataset_filename, data_dir)
         print(f"working on {dataset_formalname}")
-        ds = dataset_dict["train"]
-        print(f"working on 'train' out of {list(dataset_dict.keys())}")
-        dataset_info = get_dataset_information(dataset_filename)
-        dataset_info["Dataset Filename"] = dataset_filename
-        dataset_info["Dataset Formalname"] = dataset_formalname
+        for split in dataset_dict.keys():
+            ds = dataset_dict[split]
+            print(f"working on {split} out of {list(dataset_dict.keys())}")
+            dataset_info = get_dataset_information(dataset_filename)
+            # hardcode a few additional fields
+            dataset_info["Dataset Filename"] = dataset_filename
+            dataset_info["Dataset Formalname"] = dataset_formalname
+            dataset_info["Split"] = split
 
-        print(len(ds))
-        random_extractor = RandomInformationExtractor()  # HACK!!
+            print(len(ds))
+            random_extractor = RandomInformationExtractor()  # HACK!!
 
-        # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
-        engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-        tic = time.time()
-        n_rollouts = 0
+            # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
+            engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+            tic = time.time()
+            n_rollouts = 0
 
-        # iterate through and add rollouts to the database
-        # for i, ep in tqdm(
-        #     enumerate(ds), desc=f"Ingesting {dataset_formalname} rollouts"
-        # ):
-        #     try:
-        #         if i == 0:
-        #             print(list(ep["steps"])[0]["observation"].keys())
-        #             breakpoint()
+            # iterate through and add rollouts to the database
+            for i, ep in tqdm(
+                enumerate(ds), desc=f"Ingesting {dataset_formalname} rollouts"
+            ):
+                try:
+                    if i == 0:
+                        print(list(ep["steps"])[0]["observation"].keys())
+                        breakpoint()
 
-        #         # construct the OpenXEmbodiment Episode
-        #         episode = construct_openxembodiment_episode(ep, dataset_info)
+                    # construct the OpenXEmbodiment Episode
+                    episode = construct_openxembodiment_episode(ep, dataset_info)
 
-        #         # complete the raw information with the rollout request (random for now)
-        #         rollout = random_extractor.extract(
-        #             episode=episode, dataset_info=dataset_info
-        #         )
-        #         # potentially save the video as mp4 and frames
-        #         maybe_save_video(
-        #             episode, dataset_filename, episode.episode_metadata.file_path
-        #         )
+                    # complete the raw information with the rollout request (random for now)
+                    rollout = random_extractor.extract(
+                        episode=episode, dataset_info=dataset_info
+                    )
+                    # potentially save the video as mp4 and frames
+                    maybe_save_video(
+                        episode, dataset_filename, episode.episode_metadata.file_path
+                    )
 
-        #         # add the rollout to the database
-        #         add_rollout(engine, rollout, RolloutSQLModel)
-        #         n_rollouts += 1
-        #     except Exception as e:
-        #         print(f"Error processing episode {i} during rollout extraction: {e}")
-        #         print(traceback.format_exc())
-        #         breakpoint()
+                    # add the rollout to the database
+                    add_rollout(engine, rollout, RolloutSQLModel)
+                    n_rollouts += 1
+                except Exception as e:
+                    print(
+                        f"Error processing episode {i} during rollout extraction: {e}"
+                    )
+                    print(traceback.format_exc())
+                    breakpoint()
 
-        # if n_rollouts == 0:
-        #     breakpoint()
-        # print(f"Structured database new rollouts: {n_rollouts}")
-        # total_time = time.time() - tic
-        # print(f"Structured database time: {total_time}")
-        # print(f"Structured database mean time: {total_time / n_rollouts}")
+            if n_rollouts == 0:
+                breakpoint()
+            print(f"Structured database new rollouts: {n_rollouts}")
+            total_time = time.time() - tic
+            print(f"Structured database time: {total_time}")
+            print(f"Structured database mean time: {total_time / n_rollouts}")
 
-        # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
-        # to db and videos to disk then reconstitute rollouts for indexing!
-        rollouts = setup_rollouts(engine, dataset_formalname)
-        index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
+            # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
+            # to db and videos to disk then reconstitute rollouts for indexing!
+            rollouts = setup_rollouts(engine, dataset_formalname)
+            index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
+
+            tic = time.time()
+            # add the trajectory matrices to the index and get normalizing constants for this dataset
+            # (states and actions)
+            ingest_trajectory_matrices(rollouts, index_manager)
+            index_manager.save()
+
+            # add task and description embeddings to the index
+            # (task, description)
+            embedder = get_nomic_embedder()
+            ingest_language_embeddings(rollouts, index_manager, embedder)
+            index_manager.save()
+
+            breakpoint()
+            print(f"Embedding database new rollouts: {len(rollouts)}")
+            total_time = time.time() - tic
+            print(f"Embedding database time: {total_time}")
+            print(f"Embedding database mean time: {total_time / len(rollouts)}")
+
+            print(
+                {
+                    k: v
+                    for k, v in index_manager.metadata.items()
+                    if dataset_formalname in k
+                }
+            )
 
         breakpoint()
-        tic = time.time()
-        # add the trajectory matrices to the index and get normalizing constants for this dataset
-        # (states and actions)
-        ingest_trajectory_matrices(rollouts, index_manager)
-        index_manager.save()
-
-        # add task and description embeddings to the index
-        # (task, description)
-        embedder = get_nomic_embedder()
-        ingest_language_embeddings(rollouts, index_manager, embedder)
-        index_manager.save()
-
-        breakpoint()
-        print(f"Embedding database new rollouts: {len(rollouts)}")
-        total_time = time.time() - tic
-        print(f"Embedding database time: {total_time}")
-        print(f"Embedding database mean time: {total_time / len(rollouts)}")
-
-        print(
-            {k: v for k, v in index_manager.metadata.items() if dataset_formalname in k}
-        )
-
-    breakpoint()
