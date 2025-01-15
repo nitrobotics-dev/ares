@@ -32,7 +32,7 @@ async def setup_query(
 ) -> tuple[list[np.ndarray], list[int], str]:
     frames, frame_indices = load_video_frames(
         dataset_filename,
-        rollout.path,
+        rollout.filename,
         target_fps,
     )
     label_str = await get_grounding_nouns_async(
@@ -76,7 +76,7 @@ def run_local(
 
         total_processed += 1
         pbar.update(1)
-        pbar.set_postfix({"Last file": os.path.basename(rollout.path)})
+        pbar.set_postfix({"Last file": os.path.basename(rollout.filename)})
 
     pbar.close()
     return total_anns, total_processed, total_frames

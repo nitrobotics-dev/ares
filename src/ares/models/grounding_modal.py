@@ -7,7 +7,7 @@ import typing as t
 import numpy as np
 from modal import App, Image, build, enter, method
 
-from ares.models.grounding import GroundingAnnotator
+from ares.models.grounding import ANNOTATION_GROUNDING_FPS, GroundingAnnotator
 
 image = (
     Image.debian_slim()
@@ -78,6 +78,7 @@ async def run_annotation_parallel(
                 annotator.annotate_video.remote.aio(rollout_id, frames, label_str)
             )
         )
+        print(f"launched modal req for rollout id {rollout_id}")
 
     # Process and store results as they complete
     tracker = dict(videos=0, frames=0, annotations=0, video_ids=[])
@@ -107,7 +108,7 @@ async def run_annotation_parallel(
             # add to database
             video_id = db.add_video_with_annotations(
                 dataset_filename=dataset_file_name,
-                video_path=rollout.path,
+                video_path=rollout.filename + ".mp4",
                 frames=frames,
                 frame_indices=frame_indices,
                 annotations=all_frame_annotation_dicts,
@@ -129,7 +130,6 @@ async def run_annotation_parallel(
 # test remote modal
 @app.local_entrypoint()
 def test() -> None:
-    # do whatever local test
     import numpy as np
 
     from ares.configs.base import Rollout
@@ -146,6 +146,7 @@ def test() -> None:
     from ares.models.base import VLM
     from ares.models.grounding_utils import get_grounding_nouns_async
     from ares.models.shortcuts import get_gpt_4o
+    from ares.name_remapper import DATASET_NAMES
     from ares.utils.image_utils import load_video_frames
 
     async def setup_query(
@@ -155,12 +156,15 @@ def test() -> None:
         target_fps: int = 5,
         refusal_phrases: list[str] | None = None,
     ) -> tuple[str, list[np.ndarray], list[int], str] | dict[str, Rollout | str]:
+        # Define local async functions here to use ARES imports in the Modal container
+
         try:
             frames, frame_indices = load_video_frames(
                 dataset_filename,
-                rollout.path,
+                rollout.filename,
                 target_fps,
             )
+            print(f"loaded {len(frames)} frames of size {frames[0].shape}")
         except Exception as e:
             return {
                 "rollout_id": rollout.id,
@@ -201,9 +205,7 @@ def test() -> None:
 
         # Create and gather the futures properly
         annotation_input_futures = [
-            asyncio.create_task(
-                setup_query(dataset_file_name, rollout, vlm, target_fps)
-            )
+            asyncio.create_task(setup_query(dataset_filename, rollout, vlm, target_fps))
             for rollout in rollouts
         ]
 
@@ -214,18 +216,22 @@ def test() -> None:
             annotation_input_futures,
             ann_db,
             rollouts,
-            dataset_file_name,
+            dataset_filename,
         )
         return stats, failures
 
-    dataset_filename = ""
-    target_fps = 5
-    retry_failed = None  # path to pickle file with failures
+    dataset_info = DATASET_NAMES[1]
+    dataset_filename = dataset_info["dataset_filename"]
+    dataset_formalname = dataset_info["dataset_formalname"]
+
+    retry_failed = None  # path to pickle file with failures to retry
     # retry_failed = "failures.pkl"
 
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     rollouts = setup_rollouts(engine, dataset_formalname)
+    if len(rollouts) == 0:
+        breakpoint()
 
     if retry_failed:
         with open(retry_failed, "rb") as f:
@@ -244,12 +250,13 @@ def test() -> None:
             rollouts,
             vlm,
             ann_db,
-            target_fps,
+            ANNOTATION_GROUNDING_FPS,
         )
     )
 
     print(f"\n\nfailures: {failures}\n\n")
-    # write failures to file
+
+    # write failures to file in order to retry
     with open("failures.pkl", "wb") as f:
         pickle.dump(failures, f)
 
@@ -257,4 +264,5 @@ def test() -> None:
     print(f"\n\n")
     for k, v in stats.items():
         print(f"{k}: {v}" if not isinstance(v, list) else f"{k}: {v[:10]}...")
+    print(f"n fails: {len(failures)}")
     breakpoint()

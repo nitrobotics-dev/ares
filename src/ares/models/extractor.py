@@ -49,14 +49,18 @@ def hard_coded_dataset_info_extraction_spreadsheet(dataset_info: dict) -> dict:
     return {
         "rollout": {
             "dataset_name": dataset_info["Dataset"],
-            "dataset_formalname": dataset_info["Registered Dataset Name"],
+            "dataset_formalname": dataset_info["Dataset Formalname"],
             "dataset_filename": dataset_info["Dataset Filename"],
             "creation_time": year,
             "ingestion_time": datetime.now(),
         },
         "robot": {
             "embodiment": dataset_info["Robot"],
-            "gripper": dataset_info["Gripper"],
+            "gripper": (
+                dataset_info["Gripper"]
+                if not pd.isna(dataset_info["Gripper"])
+                else "None"
+            ),
             "morphology": dataset_info["Robot Morphology"],
             "action_space": dataset_info["Action Space"],
             "rgb_cams": dataset_info["# RGB Cams"],
@@ -107,7 +111,7 @@ def hard_coded_episode_info_extraction(episode: OpenXEmbodimentEpisode) -> dict:
     # gather trajectory data
     actions = np.stack([step.action for step in steps]).tolist()
     states = np.stack([step.observation.state for step in steps]).tolist()
-    path = episode.episode_metadata.file_path
+    path = episode.episode_metadata.file_path.removeprefix("/")
     return {
         "rollout": {
             "path": path,

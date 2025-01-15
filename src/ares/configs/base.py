@@ -26,7 +26,7 @@ class BaseConfig(BaseModel):
 
 class Robot(BaseConfig):
     embodiment: str
-    gripper: str
+    gripper: str | None = None
     morphology: str
     action_space: str
     rgb_cams: int

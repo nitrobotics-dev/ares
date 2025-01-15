@@ -269,9 +269,18 @@ class Embedder:
                 return outputs.detach().numpy()[0]
 
 
-class SentenceTransformerEmbedder:
+class SentenceTransformerEmbedder(Embedder):
     def __init__(self, provider: str, name: str):
-        self.model = SentenceTransformer(f"{provider}/{name}", trust_remote_code=True)
+        super().__init__(provider, name)
 
-    def embed(self, inp: str, prefix: str = "clustering: ") -> np.ndarray:
+    def _setup_model(self) -> None:
+        self.model = SentenceTransformer(
+            f"{self.provider}/{self.name}", trust_remote_code=True
+        )
+        self.name = self.model.model_card_data.base_model
+
+    def embed(self, inp: t.Union[str, Image.Image, np.ndarray]) -> np.ndarray:
+        if not isinstance(inp, str):
+            raise ValueError("Input must be a string for SentenceTransformerEmbedder")
+        prefix = "clustering: "
         return np.array(self.model.encode(prefix + inp))

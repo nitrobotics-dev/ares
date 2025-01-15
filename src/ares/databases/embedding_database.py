@@ -1,16 +1,3 @@
-"""
-We want a different embedding index for each robot,and for each robot's state and action spaces.
-It would be great to have a unified embedding space of 3D positions, but that relies on finding the forward kinematics model for each robot.
-We leave that for future work.
-
-Right now, for each robot, for each episode, we get (N, S) arrays for states and actions.
-The embedding indexes only work on flat vectors, so our goal is to normalize and flatten the matrices into vectors.
-    - TODO: normalize each sensor range independently
-    - TODO: better time dilation? right now just scale all to T timesteps
-
-Total 2 indices per robot plus 2 for video, text description (plus one for 3D pos!)
-"""
-
 import json
 import traceback
 from abc import ABC, abstractmethod

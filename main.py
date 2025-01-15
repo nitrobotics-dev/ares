@@ -1,6 +1,7 @@
 import os
 import time
 import traceback
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -30,9 +31,11 @@ from ares.databases.structured_database import (
     add_column_with_vals_and_defaults,
     add_rollout,
     setup_database,
+    setup_rollouts,
 )
 from ares.models.extractor import RandomInformationExtractor
-from ares.models.shortcuts import get_nomic_embedder
+from ares.models.shortcuts import Embedder, get_nomic_embedder
+from ares.name_remapper import DATASET_NAMES
 from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
 
 
@@ -45,176 +48,185 @@ def build_dataset(
     return builder, dataset_dict
 
 
+def construct_openxembodiment_episode(
+    episode: OpenXEmbodimentEpisode, dataset_info: dict
+) -> OpenXEmbodimentEpisode:
+    raw_steps = list(ep["steps"])
+    if "episode_metadata" not in ep:
+        ep["episode_metadata"] = dict(file_path=f"episode_{i}.npy")
+    episode = OpenXEmbodimentEpisode(**ep)
+    steps = episode.steps
+
+    if episode.episode_metadata is None:
+        # construct our own metadata
+        episode.episode_metadata = OpenXEmbodimentEpisodeMetadata(
+            file_path=f"episode_{i}.npy",  # to mock extension
+        )
+    return episode
+
+
+def maybe_save_video(
+    episode: OpenXEmbodimentEpisode, dataset_filename: str, path: str
+) -> None:
+    video = [step.observation.image for step in episode.steps]
+    fname = str(Path(path.removeprefix("/")).with_suffix(""))
+    if not os.path.exists(
+        os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, fname + ".mp4")
+    ):
+        save_video(video, dataset_filename, fname)
+
+
+def ingest_trajectory_matrices(
+    rollouts: list[Rollout], index_manager: IndexManager
+) -> None:
+    # collect all embedding packs for states, actions (pre-existing)
+    embedding_packs = []
+    for rollout in rollouts:
+        embedding_packs.append(rollout_to_embedding_pack(rollout))
+
+    # collect all the embeddings and get normalizing constants
+    for k in embedding_packs[0].keys():
+        embeddings = np.concatenate([pack[k] for pack in embedding_packs])
+        print(f"found {embeddings.shape} for {k}; (N,K)")
+        # find normalizing constants
+        means = np.mean(embeddings, axis=0)
+        stds = np.std(embeddings, axis=0)
+        feature_dim = embeddings.shape[1]
+        print(f"found means {means.shape} and stds {stds.shape}")
+        # setup index if not already existing
+        if k not in index_manager.indices.keys():
+            index_manager.init_index(
+                k,
+                feature_dim,
+                TEST_TIME_STEPS,
+                norm_means=means,  # normalize with dimension-specific means
+                norm_stds=stds,  # normalize with dimension-specific stds
+            )
+        # add the embeddings to the index! these will be normalized
+        for pack in tqdm(embedding_packs, desc=f"Ingesting {k} embeddings"):
+            # some datasets do not provide this information
+            if isinstance(pack.get(k), np.ndarray):
+                index_manager.add_matrix(k, pack[k], str(rollout.id))
+
+
+def ingest_language_embeddings(
+    rollouts: list[Rollout], index_manager: IndexManager, embedder: Embedder
+) -> None:
+    feature_dim = embedder.embed("test").shape[0]
+    for name in ["task", "description"]:
+        for rollout in tqdm(rollouts, desc=f"Ingesting {name} embeddings"):
+            if name not in index_manager.indices.keys():
+                index_manager.init_index(
+                    name,
+                    feature_dim,
+                    TEST_TIME_STEPS,
+                    norm_means=None,  # no need to normalize
+                    norm_stds=None,  # no need to normalize
+                    extra_metadata={"model": embedder.name},
+                )
+
+            # HACK!!!! fix the lang instructuion and success criteria weirdness
+            inp = (
+                rollout.task.language_instruction
+                if name == "description"
+                else rollout.task.success_criteria
+            )
+            # some datasets do not provide this information
+            if inp is None:
+                continue
+            embedding = embedder.embed(inp)
+            index_manager.add_vector(name, embedding, str(rollout.id))
+
+
 TEST_TIME_STEPS = 100
 
 
 if __name__ == "__main__":
-
-    EMBEDDER = get_nomic_embedder()
-
-    index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
-
     hf_base = "jxu124/OpenX-Embodiment"
-    # ones that worked
-    for dataset_filename, dataset_formalname in []:
-        # going to try oxe-downloader?
-        # oxe-download --dataset "name" !!!
+
+    for dataset_info in DATASET_NAMES:
+        dataset_filename = dataset_info["dataset_filename"]
+        dataset_formalname = dataset_info["dataset_formalname"]
 
         data_dir = "/workspaces/ares/data/oxe/"
         builder, dataset_dict = build_dataset(dataset_filename, data_dir)
-        # dataset_info = builder.info
         print(f"working on {dataset_formalname}")
         ds = dataset_dict["train"]
         print(f"working on 'train' out of {list(dataset_dict.keys())}")
-        dataset_info = get_dataset_information(dataset_formalname)
+        dataset_info = get_dataset_information(dataset_filename)
         dataset_info["Dataset Filename"] = dataset_filename
+        dataset_info["Dataset Formalname"] = dataset_formalname
 
         print(len(ds))
-
-        random_extractor = RandomInformationExtractor()
+        random_extractor = RandomInformationExtractor()  # HACK!!
 
         # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
         engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-
-        rollouts: list[Rollout] = []
-        all_times = []
         tic = time.time()
+        n_rollouts = 0
 
-        # STUFF TO ADD ON THIS GOING FORWARD
-        # 1. add FORMAL/INFORMAL to the rollout table
-        # 2. strip path name to stem
+        # iterate through and add rollouts to the database
+        # for i, ep in tqdm(
+        #     enumerate(ds), desc=f"Ingesting {dataset_formalname} rollouts"
+        # ):
+        #     try:
+        #         if i == 0:
+        #             print(list(ep["steps"])[0]["observation"].keys())
+        #             breakpoint()
 
-        for i, ep in tqdm(enumerate(ds)):
-            try:
-                raw_steps = list(ep["steps"])
-                if i == 0:
-                    print(raw_steps[0]["observation"].keys())
-                episode = OpenXEmbodimentEpisode(**ep)
-                steps = episode.steps
+        #         # construct the OpenXEmbodiment Episode
+        #         episode = construct_openxembodiment_episode(ep, dataset_info)
 
-                if episode.episode_metadata is None:
-                    # construct our own metadata
-                    episode.episode_metadata = OpenXEmbodimentEpisodeMetadata(
-                        file_path=f"episode_{i}.npy",  # to mock extension
-                    )
+        #         # complete the raw information with the rollout request (random for now)
+        #         rollout = random_extractor.extract(
+        #             episode=episode, dataset_info=dataset_info
+        #         )
+        #         # potentially save the video as mp4 and frames
+        #         maybe_save_video(
+        #             episode, dataset_filename, episode.episode_metadata.file_path
+        #         )
 
-                rollout = random_extractor.extract(
-                    episode=episode, dataset_info=dataset_info
-                )
-                rollouts.append(rollout)
-                # print(rewards)
+        #         # add the rollout to the database
+        #         add_rollout(engine, rollout, RolloutSQLModel)
+        #         n_rollouts += 1
+        #     except Exception as e:
+        #         print(f"Error processing episode {i} during rollout extraction: {e}")
+        #         print(traceback.format_exc())
+        #         breakpoint()
 
-                video = [step.observation.image for step in episode.steps]
-                fname = os.path.splitext(episode.episode_metadata.file_path)[0]
-                # check if the file exists
-                if os.path.exists(
-                    os.path.join(
-                        ARES_DATASET_VIDEO_PATH, rollout.dataset_name, fname + ".mp4"
-                    )
-                ):
-                    continue
-                out = save_video(video, rollout.dataset_filename, rollout.filename)
+        # if n_rollouts == 0:
+        #     breakpoint()
+        # print(f"Structured database new rollouts: {n_rollouts}")
+        # total_time = time.time() - tic
+        # print(f"Structured database time: {total_time}")
+        # print(f"Structured database mean time: {total_time / n_rollouts}")
 
-                # rollouts.append(rollout)
-                # # just track this
-                # start_time = time.time()
-                add_rollout(engine, rollout, RolloutSQLModel)
-                # all_times.append(time.time() - start_time)
+        # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
+        # to db and videos to disk then reconstitute rollouts for indexing!
+        rollouts = setup_rollouts(engine, dataset_formalname)
+        index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
 
-                # add the non-robot specific embeddings
-                for name in ["task", "description"]:
-                    inp = (
-                        rollout.task.language_instruction
-                        if name == "description"
-                        else rollout.task.success_criteria
-                    )
-                    if inp is None:
-                        continue
-                    embedding = EMBEDDER.embed(inp)
-                    index_manager.add_vector(name, embedding, str(rollout.id))
-
-                embedding_pack = rollout_to_embedding_pack(rollout)
-
-                for index_name, matrix in embedding_pack.items():
-                    if index_name not in index_manager.indices.keys():
-                        index_manager.init_index(
-                            index_name,
-                            matrix.shape[1],
-                            TEST_TIME_STEPS,
-                            norm_means=None,
-                            norm_stds=None,
-                        )
-                    if not (
-                        matrix is None
-                        or (isinstance(matrix, list) and all(x is None for x in matrix))
-                        or len(matrix.shape) != 2
-                    ):
-                        index_manager.add_matrix(index_name, matrix, str(rollout.id))
-
-            except Exception as e:
-                print(f"Error processing episode {i}: {e}")
-                print(traceback.format_exc())
-                breakpoint()
-
-        print(f"Total rollouts: {len(rollouts)}")
-        print(f"Total time: {time.time() - tic}")
-        print(f"Mean time: {np.mean(all_times)}")
-
-        # breakpoint()
-
-        print(index_manager.metadata)
+        breakpoint()
+        tic = time.time()
+        # add the trajectory matrices to the index and get normalizing constants for this dataset
+        # (states and actions)
+        ingest_trajectory_matrices(rollouts, index_manager)
         index_manager.save()
 
-        # sess = Session(engine)
-        # # get a df.head() basically
-        # # Get first few rows from RolloutSQLModel table
-        # first_rows = sess.query(RolloutSQLModel).limit(5).all()
-        # last_rows = (
-        #     sess.query(RolloutSQLModel).order_by(RolloutSQLModel.id.desc()).limit(5).all()
-        # )
-        # rows = first_rows + last_rows
-        # # breakpoint()
-        # # row = rows[0]
-        # # rollout = recreate_model(rows[0], Rollout)
-        # breakpoint()
-        # # Print sample rows
-        # # for row in rows:
-        # #     print(f"\nRollout {row.id}:")
-        # #     print(f"Path: {row.path}")
-        # #     print(f"Task Success: {row.task_success}")
-        # #     print(f"Language Instruction: {row.task_language_instruction}")
-        # #     breakpoint()
+        # add task and description embeddings to the index
+        # (task, description)
+        embedder = get_nomic_embedder()
+        ingest_language_embeddings(rollouts, index_manager, embedder)
+        index_manager.save()
 
-        # row_count = sess.execute(
-        #     select(func.count()).select_from(RolloutSQLModel)
-        # ).scalar_one()
-        # print(f"row count: {row_count}")
-        # # res = (
-        # #     sess.query(RolloutSQLModel)
-        # #     .filter(RolloutSQLModel.task_success > 0.5)
-        # #     .all()
-        # # )
-        # # print(f"mean wins: {len(res) / row_count}")
-        # res = sess.scalars(sess.query(RolloutSQLModel.task_language_instruction)).all()
-        # res = sess.scalars(sess.query(RolloutSQLModel.trajectory_is_last)).all()
+        breakpoint()
+        print(f"Embedding database new rollouts: {len(rollouts)}")
+        total_time = time.time() - tic
+        print(f"Embedding database time: {total_time}")
+        print(f"Embedding database mean time: {total_time / len(rollouts)}")
 
-        # # get unique dataset_name
-        # res = sess.scalars(sess.query(RolloutSQLModel.dataset_name)).unique()
-        # print(f"unique dataset_name: {list(res)}")
-        # # comparison df
-        # comparison_df = pd.read_sql(
-        #     select(
-        #         RolloutSQLModel.trajectory_is_last,
-        #         RolloutSQLModel.trajectory_is_terminal,
-        #     ),
-        #     engine,
-        # )
-
-        # # Print summary statistics
-        # print(
-        #     (
-        #         comparison_df.trajectory_is_last == comparison_df.trajectory_is_terminal
-        #     ).mean()
-        # )
+        print(
+            {k: v for k, v in index_manager.metadata.items() if dataset_formalname in k}
+        )
 
     breakpoint()

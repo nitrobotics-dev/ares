@@ -26,7 +26,8 @@ def get_image_from_path(path: str) -> Image.Image:
 def get_video_from_path(
     dataset: str, path: str
 ) -> str | bytes | io.BytesIO | np.ndarray:
-    # TODO: implement
+    if not path.endswith(".mp4"):
+        path += ".mp4"
     return os.path.join(ARES_DATASET_VIDEO_PATH, dataset, path)
 
 

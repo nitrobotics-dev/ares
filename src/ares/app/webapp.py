@@ -148,7 +148,6 @@ def main() -> None:
         create_tabbed_visualizations(
             general_visualizations, [viz["title"] for viz in general_visualizations]
         )
-
     # section_success_rate = "success rate analytics"
     # with (
     #     filter_error_context(section_success_rate),

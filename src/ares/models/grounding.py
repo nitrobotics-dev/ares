@@ -10,6 +10,8 @@ from transformers import (
     AutoProcessor,
 )
 
+ANNOTATION_GROUNDING_FPS = 5
+
 
 class GroundingAnnotator:
     def __init__(
@@ -178,7 +180,7 @@ class GroundingAnnotator:
         rollout_id: str,
         frames: list,
         labels_str: str,
-        batch_size: int = 12,
+        batch_size: int = 8,
     ) -> list[list[dict]]:
         """Annotate video frames in batches."""
         all_annotations = []

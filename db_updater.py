@@ -8,30 +8,29 @@ from ares.databases.structured_database import (
     add_column_with_vals_and_defaults,
     db_to_df,
     get_all_rollouts,
+    get_dataset_rollouts,
+    get_rollout_by_name,
     setup_database,
 )
 from ares.name_remapper import DATASET_NAMES
 
 engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-rollouts = get_all_rollouts(engine)
+# rollouts = get_all_rollouts(engine)
+rollouts = get_dataset_rollouts(engine, "Imperial Wrist Cam")
 
 
 if __name__ == "__main__":
     id_keys = ["dataset_name", "path"]
 
-    new_col_key_stem = ["dataset_filename", "dataset_formalname"]
-    new_cols_flat_names = ["dataset_filename", "dataset_formalname"]
-    new_cols_flat_types = [str, str]
-    default_vals = [None, None]
+    new_col_key_stem = ["path"]
+    new_cols_flat_names = ["path"]
+    new_cols_flat_types = [str]
+    default_vals = [None]
 
     for i in range(len(new_cols_flat_names)):
         input_mapping = dict()
         for rollout in rollouts:
-            new_val = getattr(
-                rollout,
-                "dataset_name",
-            )
-            new_val = DATASET_NAMES[new_val][new_col_key_stem[i]]
+            new_val = rollout.path.removeprefix("/")
             input_mapping[tuple(getattr(rollout, k) for k in id_keys)] = new_val
 
         add_column_with_vals_and_defaults(

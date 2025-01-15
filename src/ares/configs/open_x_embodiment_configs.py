@@ -47,30 +47,52 @@ class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
     image: np.ndarray
     state: np.ndarray | None = None
     depth: np.ndarray | None = None
-    highres_image: np.ndarray | None = None
     wrist_image: np.ndarray | None = None
     end_effector_state: np.ndarray | None = None
 
-    @model_validator(mode="after")
-    def swap_in_highres_image(self) -> "OpenXEmbodimentStepObservation":
-        # use the highres image as image if available
-        if self.highres_image is not None:
-            self.image = self.highres_image
-        return self
+    @model_validator(mode="before")
+    def get_image(cls, data: dict) -> "dict":
+        if "highres_image" in data:
+            data["image"] = data.pop("highres_image")
+        elif "hand_image" in data and "image" not in data:
+            data["image"] = data.pop("hand_image")
+        elif "agentview_rgb" in data:
+            data["image"] = data.pop("agentview_rgb")
+
+        if "eye_in_hand_rgb" in data:
+            data["wrist_image"] = data.pop("eye_in_hand_rgb")
+        return data
 
     @model_validator(mode="before")
-    def concat_state(cls, data: dict) -> dict:
+    def get_state(cls, data: dict) -> dict:
         if "state" not in data:
             extra_state_keys = [
+                "gripper",
+                "gripper_states",
                 "end_effector_cartesian_pos",
                 "end_effector_cartesian_velocity",
                 "joint_pos",
+                "joint_states",
+                "pose",
             ]
-            state_arrays = [data[k] for k in extra_state_keys if k in data]
+            state_arrays = []
+            for k in extra_state_keys:
+                if k in data:
+                    value = data[k]
+                    if isinstance(value, bool):
+                        state_arrays.append(np.array([float(value)]))
+                    elif hasattr(value, "shape"):
+                        if value.shape == ():
+                            state_arrays.append(value.numpy().reshape(1))
+                        else:
+                            state_arrays.append(value)
             if state_arrays:
                 data["state"] = np.concatenate(state_arrays)
             else:
                 data["state"] = None
+        if "end_effector_state" not in data:
+            if "ee_state" in data:
+                data["end_effector_state"] = data.pop("ee_state")
         return data
 
 
@@ -102,19 +124,33 @@ class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
             # Add more field remapping here as needed
             action = data["action"]
             if isinstance(action, dict):
-                if "gripper_closedness_action" in action:  # jaco_play
-                    data["action"] = np.concatenate(
-                        [
-                            action["world_vector"],
-                            action["gripper_closedness_action"],
-                            action["terminate_episode"],
-                        ]
-                    )
+                extra_action_keys = [
+                    "rotation_delta",
+                    "world_vector",
+                    "gripper_closedness_action",
+                    "terminate_episode",
+                ]
+                action_arrays = []
+                for k in extra_action_keys:
+                    if k in action:
+                        value = action[k]
+                        if isinstance(value, (int, float)):
+                            action_arrays.append(np.array([float(value)]))
+                        elif hasattr(value, "shape"):
+                            if value.shape == ():
+                                action_arrays.append(value.numpy().reshape(1))
+                            else:
+                                action_arrays.append(value)
+
+                if action_arrays:
+                    data["action"] = np.concatenate(action_arrays)
+                else:
+                    data["action"] = None
         return data
 
 
 class OpenXEmbodimentEpisode(TensorConverterMixin, BaseModel):
-    episode_metadata: OpenXEmbodimentEpisodeMetadata | None = None
+    episode_metadata: OpenXEmbodimentEpisodeMetadata
     steps: list[OpenXEmbodimentStep]
 
 
@@ -126,6 +162,6 @@ def get_oxe_dataframe() -> pd.DataFrame:
     return pd.read_csv(PATH_TO_SPREADSHEET, header=HEADER_ROW)
 
 
-def get_dataset_information(dataset_formalname: str) -> pd.DataFrame:
+def get_dataset_information(dataset_filename: str) -> pd.DataFrame:
     df = get_oxe_dataframe()
-    return dict(df[df["Registered Dataset Name"] == dataset_formalname].iloc[0])
+    return dict(df[df["Registered Dataset Name"] == dataset_filename].iloc[0])
