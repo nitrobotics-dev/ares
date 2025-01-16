@@ -234,6 +234,13 @@ def add_column_with_vals_and_defaults(
                 )
 
 
+def get_rollouts_by_ids(engine: Engine, ids: list[uuid.UUID]) -> list[Rollout]:
+    with Session(engine) as session:
+        query = select(RolloutSQLModel).where(RolloutSQLModel.id.in_(ids))
+        rows = session.exec(query).all()
+        return [recreate_model(row[0], Rollout) for row in rows]
+
+
 if __name__ == "__main__":
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     df = db_to_df(engine)

@@ -73,7 +73,8 @@ if __name__ == "__main__":
 
             # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
             # to db and videos to disk then reconstitute rollouts for indexing!
-            run_embedding_database_ingestion(engine, dataset_formalname)
+            rollouts = setup_rollouts(engine, dataset_formalname)
+            run_embedding_database_ingestion(rollouts)
 
             # TODO: run grounding here!
 
