@@ -165,3 +165,13 @@ def get_oxe_dataframe() -> pd.DataFrame:
 def get_dataset_information(dataset_filename: str) -> pd.DataFrame:
     df = get_oxe_dataframe()
     return dict(df[df["Registered Dataset Name"] == dataset_filename].iloc[0])
+
+
+def construct_openxembodiment_episode(
+    ep: dict, dataset_info: dict, i: int
+) -> OpenXEmbodimentEpisode:
+    raw_steps = list(ep["steps"])
+    if "episode_metadata" not in ep:
+        ep["episode_metadata"] = dict(file_path=f"episode_{i}.npy")
+    episode = OpenXEmbodimentEpisode(**ep)
+    return episode

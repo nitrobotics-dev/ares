@@ -17,11 +17,13 @@ BASE_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/embedding_data"
 TEST_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/test_embedding_data"
 TEST_TIME_STEPS = 100
 
+META_INDEX_NAMES = ["description", "task"]
+
 
 def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
     if isinstance(rollout, pd.Series):
-        return f"{rollout['dataset_name']}-{rollout['robot_embodiment']}-{suffix}"
-    return f"{rollout.dataset_name}-{rollout.robot.embodiment}-{suffix}"
+        return f"{rollout['dataset_formalname']}-{rollout['robot_embodiment']}-{suffix}"
+    return f"{rollout.dataset_formalname}-{rollout.robot.embodiment}-{suffix}"
 
 
 def rollout_to_embedding_pack(

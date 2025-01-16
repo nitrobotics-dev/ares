@@ -47,7 +47,7 @@ async def run_annotation_parallel(
     annotation_input_futures: list[t.Any],
     db: "AnnotationDatabase",
     rollouts: list["Rollout"],
-    dataset_file_name: str,
+    dataset_filename: str,
 ) -> tuple[dict[str, int], list[dict]]:
     id_to_rollout = {r.id: r for r in rollouts}
     id_to_annotation_inputs = dict()
@@ -107,7 +107,7 @@ async def run_annotation_parallel(
             )
             # add to database
             video_id = db.add_video_with_annotations(
-                dataset_filename=dataset_file_name,
+                dataset_filename=dataset_filename,
                 video_path=rollout.filename + ".mp4",
                 frames=frames,
                 frame_indices=frame_indices,

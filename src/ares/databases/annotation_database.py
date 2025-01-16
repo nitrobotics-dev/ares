@@ -1,6 +1,7 @@
 import time
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
@@ -245,11 +246,7 @@ class AnnotationDatabase:
             video_id: Unique identifier for the video
         """
         # Create video metadata
-        video_path = (
-            video_path.replace(".npy", ".mp4")
-            .replace(".npz", ".mp4")
-            .replace(".p", ".mp4")
-        )  # HACK
+        video_path = str(Path(video_path).with_suffix(".mp4"))
         video_id = f"{dataset_filename}/{video_path}"
         metadata = {
             "dataset_filename": dataset_filename,
@@ -291,8 +288,13 @@ class AnnotationDatabase:
             "annotations": list(self.annotations.find().limit(limit)),
         }
 
+    def get_video_ids(self) -> List[str]:
+        return list(self.videos.find().distinct("_id"))
 
-# make test inputs
+    def get_annotation_ids(self) -> List[str]:
+        return list(self.annotations.find().distinct("video_id"))
+
+
 if __name__ == "__main__":
     db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     # db.add_video("test_video", {"test": "test"})

@@ -138,7 +138,7 @@ def hard_coded_episode_info_extraction(episode: OpenXEmbodimentEpisode) -> dict:
 
 class InformationExtractor:
     def __init__(self) -> None:
-        pass
+        raise NotImplementedError
 
     def extract(
         self,

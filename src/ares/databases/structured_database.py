@@ -157,6 +157,12 @@ def db_to_df(engine: Engine) -> pd.DataFrame:
     return df
 
 
+def get_partial_df(engine: Engine, columns: list[str]) -> pd.DataFrame:
+    query = select(RolloutSQLModel).with_only_columns(*columns)
+    df = pd.read_sql(query, engine)
+    return df
+
+
 def setup_rollouts(
     engine: Engine,
     dataset_formalname: str,
