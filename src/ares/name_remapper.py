@@ -51,14 +51,14 @@ DATASET_NAMES = [
     #     "dataset_filename": "utokyo_saytap_converted_externally_to_rlds",
     #     "dataset_formalname": "Saytap",
     # },
-    {
-        "dataset_filename": "viola",
-        "dataset_formalname": "Austin VIOLA",
-    },
-    {
-        "dataset_filename": "kaist_nonprehensile_converted_externally_to_rlds",
-        "dataset_formalname": "KAIST Nonprehensile Objects",
-    },
+    # {
+    #     "dataset_filename": "viola",
+    #     "dataset_formalname": "Austin VIOLA",
+    # },
+    # {
+    #     "dataset_filename": "kaist_nonprehensile_converted_externally_to_rlds",
+    #     "dataset_formalname": "KAIST Nonprehensile Objects",
+    # },
     {
         "dataset_filename": "berkeley_mvp_converted_externally_to_rlds",
         "dataset_formalname": "Berkeley MVP Data",

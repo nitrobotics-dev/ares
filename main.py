@@ -20,6 +20,7 @@ from ares.configs.open_x_embodiment_configs import (
 from ares.configs.pydantic_sql_helpers import recreate_model
 from ares.databases.embedding_database import (
     TEST_EMBEDDING_DB_PATH,
+    TEST_TIME_STEPS,
     FaissIndex,
     IndexManager,
     rollout_to_embedding_pack,
@@ -33,7 +34,7 @@ from ares.databases.structured_database import (
     setup_database,
     setup_rollouts,
 )
-from ares.models.extractor import RandomInformationExtractor
+from ares.models.extractor import InformationExtractor, RandomInformationExtractor
 from ares.models.shortcuts import Embedder, get_nomic_embedder
 from ares.name_remapper import DATASET_NAMES
 from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
@@ -49,19 +50,12 @@ def build_dataset(
 
 
 def construct_openxembodiment_episode(
-    episode: OpenXEmbodimentEpisode, dataset_info: dict
+    ep: dict, dataset_info: dict, i: int
 ) -> OpenXEmbodimentEpisode:
     raw_steps = list(ep["steps"])
     if "episode_metadata" not in ep:
         ep["episode_metadata"] = dict(file_path=f"episode_{i}.npy")
     episode = OpenXEmbodimentEpisode(**ep)
-    steps = episode.steps
-
-    if episode.episode_metadata is None:
-        # construct our own metadata
-        episode.episode_metadata = OpenXEmbodimentEpisodeMetadata(
-            file_path=f"episode_{i}.npy",  # to mock extension
-        )
     return episode
 
 
@@ -76,7 +70,7 @@ def maybe_save_video(
         save_video(video, dataset_filename, fname)
 
 
-def ingest_trajectory_matrices(
+def ingest_trajectory_matrices_from_rollouts(
     rollouts: list[Rollout], index_manager: IndexManager
 ) -> None:
     # collect all embedding packs for states, actions (pre-existing)
@@ -109,7 +103,7 @@ def ingest_trajectory_matrices(
                 index_manager.add_matrix(k, pack[k], str(rollout.id))
 
 
-def ingest_language_embeddings(
+def ingest_language_embeddings_from_rollouts(
     rollouts: list[Rollout], index_manager: IndexManager, embedder: Embedder
 ) -> None:
     feature_dim = embedder.embed("test").shape[0]
@@ -138,103 +132,104 @@ def ingest_language_embeddings(
             index_manager.add_vector(name, embedding, str(rollout.id))
 
 
-TEST_TIME_STEPS = 100
+def run_structured_database_ingestion(
+    ds: tfds.datasets,
+    dataset_info: dict,
+    extractor: InformationExtractor,
+    engine: Engine,
+    dataset_filename: str,
+) -> None:
+    for i, ep in tqdm(enumerate(ds), desc=f"Ingesting {dataset_formalname} rollouts"):
+        try:
+            if i == 0:
+                print(list(ep["steps"])[0]["observation"].keys())
+                breakpoint()
+
+            # construct the OpenXEmbodiment Episode
+            episode = construct_openxembodiment_episode(ep, dataset_info, i)
+
+            # complete the raw information with the rollout request (random for now)
+            rollout = extractor.extract(episode=episode, dataset_info=dataset_info)
+            # potentially save the video as mp4 and frames
+            maybe_save_video(
+                episode, dataset_filename, episode.episode_metadata.file_path
+            )
+
+            # add the rollout to the database
+            add_rollout(engine, rollout, RolloutSQLModel)
+            n_rollouts += 1
+        except Exception as e:
+            print(f"Error processing episode {i} during rollout extraction: {e}")
+            print(traceback.format_exc())
+            breakpoint()
+
+    if n_rollouts == 0:
+        breakpoint()
+    print(f"Structured database new rollouts: {n_rollouts}")
+    total_time = time.time() - tic
+    print(f"Structured database time: {total_time}")
+    print(f"Structured database mean time: {total_time / n_rollouts}")
+
+
+def run_embedding_database_ingestion(engine: Engine, dataset_formalname: str) -> None:
+    rollouts = setup_rollouts(engine, dataset_formalname)
+    index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
+
+    tic = time.time()
+    # add the trajectory matrices to the index and get normalizing constants for this dataset
+    # (states and actions)
+    ingest_trajectory_matrices_from_rollouts(rollouts, index_manager)
+    index_manager.save()
+
+    # add task and description embeddings to the index
+    # (task, description)
+    embedder = get_nomic_embedder()
+    ingest_language_embeddings_from_rollouts(rollouts, index_manager, embedder)
+    index_manager.save()
+
+    breakpoint()
+    print(f"Embedding database new rollouts: {len(rollouts)}")
+    total_time = time.time() - tic
+    print(f"Embedding database time: {total_time}")
+    print(f"Embedding database mean time: {total_time / len(rollouts)}")
+
+    print({k: v for k, v in index_manager.metadata.items() if dataset_formalname in k})
 
 
 if __name__ == "__main__":
     hf_base = "jxu124/OpenX-Embodiment"
+    random_extractor = RandomInformationExtractor()  # HACK!!
+    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+    data_dir = "/workspaces/ares/data/oxe/"
 
     for dataset_info in DATASET_NAMES:
         dataset_filename = dataset_info["dataset_filename"]
         dataset_formalname = dataset_info["dataset_formalname"]
-
-        data_dir = "/workspaces/ares/data/oxe/"
         builder, dataset_dict = build_dataset(dataset_filename, data_dir)
-        print(f"working on {dataset_formalname}")
+        print(
+            f"working on {dataset_formalname} with splits {list(dataset_dict.keys())}"
+        )
+
         for split in dataset_dict.keys():
             ds = dataset_dict[split]
-            print(f"working on {split} out of {list(dataset_dict.keys())}")
+            print(f"found {len(ds)} episodes in {split}")
             dataset_info = get_dataset_information(dataset_filename)
+
             # hardcode a few additional fields
             dataset_info["Dataset Filename"] = dataset_filename
             dataset_info["Dataset Formalname"] = dataset_formalname
             dataset_info["Split"] = split
 
-            print(len(ds))
-            random_extractor = RandomInformationExtractor()  # HACK!!
-
-            # os.remove(TEST_ROBOT_DB_PATH.replace(SQLITE_PREFIX, ""))
-            engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
             tic = time.time()
             n_rollouts = 0
-
-            # iterate through and add rollouts to the database
-            for i, ep in tqdm(
-                enumerate(ds), desc=f"Ingesting {dataset_formalname} rollouts"
-            ):
-                try:
-                    if i == 0:
-                        print(list(ep["steps"])[0]["observation"].keys())
-                        breakpoint()
-
-                    # construct the OpenXEmbodiment Episode
-                    episode = construct_openxembodiment_episode(ep, dataset_info)
-
-                    # complete the raw information with the rollout request (random for now)
-                    rollout = random_extractor.extract(
-                        episode=episode, dataset_info=dataset_info
-                    )
-                    # potentially save the video as mp4 and frames
-                    maybe_save_video(
-                        episode, dataset_filename, episode.episode_metadata.file_path
-                    )
-
-                    # add the rollout to the database
-                    add_rollout(engine, rollout, RolloutSQLModel)
-                    n_rollouts += 1
-                except Exception as e:
-                    print(
-                        f"Error processing episode {i} during rollout extraction: {e}"
-                    )
-                    print(traceback.format_exc())
-                    breakpoint()
-
-            if n_rollouts == 0:
-                breakpoint()
-            print(f"Structured database new rollouts: {n_rollouts}")
-            total_time = time.time() - tic
-            print(f"Structured database time: {total_time}")
-            print(f"Structured database mean time: {total_time / n_rollouts}")
+            run_structured_database_ingestion(
+                ds, dataset_info, random_extractor, engine, dataset_filename
+            )
 
             # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
             # to db and videos to disk then reconstitute rollouts for indexing!
-            rollouts = setup_rollouts(engine, dataset_formalname)
-            index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
+            run_embedding_database_ingestion(engine, dataset_formalname)
 
-            tic = time.time()
-            # add the trajectory matrices to the index and get normalizing constants for this dataset
-            # (states and actions)
-            ingest_trajectory_matrices(rollouts, index_manager)
-            index_manager.save()
-
-            # add task and description embeddings to the index
-            # (task, description)
-            embedder = get_nomic_embedder()
-            ingest_language_embeddings(rollouts, index_manager, embedder)
-            index_manager.save()
-
-            breakpoint()
-            print(f"Embedding database new rollouts: {len(rollouts)}")
-            total_time = time.time() - tic
-            print(f"Embedding database time: {total_time}")
-            print(f"Embedding database mean time: {total_time / len(rollouts)}")
-
-            print(
-                {
-                    k: v
-                    for k, v in index_manager.metadata.items()
-                    if dataset_formalname in k
-                }
-            )
+            # TODO: run grounding!
 
         breakpoint()

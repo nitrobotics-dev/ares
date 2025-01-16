@@ -15,6 +15,7 @@ from ares.configs.base import Rollout
 
 BASE_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/embedding_data"
 TEST_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/test_embedding_data"
+TEST_TIME_STEPS = 100
 
 
 def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:

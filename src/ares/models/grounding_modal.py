@@ -200,7 +200,7 @@ def test() -> None:
         vlm: VLM,
         ann_db: AnnotationDatabase,
         target_fps: int = 5,
-    ) -> tuple[dict, list[dict]]:
+    ) -> tuple[dict[str, int], list[dict]]:
         rollout_ids = [r.id for r in rollouts]
 
         # Create and gather the futures properly
@@ -220,9 +220,11 @@ def test() -> None:
         )
         return stats, failures
 
+    """ SETUP LOCAL STRUCTS """
     dataset_info = DATASET_NAMES[0]
     dataset_filename = dataset_info["dataset_filename"]
     dataset_formalname = dataset_info["dataset_formalname"]
+    outer_batch_size = 200  # laptop ram
 
     retry_failed = None  # path to pickle file with failures to retry
     # retry_failed = "failures.pkl"
@@ -230,39 +232,54 @@ def test() -> None:
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     rollouts = setup_rollouts(engine, dataset_formalname)
+    rollouts = rollouts[:100] + rollouts[300:]
     if len(rollouts) == 0:
         breakpoint()
 
     if retry_failed:
         with open(retry_failed, "rb") as f:
             failures = pickle.load(f)
-
         failed_ids = [str(f["rollout_id"]) for f in failures]
         rollouts = [r for r in rollouts if str(r.id) in failed_ids]
 
-    print(f"\n\nfound {len(rollouts)} rollouts\n\n")
-    vlm = get_gpt_4o()
+    print(f"\n\nfound {len(rollouts)} total rollouts\n\n")
     tic = time.time()
+    overall_stats = dict()
+    overall_failures = []
 
-    stats, failures = asyncio.run(
-        run_ground_and_annotate(
-            dataset_filename,
-            rollouts,
-            vlm,
-            ann_db,
-            ANNOTATION_GROUNDING_FPS,
+    # limited by CPU RAM (cant actually create all the potential requests at once, so run in batches)
+    for i in range(0, len(rollouts), outer_batch_size):
+        print(
+            f"processing batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"
         )
-    )
+        # We want to create the item within the outer loop as the vlm semaphore gets "bound" to the async contex
+        vlm = get_gpt_4o()
+        rollouts_batch = rollouts[i : i + outer_batch_size]
+        stats, failures = asyncio.run(
+            run_ground_and_annotate(
+                dataset_filename,
+                rollouts_batch,
+                vlm,
+                ann_db,
+                ANNOTATION_GROUNDING_FPS,
+            )
+        )
+        print(
+            f"completed batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"
+        )
+        for k, v in stats.items():
+            overall_stats[k] = overall_stats.get(k, 0) + v
+        overall_failures.extend(failures)
 
-    print(f"\n\nfailures: {failures}\n\n")
+    print(f"\n\nfailures: {overall_failures}\n\n")
 
     # write failures to file in order to retry
     with open("failures.pkl", "wb") as f:
-        pickle.dump(failures, f)
+        pickle.dump(overall_failures, f)
 
     print("time taken", time.time() - tic)
     print(f"\n\n")
     for k, v in stats.items():
         print(f"{k}: {v}" if not isinstance(v, list) else f"{k}: {v[:10]}...")
-    print(f"n fails: {len(failures)}")
+    print(f"\nn fails: {len(overall_failures)}")
     breakpoint()
