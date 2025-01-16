@@ -16,7 +16,6 @@ from ares.configs.base import Rollout
 BASE_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/embedding_data"
 TEST_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/test_embedding_data"
 TEST_TIME_STEPS = 100
-
 META_INDEX_NAMES = ["description", "task"]
 
 

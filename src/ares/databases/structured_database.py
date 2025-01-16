@@ -116,12 +116,12 @@ def get_rollouts_as_df(engine: Engine) -> pd.DataFrame:
 
 
 def get_rollout_by_name(
-    engine: Engine, dataset_formalname: str, path: str
+    engine: Engine, dataset_formalname: str, filename: str
 ) -> t.Optional[Rollout]:
     with Session(engine) as session:
         query = select(RolloutSQLModel).where(
             RolloutSQLModel.dataset_formalname == dataset_formalname,
-            RolloutSQLModel.path == path,
+            RolloutSQLModel.filename == filename,
         )
         row = session.exec(query).first()
         if row is None:
@@ -158,7 +158,9 @@ def db_to_df(engine: Engine) -> pd.DataFrame:
 
 
 def get_partial_df(engine: Engine, columns: list[str]) -> pd.DataFrame:
-    query = select(RolloutSQLModel).with_only_columns(*columns)
+    # Convert column names to actual SQLModel column references
+    model_columns = [getattr(RolloutSQLModel, col) for col in columns]
+    query = select(RolloutSQLModel).with_only_columns(*model_columns)
     df = pd.read_sql(query, engine)
     return df
 
