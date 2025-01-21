@@ -8,6 +8,8 @@ from pathlib import Path
 
 import click
 import pandas as pd
+from run_grounding_annotation_with_modal import app as modal_app
+from run_grounding_annotation_with_modal import run_modal_grounding
 
 # relative imports fine in our scripts package
 from run_trajectory_embedding_ingestion import (
@@ -34,7 +36,7 @@ from ares.databases.structured_database import (
     setup_database,
 )
 
-HEALING_EXCEPTIONS = {"Saytap": ["grounding"]}
+HEALING_EXCEPTIONS = {"utokyo_saytap_converted_externally_to_rlds": ["grounding"]}
 HEAL_INFO_DIR = "/workspaces/ares/data/heal_info"
 
 
@@ -54,6 +56,7 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
     dataset_formalname_to_df = {
         k: v for k, v in rollout_df.groupby("dataset_formalname")
     }
+    dataset_filename_to_df = {k: v for k, v in rollout_df.groupby("dataset_filename")}
 
     # check embedding database
     to_update_embedding_index_ids = []
@@ -95,20 +98,19 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
 
     print("\n\n" + "=" * 100 + "\n\n")
     # to update grounding
-    to_update_grounding_video_ids = []
-    to_update_grounding_annotation_ids = []
-    for dataset_formalname, id_df in dataset_formalname_to_df.items():
-        if "grounding" in HEALING_EXCEPTIONS.get(dataset_formalname, []):
-            to_update_grounding_video_ids.extend(id_df["id"].tolist())
+    to_update_grounding_ids = []
+    existing_video_ids = pd.Series(ann_db.get_video_ids())
+    for dataset_filename, id_df in dataset_filename_to_df.items():
+        if "grounding" in HEALING_EXCEPTIONS.get(dataset_filename, []):
+            to_update_grounding_ids.extend(id_df["id"].tolist())
         # check if videos exists -- if not, add to list (will add video and grounding)
-        existing_video_ids = pd.Series(ann_db.get_video_ids())
         found_video_ids = (id_df["dataset_filename"] + "/" + id_df["filename"]).apply(
             lambda x: str(Path(x).with_suffix(".mp4"))
         )
         mask = ~found_video_ids.isin(existing_video_ids)
         if mask.any():
-            print(f"Found {len(mask)} missing videos for dataset {dataset_formalname}")
-            to_update_grounding_video_ids.extend(id_df[mask]["id"].astype(str).tolist())
+            print(f"Found {mask.sum()} missing videos for dataset {dataset_filename}")
+            to_update_grounding_ids.extend(id_df[mask]["id"].astype(str).tolist())
 
         # Handle videos that exist but are missing annotations
         has_video_mask = found_video_ids.isin(existing_video_ids)
@@ -118,57 +120,44 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
         )
         if missing_annotations_mask.any():
             print(
-                f"Found {missing_annotations_mask.sum()} videos missing annotations for dataset {dataset_formalname}"
+                f"Found {missing_annotations_mask.sum()} videos missing annotations for dataset {dataset_filename}"
             )
-            to_update_grounding_annotation_ids.extend(
+            to_update_grounding_ids.extend(
                 id_df[has_video_mask][missing_annotations_mask]["id"]
                 .astype(str)
                 .tolist()
             )
 
-    update_grounding_video_ids_path = os.path.join(
-        heal_dir, "update_grounding_video_ids.txt"
-    )
-    with open(update_grounding_video_ids_path, "w") as f:
-        for id in to_update_grounding_video_ids:
+    update_grounding_ids_path = os.path.join(heal_dir, "update_grounding_ids.txt")
+    to_update_grounding_ids = list(set(to_update_grounding_ids))  # remove duplicates
+    with open(update_grounding_ids_path, "w") as f:
+        for id in to_update_grounding_ids:
             f.write(f"{id}\n")
     print(
-        f"Found {len(to_update_grounding_video_ids)} ids to update in grounding database; saving to disk at {update_grounding_video_ids_path}"
+        f"Found {len(to_update_grounding_ids)} ids to update in grounding database; saving to disk at {update_grounding_ids_path}"
     )
-
-    update_grounding_annotation_ids_path = os.path.join(
-        heal_dir, "update_grounding_annotation_ids.txt"
-    )
-    with open(update_grounding_annotation_ids_path, "w") as f:
-        for id in to_update_grounding_annotation_ids:
-            f.write(f"{id}\n")
-    print(
-        f"Found {len(to_update_grounding_annotation_ids)} ids to update in grounding database; saving to disk at {update_grounding_annotation_ids_path}"
-    )
-    print(f"TIME DIR STR: {time_str}")
-    return time_str
+    print(f"TIME DIR: {heal_dir}")
 
 
-@click.command("execute-heal")
+@click.command("exec-heal")
 @click.option("--time-dir", type=str, required=True)
 def execute_heal(time_dir: str):
     heal_dir = os.path.join(HEAL_INFO_DIR, time_dir)
-    update_embedding_ids_path = os.path.join(heal_dir, "update_embedding_ids.txt")
 
-    # run embedding ingestion via click's command
+    # run embedding ingestion via click's command from our embedding ingestion script
+    update_embedding_ids_path = os.path.join(heal_dir, "update_embedding_ids.txt")
     run_trajectory_embedding_ingestion.callback(
         engine_url=TEST_ROBOT_DB_PATH,
         dataset_formalname=None,
         from_id_file=update_embedding_ids_path,
     )
-    # update_grounding_video_ids_path = os.path.join(
-    #     heal_dir, "update_grounding_video_ids.txt"
-    # )
-    # update_grounding_annotation_ids_path = os.path.join(
-    #     heal_dir, "update_grounding_annotation_ids.txt"
-    # )
-    breakpoint()
-    pass
+
+    # update grounding database
+    update_grounding_ids_path = os.path.join(heal_dir, "update_grounding_ids.txt")
+    with modal_app.run():
+        run_modal_grounding(retry_failed_path=update_grounding_ids_path)
+
+    print(f"Finished healing")
 
 
 @click.group()

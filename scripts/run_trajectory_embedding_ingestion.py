@@ -41,10 +41,18 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
     # collect all the embeddings and get normalizing constants
     for k in embedding_packs[0].keys():
         embeddings = np.concatenate([pack[k] for pack in embedding_packs])
+        # Check if embeddings array contains all None values
+        if all(x is None for x in embeddings.flatten()):
+            print(f"Skipping {k} - embeddings array contains all None values")
+            continue
         print(f"found {embeddings.shape} for {k}; (N,K)")
         # find normalizing constants
-        means = np.mean(embeddings, axis=0)
-        stds = np.std(embeddings, axis=0)
+        try:
+            means = np.mean(embeddings, axis=0)
+            stds = np.std(embeddings, axis=0)
+        except Exception as e:
+            print(e)
+            breakpoint()
         feature_dim = embeddings.shape[1]
         print(f"found means {means.shape} and stds {stds.shape}")
         # setup index if not already existing
@@ -63,7 +71,6 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
             # some datasets do not provide this information
             if isinstance(pack.get(k), np.ndarray):
                 index_manager.add_matrix(k, pack[k], str(rollout.id))
-    breakpoint()
 
 
 def ingest_language_embeddings_from_rollouts_per_dataset(
@@ -76,7 +83,7 @@ def ingest_language_embeddings_from_rollouts_per_dataset(
                 index_manager.init_index(
                     name,
                     feature_dim,
-                    TEST_TIME_STEPS,
+                    time_steps=1,  # lang embeddings dont get time dimension
                     norm_means=None,  # no need to normalize
                     norm_stds=None,  # no need to normalize
                     extra_metadata={"model": embedder.name},
@@ -102,7 +109,6 @@ def run_embedding_database_ingestion_per_dataset(rollouts: list[Rollout]) -> Non
     # add the trajectory matrices to the index and get normalizing constants for this dataset
     # (states and actions)
     ingest_trajectory_matrices_from_rollouts_per_dataset(rollouts, index_manager)
-    return
     index_manager.save()
 
     # add task and description embeddings to the index
@@ -113,13 +119,16 @@ def run_embedding_database_ingestion_per_dataset(rollouts: list[Rollout]) -> Non
     )
     index_manager.save()
 
-    breakpoint()
     print(f"Embedding database new rollouts: {len(rollouts)}")
     total_time = time.time() - tic
     print(f"Embedding database time: {total_time}")
     print(f"Embedding database mean time: {total_time / len(rollouts)}")
-
-    print({k: v for k, v in index_manager.metadata.items()})
+    relevant_metadata = {
+        k: v
+        for k, v in index_manager.metadata.items()
+        if rollouts[0].dataset_formalname in k
+    }
+    print(f"Metadata: {relevant_metadata}")
 
 
 @click.command()
