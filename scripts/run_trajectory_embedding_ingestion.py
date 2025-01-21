@@ -1,6 +1,8 @@
 import os
 import time
+from collections import defaultdict
 from pathlib import Path
+from typing import Union
 
 import click
 import numpy as np
@@ -26,13 +28,15 @@ from ares.models.extractor import RandomInformationExtractor
 from ares.models.shortcuts import Embedder, get_nomic_embedder
 
 
-def ingest_trajectory_matrices_from_rollouts(
+def ingest_trajectory_matrices_from_rollouts_per_dataset(
     rollouts: list[Rollout], index_manager: IndexManager
 ) -> None:
     # collect all embedding packs for states, actions (pre-existing)
     embedding_packs = []
     for rollout in rollouts:
         embedding_packs.append(rollout_to_embedding_pack(rollout))
+    if len(embedding_packs) == 0:
+        return
 
     # collect all the embeddings and get normalizing constants
     for k in embedding_packs[0].keys():
@@ -59,9 +63,10 @@ def ingest_trajectory_matrices_from_rollouts(
             # some datasets do not provide this information
             if isinstance(pack.get(k), np.ndarray):
                 index_manager.add_matrix(k, pack[k], str(rollout.id))
+    breakpoint()
 
 
-def ingest_language_embeddings_from_rollouts(
+def ingest_language_embeddings_from_rollouts_per_dataset(
     rollouts: list[Rollout], index_manager: IndexManager, embedder: Embedder
 ) -> None:
     feature_dim = embedder.embed("test").shape[0]
@@ -90,19 +95,22 @@ def ingest_language_embeddings_from_rollouts(
             index_manager.add_vector(name, embedding, str(rollout.id))
 
 
-def run_embedding_database_ingestion(rollouts: list[Rollout]) -> None:
-    index_manager = IndexManager(TEST_EMBEDDING_DB_PATH, index_class=FaissIndex)
+def run_embedding_database_ingestion_per_dataset(rollouts: list[Rollout]) -> None:
+    index_manager = IndexManager(TEST_EMBEDDING_DB_PATH_2, index_class=FaissIndex)
 
     tic = time.time()
     # add the trajectory matrices to the index and get normalizing constants for this dataset
     # (states and actions)
-    ingest_trajectory_matrices_from_rollouts(rollouts, index_manager)
+    ingest_trajectory_matrices_from_rollouts_per_dataset(rollouts, index_manager)
+    return
     index_manager.save()
 
     # add task and description embeddings to the index
     # (task, description)
     embedder = get_nomic_embedder()
-    ingest_language_embeddings_from_rollouts(rollouts, index_manager, embedder)
+    ingest_language_embeddings_from_rollouts_per_dataset(
+        rollouts, index_manager, embedder
+    )
     index_manager.save()
 
     breakpoint()
@@ -123,19 +131,23 @@ def run_embedding_database_ingestion(rollouts: list[Rollout]) -> None:
 )
 @click.option(
     "--dataset-formalname",
-    type=str | None,
+    type=Union[str, None],
     required=False,
     help="Formal name of the dataset to process",
     default=None,
 )
 @click.option(
     "--from-id-file",
-    type=str,
+    type=Union[str, None],
     required=False,
     help="File containing rollout ids to ingest",
     default=None,
 )
-def main(engine_url: str, dataset_formalname: str | None, from_id_file: str | None):
+def main(
+    engine_url: str,
+    dataset_formalname: Union[str, None],
+    from_id_file: Union[str, None],
+):
     """Run embedding database ingestion for trajectory data."""
     assert (
         dataset_formalname is not None or from_id_file is not None
@@ -147,7 +159,12 @@ def main(engine_url: str, dataset_formalname: str | None, from_id_file: str | No
         rollouts = get_rollouts_by_ids(engine, rollout_ids)
     else:
         rollouts = setup_rollouts(engine, dataset_formalname)
-    run_embedding_database_ingestion(rollouts)
+
+    dataset_to_rollouts = defaultdict(list)
+    for rollout in rollouts:
+        dataset_to_rollouts[rollout.dataset_formalname].append(rollout)
+    for dataset_formalname, dataset_rollouts in dataset_to_rollouts.items():
+        run_embedding_database_ingestion_per_dataset(dataset_rollouts)
 
 
 if __name__ == "__main__":

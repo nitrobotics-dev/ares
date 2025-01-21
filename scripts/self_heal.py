@@ -9,6 +9,11 @@ from pathlib import Path
 import click
 import pandas as pd
 
+# relative imports fine in our scripts package
+from run_trajectory_embedding_ingestion import (
+    main as run_trajectory_embedding_ingestion,
+)
+
 from ares.databases.annotation_database import (
     TEST_ANNOTATION_DB_PATH,
     AnnotationDatabase,
@@ -28,16 +33,14 @@ from ares.databases.structured_database import (
     get_rollout_by_name,
     setup_database,
 )
-from scripts.run_trajectory_embedding_ingestion import (
-    main as run_embedding_database_ingestion_main,
-)
 
 HEALING_EXCEPTIONS = {"Saytap": ["grounding"]}
 HEAL_INFO_DIR = "/workspaces/ares/data/heal_info"
 
 
 @click.command("find-heal")
-def find_heal_opportunities(heal_info_dir: str = HEAL_INFO_DIR) -> str:
+@click.option("--heal-info-dir", type=str, default=HEAL_INFO_DIR)
+def find_heal_opportunities(heal_info_dir: str) -> str:
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
     embedding_db = IndexManager(TEST_EMBEDDING_DB_PATH_2, FaissIndex)
@@ -66,10 +69,8 @@ def find_heal_opportunities(heal_info_dir: str = HEAL_INFO_DIR) -> str:
         ] + META_INDEX_NAMES  # description, task
         for index_name in potential_index_names:
             if index_name not in embedding_db.indices:
-                to_update_embedding_index_ids.extend(id_df["id"].tolist())
-                print(
-                    f"Index {index_name} not found in embedding database; adding {len(to_update_embedding_index_ids)} ids to update list"
-                )
+                missing_ids = id_df["id"].tolist()
+                existing_index_ids = []
             else:
                 existing_index = embedding_db.indices[index_name]
                 existing_index_ids = existing_index.get_all_ids()
@@ -77,11 +78,12 @@ def find_heal_opportunities(heal_info_dir: str = HEAL_INFO_DIR) -> str:
                 missing_ids = set(id_df["id"].astype(str).tolist()) - set(
                     existing_index_ids.tolist()
                 )
-                if len(missing_ids) > 0:
-                    print(
-                        f"Found {len(missing_ids)} missing ids for index {index_name} out of {len(existing_index_ids)} existing ids; {len(missing_ids) / len(existing_index_ids) * 100:.2f}% missing"
-                    )
-                    to_update_embedding_index_ids.extend(missing_ids)
+            if len(missing_ids) > 0:
+                n_existing = len(existing_index_ids)
+                print(
+                    f"Found {len(missing_ids)} missing ids for index {index_name} out of {n_existing} existing ids; {100 * len(missing_ids) / (n_existing if n_existing > 0 else len(missing_ids)):.2f}% missing"
+                )
+                to_update_embedding_index_ids.extend(missing_ids)
 
     update_embedding_ids_path = os.path.join(heal_dir, "update_embedding_ids.txt")
     with open(update_embedding_ids_path, "w") as f:
@@ -152,9 +154,11 @@ def find_heal_opportunities(heal_info_dir: str = HEAL_INFO_DIR) -> str:
 def execute_heal(time_dir: str):
     heal_dir = os.path.join(HEAL_INFO_DIR, time_dir)
     update_embedding_ids_path = os.path.join(heal_dir, "update_embedding_ids.txt")
-    # run embedding ingestion
-    run_embedding_database_ingestion_main(
+
+    # run embedding ingestion via click's command
+    run_trajectory_embedding_ingestion.callback(
         engine_url=TEST_ROBOT_DB_PATH,
+        dataset_formalname=None,
         from_id_file=update_embedding_ids_path,
     )
     # update_grounding_video_ids_path = os.path.join(

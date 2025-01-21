@@ -234,7 +234,9 @@ def add_column_with_vals_and_defaults(
                 )
 
 
-def get_rollouts_by_ids(engine: Engine, ids: list[uuid.UUID]) -> list[Rollout]:
+def get_rollouts_by_ids(engine: Engine, ids: list[str]) -> list[Rollout]:
+    # convert str ids to uuid.UUID
+    ids = [uuid.UUID(id) for id in ids]
     with Session(engine) as session:
         query = select(RolloutSQLModel).where(RolloutSQLModel.id.in_(ids))
         rows = session.exec(query).all()

@@ -357,6 +357,10 @@ class IndexManager:
         path = self.base_dir / f"{name}.index"
         if path.exists():
             self.indices[name].load(path)
+            # Update metadata has_normalization flag based on loaded normalization constants
+            self.metadata[name]["has_normalization"] = (
+                self.indices[name].norm_means is not None
+            )
 
     def save(self) -> None:
         """Save indices and metadata to disk"""
