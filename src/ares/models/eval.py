@@ -19,6 +19,7 @@ from ares.utils.image_utils import load_video_frames
 from ares.utils.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 
 IMAGE_TILE_SIZE = (512, 512)
+MAX_N_FRAMES = 40  # combination of experiments with FPS and API throughout limits
 
 
 def save_frames_to_mp4(frames: list[np.ndarray], fname: str) -> None:
@@ -38,7 +39,7 @@ def save_frames_to_mp4(frames: list[np.ndarray], fname: str) -> None:
 def easy_get_frames(
     dataset_filename: str, task: str, success_flag: str, fps: int | float
 ) -> list[np.ndarray]:
-    # small hack -- if FPS is 0, just access first and last frame!
+    # Note: FPS of 0 means to use just the first and last frames
     fname = f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success_flag}.mp4"
     frames, frame_indices = load_video_frames(
         dataset_filename, fname, target_fps=fps if fps != 0 else 1
@@ -46,7 +47,6 @@ def easy_get_frames(
     if fps == 0:
         frames = [frames[0], frames[-1]]
 
-    MAX_N_FRAMES = 40  # HACK: fix when higher tier TPM limits
     if len(frames) > MAX_N_FRAMES:
         print(
             f"received {len(frames)} frames; downsampling to 40 frames. do you still need me?"

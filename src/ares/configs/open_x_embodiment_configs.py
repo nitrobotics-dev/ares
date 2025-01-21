@@ -107,7 +107,6 @@ class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
     observation: OpenXEmbodimentStepObservation
     reward: float
 
-    # TODO: hack to remap fields between datasets
     @model_validator(mode="before")
     @classmethod
     def remap_fields(cls, data: dict) -> dict:

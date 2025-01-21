@@ -216,9 +216,7 @@ def get_frame_indices_for_fps(
     Returns:
         List of frame indices to sample
     """
-    video_path = (
-        video_path.replace(".npy", ".mp4").replace(".npz", ".mp4").replace(".p", ".mp4")
-    )  # HACK
+    video_path = str(Path(video_path).with_suffix(".mp4"))
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
     cap = cv2.VideoCapture(video_path)
@@ -244,7 +242,6 @@ def load_video_frames(
     frames_to_process = choose_and_preprocess_frames(
         all_frames, specified_frames=frame_indices
     )
-    print(f"Loaded {len(frames_to_process)} frames")
     return frames_to_process, frame_indices
 
 

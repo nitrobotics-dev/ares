@@ -9,6 +9,8 @@ from modal import App, Image, build, enter, method
 
 from ares.models.grounding import ANNOTATION_GROUNDING_FPS, GroundingAnnotator
 
+FAILURES_PATH = "/workspaces/ares/data/failures.pkl"
+
 image = (
     Image.debian_slim()
     .apt_install("python3-opencv")
@@ -129,6 +131,7 @@ async def run_annotation_parallel(
 @app.local_entrypoint()
 def run_modal_grounding(
     dataset_filename: str | None = None,
+    split: str | None = None,
     outer_batch_size: int = 200,  # RAM limits number of concurrent rollouts formatted into requests
     retry_failed_path: str = None,  # path to pickle file with failures to retry
     annotation_fps: int = ANNOTATION_GROUNDING_FPS,
@@ -151,10 +154,10 @@ def run_modal_grounding(
         setup_database,
         setup_rollouts,
     )
+    from ares.DATASET_NAMES import DATASET_NAMES
     from ares.models.base import VLM
     from ares.models.grounding_utils import get_grounding_nouns_async
     from ares.models.shortcuts import get_gpt_4o
-    from ares.name_remapper import DATASET_NAMES
     from ares.utils.image_utils import load_video_frames
 
     async def setup_query(
@@ -163,7 +166,7 @@ def run_modal_grounding(
         target_fps: int = 5,
         refusal_phrases: list[str] | None = None,
     ) -> tuple[str, list[np.ndarray], list[int], str] | dict[str, Rollout | str]:
-        # Define local async functions here to use ARES imports in the Modal container
+        # Define local async functions here to avoid using ARES imports in the Modal container
 
         try:
             frames, frame_indices = load_video_frames(
@@ -171,7 +174,6 @@ def run_modal_grounding(
                 rollout.filename,
                 target_fps,
             )
-            print(f"loaded {len(frames)} frames of size {frames[0].shape}")
         except Exception as e:
             return {
                 "rollout_id": rollout.id,
@@ -245,12 +247,12 @@ def run_modal_grounding(
         ][0]
         dataset_formalname = dataset_info["dataset_formalname"]
         rollouts = setup_rollouts(engine, dataset_formalname)
-
+        rollouts = [r for r in rollouts if r.split == split]
     if len(rollouts) == 0:
         print(
             f"no rollouts found for dataset filename {dataset_filename}, retry failed path {retry_failed_path}"
         )
-        breakpoint()
+        return
 
     print(f"\n\nfound {len(rollouts)} total rollouts\n\n")
     tic = time.time()
@@ -284,7 +286,7 @@ def run_modal_grounding(
     print(f"\n\nfailures: {overall_failures}\n\n")
 
     # write failures to file in order to retry
-    with open("failures.pkl", "wb") as f:
+    with open(FAILURES_PATH, "wb") as f:
         pickle.dump(overall_failures, f)
 
     print("time taken", time.time() - tic)
@@ -292,4 +294,3 @@ def run_modal_grounding(
     for k, v in overall_stats.items():
         print(f"{k}: {v}" if not isinstance(v, list) else f"{k}: {v[:10]}...")
     print(f"\nn fails: {len(overall_failures)}")
-    breakpoint()

@@ -28,10 +28,12 @@ from ares.databases.structured_database import (
     setup_database,
     setup_rollouts,
 )
+from ares.DATASET_NAMES import DATASET_NAMES
 from ares.models.extractor import InformationExtractor, RandomInformationExtractor
 from ares.models.shortcuts import Embedder, get_nomic_embedder
-from ares.name_remapper import DATASET_NAMES
 from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
+from scripts.run_grounding_annotation_with_modal import app as modal_app
+from scripts.run_grounding_annotation_with_modal import run_modal_grounding
 from scripts.run_structured_ingestion import (
     build_dataset,
     run_structured_database_ingestion,
@@ -55,6 +57,8 @@ if __name__ == "__main__":
         )
 
         for split in dataset_dict.keys():
+            if split == "train":
+                continue
             ds = dataset_dict[split]
             print(f"found {len(ds)} episodes in {split}")
             dataset_info = get_dataset_information(dataset_filename)
@@ -64,6 +68,7 @@ if __name__ == "__main__":
             dataset_info["Dataset Formalname"] = dataset_formalname
             dataset_info["Split"] = split
 
+            # run structured ingestion
             run_structured_database_ingestion(
                 ds,
                 dataset_info,
@@ -78,6 +83,6 @@ if __name__ == "__main__":
             rollouts = setup_rollouts(engine, dataset_formalname)
             run_embedding_database_ingestion_per_dataset(rollouts)
 
-            # TODO: run grounding here!
-
-        breakpoint()
+            # run grounding annotation with modal
+            with modal_app.run():
+                run_modal_grounding(dataset_filename=dataset_filename, split=split)

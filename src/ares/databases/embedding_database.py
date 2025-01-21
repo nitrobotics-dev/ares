@@ -46,11 +46,74 @@ def rollout_to_embedding_pack(
     }
 
 
+class NormalizationTracker:
+    """Tracks mean and standard deviation statistics for online or batch normalization"""
+
+    def __init__(
+        self,
+        feature_dim: int,
+        initial_means: Optional[np.ndarray] = None,
+        initial_stds: Optional[np.ndarray] = None,
+    ):
+        self.feature_dim = feature_dim
+        # For online updates
+        self.count = 0
+        self.mean = (
+            np.zeros(feature_dim) if initial_means is None else initial_means.copy()
+        )
+        self.M2 = np.zeros(feature_dim)  # For Welford's online algorithm
+        # For batch computation
+        self._cached_means = initial_means
+        self._cached_stds = initial_stds
+
+    def update_online(self, matrix: np.ndarray) -> None:
+        """Update statistics using Welford's online algorithm"""
+        # Ensure matrix is 2D with features as columns
+        if matrix.ndim == 1:
+            matrix = matrix.reshape(1, -1)
+        elif matrix.ndim > 2:
+            matrix = matrix.reshape(-1, self.feature_dim)
+
+        for x in matrix:
+            self.count += 1
+            delta = x - self.mean
+            self.mean += delta / self.count
+            delta2 = x - self.mean
+            self.M2 += delta * delta2
+
+    def get_current_stats(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Get current mean and std estimates"""
+        if self.count < 2:
+            return self.mean, np.ones_like(self.mean)
+
+        variance = self.M2 / (self.count - 1)
+        std = np.sqrt(variance)
+        # Prevent division by zero in normalization
+        std[std == 0] = 1.0
+        return self.mean, std
+
+    def compute_batch_stats(
+        self, matrices: List[np.ndarray]
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Compute statistics from a batch of matrices"""
+        # Reshape all matrices to 2D arrays with features as columns
+        all_data = np.vstack([m.reshape(-1, self.feature_dim) for m in matrices])
+
+        means = np.mean(all_data, axis=0)
+        stds = np.std(all_data, axis=0)
+        # Prevent division by zero in normalization
+        stds[stds == 0] = 1.0
+
+        self._cached_means = means
+        self._cached_stds = stds
+        return means, stds
+
+
 class Index(ABC):
     """Base class for vector indices"""
 
     @abstractmethod
-    def __init__(self, feature_dim: int, time_steps: int):
+    def __init__(self, feature_dim: int, time_steps: int, online_norm: bool = False):
         self.feature_dim = feature_dim
         self.time_steps = time_steps
         self.total_dim = feature_dim * time_steps
@@ -59,6 +122,11 @@ class Index(ABC):
         # Initialize normalization constants to None
         self.norm_means: Optional[np.ndarray] = None
         self.norm_stds: Optional[np.ndarray] = None
+
+        # Optional online normalization
+        self.online_norm = online_norm
+        if online_norm:
+            self.norm_tracker = NormalizationTracker(feature_dim)
 
     @abstractmethod
     def add_vector(self, vector: np.ndarray, entry_id: str) -> None:
@@ -134,10 +202,16 @@ class Index(ABC):
         """
         pass
 
+    def update_normalization(self, matrix: np.ndarray) -> None:
+        """Update normalization statistics if online normalization is enabled"""
+        if self.online_norm:
+            self.norm_tracker.update_online(matrix)
+            self.norm_means, self.norm_stds = self.norm_tracker.get_current_stats()
+
 
 class FaissIndex(Index):
-    def __init__(self, feature_dim: int, time_steps: int):
-        super().__init__(feature_dim, time_steps)
+    def __init__(self, feature_dim: int, time_steps: int, online_norm: bool = False):
+        super().__init__(feature_dim, time_steps, online_norm)
         base_index = faiss.IndexFlatL2(self.total_dim)
         self.index = faiss.IndexIDMap2(base_index)
         self.id_map: Dict[int, str] = {}
@@ -240,13 +314,20 @@ class FaissIndex(Index):
 
 
 class IndexManager:
-    def __init__(self, base_dir: str, index_class: Type[Index], max_backups: int = 1):
+    def __init__(
+        self,
+        base_dir: str,
+        index_class: Type[Index],
+        max_backups: int = 1,
+        online_norm: bool = False,
+    ):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(exist_ok=True, parents=True)
         self.index_class = index_class
         self.max_backups = max_backups
         self.indices: Dict[str, Index] = {}
         self.metadata: Dict[str, dict] = {}
+        self.online_norm = online_norm
 
         # Load existing indices if they exist
         self.load()
@@ -260,11 +341,10 @@ class IndexManager:
         norm_stds: Optional[np.ndarray] = None,
         extra_metadata: Optional[dict] = None,
     ) -> None:
-        """Initialize a new index with specified dimensions and optional normalization"""
         if name in self.indices:
             raise ValueError(f"Index {name} already exists")
 
-        index = self.index_class(feature_dim, time_steps)
+        index = self.index_class(feature_dim, time_steps, online_norm=self.online_norm)
         if norm_means is not None and norm_stds is not None:
             index.set_normalization(norm_means, norm_stds)
 
@@ -274,6 +354,7 @@ class IndexManager:
             feature_dim=feature_dim,
             time_steps=time_steps,
             has_normalization=norm_means is not None,
+            online_norm=self.online_norm,
             **(extra_metadata or {}),
         )
 
@@ -327,6 +408,11 @@ class IndexManager:
 
         index = self.indices[name]
         interpolated = self._interpolate_matrix(matrix, index.time_steps)
+
+        # Update online normalization if enabled
+        if self.online_norm:
+            index.update_normalization(interpolated)
+
         normalized = index.normalize_matrix(interpolated)
         vector = normalized.flatten()
         self.add_vector(name, vector, entry_id)

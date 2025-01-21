@@ -40,7 +40,11 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
 
     # collect all the embeddings and get normalizing constants
     for k in embedding_packs[0].keys():
-        embeddings = np.concatenate([pack[k] for pack in embedding_packs])
+        try:
+            embeddings = np.concatenate([pack[k] for pack in embedding_packs])
+        except Exception as e:
+            print(e)
+            breakpoint()
         # Check if embeddings array contains all None values
         if all(x is None for x in embeddings.flatten()):
             print(f"Skipping {k} - embeddings array contains all None values")

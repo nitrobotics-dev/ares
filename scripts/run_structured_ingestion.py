@@ -58,7 +58,6 @@ def run_structured_database_ingestion(
         try:
             if i == 0:
                 print(list(ep["steps"])[0]["observation"].keys())
-                breakpoint()
 
             # construct the OpenXEmbodiment Episode
             episode = construct_openxembodiment_episode(ep, dataset_info, i)

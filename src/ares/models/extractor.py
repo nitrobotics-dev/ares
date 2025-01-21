@@ -138,7 +138,7 @@ def hard_coded_episode_info_extraction(episode: OpenXEmbodimentEpisode) -> dict:
 
 class InformationExtractor:
     def __init__(self) -> None:
-        raise NotImplementedError
+        pass
 
     def extract(
         self,
@@ -151,98 +151,6 @@ class InformationExtractor:
         model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
         raise NotImplementedError
-
-
-class RandomInformationExtractor(InformationExtractor):
-    """
-    Creates a random information extractor that extracts random information from the episode.
-    The created object is filled with random string values for testing purposes.
-    """
-
-    def random_string(self, length_bound: int = 10) -> str:
-        return "".join(
-            np.random.choice(
-                list(string.ascii_lowercase),
-                size=np.random.randint(1, length_bound + 1),
-            )
-        )
-
-    def finish_random_object(
-        self, object: t.Type[BaseConfig], kwargs: t.Dict[str, t.Any]
-    ) -> BaseConfig:
-        # Get all fields from the model class
-        fields = object.model_fields
-        filled_kwargs = kwargs.copy()
-
-        # Fill in missing fields with random values based on their type
-        for field_name, field_info in fields.items():
-            if field_name not in filled_kwargs:
-                field_type = field_info.annotation
-
-                # Handle different field types
-                if field_type == str:
-                    filled_kwargs[field_name] = self.random_string()
-                elif field_type == int:
-                    filled_kwargs[field_name] = np.random.randint(0, 10)
-                elif field_type == float:
-                    filled_kwargs[field_name] = np.random.uniform(0, 1)
-                elif field_type == bool:
-                    filled_kwargs[field_name] = bool(np.random.choice([True, False]))
-                elif field_type == datetime:
-                    filled_kwargs[field_name] = datetime.now()
-                elif t.get_origin(field_type) == list:
-                    # For lists, create a random-length list of random values
-                    elem_type = t.get_args(field_type)[0]
-                    length = np.random.randint(1, 5)
-                    if elem_type == str:
-                        filled_kwargs[field_name] = [
-                            self.random_string() for _ in range(length)
-                        ]
-                    elif elem_type in (int, float):
-                        filled_kwargs[field_name] = np.random.rand(length).tolist()
-                    else:
-                        filled_kwargs[field_name] = []
-
-        # Create and return the object with all fields filled
-        return object(**filled_kwargs)
-
-    def extract(
-        self,
-        episode: OpenXEmbodimentEpisode,
-        dataset_info: DatasetInfo,
-        *,  # Force keyword arguments
-        robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-    ) -> Rollout:
-        robot_kwargs = robot_kwargs or {}
-        environment_kwargs = environment_kwargs or {}
-        task_kwargs = task_kwargs or {}
-        model_kwargs = model_kwargs or {}
-
-        dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
-        episode_info_dict = hard_coded_episode_info_extraction(episode)
-        hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
-
-        # Create component objects in a loop
-        components = {
-            "robot": Robot,
-            "environment": Environment,
-            "task": Task,
-            "trajectory": Trajectory,
-        }
-        objects = {
-            name: self.finish_random_object(cls, hardcoded_info[name])
-            for name, cls in components.items()
-        }
-
-        # Create final rollout with all components
-        rollout = self.finish_random_object(
-            Rollout,
-            {**hardcoded_info["rollout"], **objects},
-        )
-        return rollout
 
 
 class VLMInformationExtractor(InformationExtractor):
@@ -340,3 +248,97 @@ class VLMInformationExtractor(InformationExtractor):
         }
         breakpoint()
         return Rollout(**rollout_kwargs)
+
+
+class RandomInformationExtractor(InformationExtractor):
+    """
+    Creates a random information extractor that extracts random information from the episode.
+    The created object is filled with random string/ints/floats/bools/datetimes/lists etc.
+
+    This should only be used for testing purposes.
+    """
+
+    def random_string(self, length_bound: int = 10) -> str:
+        return "".join(
+            np.random.choice(
+                list(string.ascii_lowercase),
+                size=np.random.randint(1, length_bound + 1),
+            )
+        )
+
+    def finish_random_object(
+        self, object: t.Type[BaseConfig], kwargs: t.Dict[str, t.Any]
+    ) -> BaseConfig:
+        # Get all fields from the model class
+        fields = object.model_fields
+        filled_kwargs = kwargs.copy()
+
+        # Fill in missing fields with random values based on their type
+        for field_name, field_info in fields.items():
+            if field_name not in filled_kwargs:
+                field_type = field_info.annotation
+
+                # Handle different field types
+                if field_type == str:
+                    filled_kwargs[field_name] = self.random_string()
+                elif field_type == int:
+                    filled_kwargs[field_name] = np.random.randint(0, 10)
+                elif field_type == float:
+                    filled_kwargs[field_name] = np.random.uniform(0, 1)
+                elif field_type == bool:
+                    filled_kwargs[field_name] = bool(np.random.choice([True, False]))
+                elif field_type == datetime:
+                    filled_kwargs[field_name] = datetime.now()
+                elif t.get_origin(field_type) == list:
+                    # For lists, create a random-length list of random values
+                    elem_type = t.get_args(field_type)[0]
+                    length = np.random.randint(1, 5)
+                    if elem_type == str:
+                        filled_kwargs[field_name] = [
+                            self.random_string() for _ in range(length)
+                        ]
+                    elif elem_type in (int, float):
+                        filled_kwargs[field_name] = np.random.rand(length).tolist()
+                    else:
+                        filled_kwargs[field_name] = []
+
+        # Create and return the object with all fields filled
+        return object(**filled_kwargs)
+
+    def extract(
+        self,
+        episode: OpenXEmbodimentEpisode,
+        dataset_info: DatasetInfo,
+        *,  # Force keyword arguments
+        robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> Rollout:
+        robot_kwargs = robot_kwargs or {}
+        environment_kwargs = environment_kwargs or {}
+        task_kwargs = task_kwargs or {}
+        model_kwargs = model_kwargs or {}
+
+        dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
+        episode_info_dict = hard_coded_episode_info_extraction(episode)
+        hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
+
+        # Create component objects in a loop
+        components = {
+            "robot": Robot,
+            "environment": Environment,
+            "task": Task,
+            "trajectory": Trajectory,
+        }
+        objects = {
+            name: self.finish_random_object(cls, hardcoded_info[name])
+            for name, cls in components.items()
+        }
+
+        # Create final rollout with all components
+        rollout = self.finish_random_object(
+            Rollout,
+            {**hardcoded_info["rollout"], **objects},
+        )
+        return rollout

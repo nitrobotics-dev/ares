@@ -17,7 +17,6 @@ async def get_grounding_nouns_async(
     """Get object labels from VLM asynchronously."""
     if task_instructions is None:
         task_instructions = ""
-    print(f"Task instructions: {task_instructions}")
     _, response = await vlm.ask_async(
         info=dict(task_instructions=task_instructions),
         prompt_filename=prompt_filename,

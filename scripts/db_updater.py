@@ -15,15 +15,11 @@ from ares.databases.structured_database import (
     get_rollout_by_name,
     setup_database,
 )
-from ares.name_remapper import DATASET_NAMES
+from ares.DATASET_NAMES import DATASET_NAMES
 
 engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 rollouts = get_all_rollouts(engine)
 
-"""
-things to add: 
-- data collection method
-"""
 DATASET_INFOS = dict()
 for data_names in DATASET_NAMES:
     dfilename = data_names["dataset_filename"]
