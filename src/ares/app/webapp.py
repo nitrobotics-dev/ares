@@ -31,15 +31,12 @@ from ares.app.viz_helpers import (
     show_hero_display,
     total_statistics,
 )
+from ares.constants import DATA_DIR
 from ares.databases.structured_database import RolloutSQLModel
-from ares.utils.task_utils import PI_DEMO_PATH
 
+# top level variables
 title = "ARES Dashboard"
-video_paths = list(os.listdir(PI_DEMO_PATH))
-
-tmp_dump_dir = "/workspaces/ares/data/tmp/"
-
-# Add at the top level
+tmp_dump_dir = os.path.join(DATA_DIR, "tmp2")
 section_times: dict[str, float] = defaultdict(float)
 
 
@@ -111,23 +108,27 @@ def main() -> None:
         reduced_embeddings = st.session_state[f"{state_key}_reduced"]
         labels = st.session_state[f"{state_key}_labels"]
         state_ids = st.session_state[f"{state_key}_ids"]
+        try:
+            desired_ids = df[id_key].apply(str)
+            id_to_idx_state = {_id: idx for idx, _id in enumerate(state_ids)}
+            desired_state_indices = [id_to_idx_state[_id] for _id in desired_ids]
+            reduced_embeddings = reduced_embeddings[desired_state_indices]
+            labels = labels[desired_state_indices]
 
-        desired_ids = df[id_key].apply(str)
-        id_to_idx_state = {_id: idx for idx, _id in enumerate(state_ids)}
-        desired_state_indices = [id_to_idx_state[_id] for _id in desired_ids]
-        reduced_embeddings = reduced_embeddings[desired_state_indices]
-        labels = labels[desired_state_indices]
-
-        filtered_df, cluster_fig, selection, selection_flag = (
-            embedding_data_filters_display(
-                df=df,
-                reduced=reduced_embeddings,
-                labels=labels,
-                raw_data_key=raw_data_key,
-                id_key=id_key,
-                keep_mask=kept_ids,
+            filtered_df, cluster_fig, selection, selection_flag = (
+                embedding_data_filters_display(
+                    df=df,
+                    reduced=reduced_embeddings,
+                    labels=labels,
+                    raw_data_key=raw_data_key,
+                    id_key=id_key,
+                    keep_mask=kept_ids,
+                )
             )
-        )
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            breakpoint()
 
         if filtered_df.empty:
             st.warning(
@@ -226,19 +227,19 @@ def main() -> None:
             robot_array_visualizations = []
     st.divider()
 
-    section_export = "exporting data"
-    with filter_error_context(section_export), timer_context(section_export):
-        # Export controls
-        # Collect all visualizations
-        # TODO: add structured data filters to export
-        all_visualizations = [
-            *general_visualizations,
-            *success_visualizations,
-            *time_series_visualizations,
-            *robot_array_visualizations,
-            *hero_visualizations,  # Add hero visualizations to export
-        ]
-        export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
+    # section_export = "exporting data"
+    # with filter_error_context(section_export), timer_context(section_export):
+    #     # Export controls
+    #     # Collect all visualizations
+    #     # TODO: add structured data filters to export
+    #     all_visualizations = [
+    #         *general_visualizations,
+    #         *success_visualizations,
+    #         *time_series_visualizations,
+    #         *robot_array_visualizations,
+    #         *hero_visualizations,  # Add hero visualizations to export
+    #     ]
+    #     export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
 
     # Print timing report at the end
     print("\n=== Timing Report ===")

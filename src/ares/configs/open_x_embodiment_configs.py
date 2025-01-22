@@ -1,9 +1,12 @@
+import os
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from pydantic import BaseModel, model_validator
+
+from ares.constants import OXE_DIR
 
 
 class TensorConverterMixin(BaseModel):
@@ -153,7 +156,7 @@ class OpenXEmbodimentEpisode(TensorConverterMixin, BaseModel):
     steps: list[OpenXEmbodimentStep]
 
 
-PATH_TO_SPREADSHEET = "/workspaces/ares/data/oxe.csv"
+PATH_TO_SPREADSHEET = os.path.join(OXE_DIR, "oxe.csv")
 HEADER_ROW = 16
 
 

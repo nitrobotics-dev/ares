@@ -14,9 +14,10 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 
 from ares.configs.base import pydantic_to_field_instructions
+from ares.constants import DATA_DIR
+from ares.extras.pi_demo_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 from ares.models.base import VLM
 from ares.utils.image_utils import load_video_frames
-from ares.utils.task_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 
 IMAGE_TILE_SIZE = (512, 512)
 MAX_N_FRAMES = 40  # combination of experiments with FPS and API throughout limits
@@ -277,7 +278,10 @@ if __name__ == "__main__":
 
                 # Save results for this VLM
                 if results:
-                    path = f"/workspaces/ares/data/eval_dump/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv"
+                    path = os.path.join(
+                        DATA_DIR,
+                        f"eval_dump/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv",
+                    )
                     df = pd.DataFrame(results)
                     df.to_csv(path, index=False)
                     print(f"saved results to {path}")

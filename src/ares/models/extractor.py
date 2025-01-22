@@ -219,7 +219,9 @@ class VLMInformationExtractor(InformationExtractor):
         breakpoint()
         messages, response = self.vlm.ask(
             info=info,
-            prompt_filename=model_kwargs.get("prompt_filename", "test_prompt.jinja2"),
+            prompt_filename=model_kwargs.get(
+                "prompt_filename", "extractor_prompt.jinja2"
+            ),
             images=images,
         )
         # Parse the response content as JSON if it's a string

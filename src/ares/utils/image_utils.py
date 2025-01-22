@@ -13,7 +13,7 @@ import requests
 from moviepy.editor import ImageSequenceClip
 from PIL import Image
 
-ARES_DATASET_VIDEO_PATH = "/workspaces/ares/data/videos"
+from ares.constants import VIDEO_DIR
 
 
 def get_image_from_path(path: str) -> Image.Image:
@@ -29,13 +29,6 @@ def get_video_from_path(
     if not path.endswith(".mp4"):
         path += ".mp4"
     return os.path.join(ARES_DATASET_VIDEO_PATH, dataset, path)
-
-
-def get_video_from_cloud(
-    dataset: str, path: str
-) -> str | bytes | io.BytesIO | np.ndarray:
-    # TODO: implement
-    raise NotImplementedError("Not implemented")
 
 
 def save_video(
@@ -187,7 +180,6 @@ def choose_and_preprocess_frames(
             frames = [all_frames[-1]]
         else:
             # otherwise, use evenly spaced frames
-            # TODO: consider using biased samples
             total_frames = len(all_frames)
             indices = np.linspace(
                 0, total_frames - 1, n_frames, dtype=int, endpoint=True
@@ -243,24 +235,3 @@ def load_video_frames(
         all_frames, specified_frames=frame_indices
     )
     return frames_to_process, frame_indices
-
-
-if __name__ == "__main__":
-    # from ares.utils.task_utils import PI_DEMO_TASKS
-
-    # load mp4, break to frames, and save to disk using the helpers
-    # dataset = "pi_demos"
-    dataset_filename = "cmu_play_fusion"
-
-    # for _, info in PI_DEMO_TASKS.items():
-    #     for attempt in ["success", "fail"]:
-    # fname = info["filename_prefix"] + f"_{attempt}.mp4"
-    fname = "data/train/episode_212"
-    mp4_path = get_video_from_path(dataset_filename, fname + ".mp4")
-    dirpath = mp4_path.replace(".mp4", "")
-
-    if not os.path.exists(dirpath) or not len(os.listdir(dirpath)):
-        frames = split_video_to_frames(mp4_path)
-        save_video(frames, dataset, str(Path(fname).with_suffix("")))
-    else:
-        print(f"Folder already exists for {fname}, skipping...")

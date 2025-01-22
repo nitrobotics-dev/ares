@@ -7,6 +7,8 @@ import pdfkit
 import plotly.graph_objects as go
 import streamlit as st
 
+from ares.constants import DATA_DIR
+
 
 def export_dataframe(df: pd.DataFrame, base_path: str) -> str:
     """Export dataframe to CSV file with timestamp.
@@ -173,13 +175,12 @@ def export_options(
         cluster_fig: Optional plotly figure for cluster visualization
     """
     st.header("Export Options")
-    # st.write(f"TODO: actual html exports of plots")
     export_col1, export_col2, export_col3, _ = st.columns([1, 1, 1, 1])
 
     with export_col1:
         export_path = st.text_input(
             "Export Directory",
-            value="/workspaces/ares/data/tmp/",
+            value=DATA_DIR,
             help="Directory where exported files will be saved",
         )
 

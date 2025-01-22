@@ -1,3 +1,4 @@
+import os
 import typing as t
 import uuid
 from datetime import datetime
@@ -8,10 +9,13 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from ares.configs.base import Rollout
 from ares.configs.pydantic_sql_helpers import create_flattened_model, recreate_model
+from ares.constants import DATA_DIR
 
 SQLITE_PREFIX = "sqlite:///"
-BASE_ROBOT_DB_PATH = SQLITE_PREFIX + "robot_data.db"
-TEST_ROBOT_DB_PATH = SQLITE_PREFIX + "test_robot_data.db"
+SQLITE_ABS_PREFIX = SQLITE_PREFIX + "/"
+
+BASE_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(DATA_DIR, "robot_data.db")
+TEST_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(DATA_DIR, "test_robot_data.db")
 
 RolloutSQLModel = create_flattened_model(Rollout)
 

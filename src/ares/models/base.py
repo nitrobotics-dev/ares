@@ -20,7 +20,7 @@ from vertexai.generative_models import GenerativeModel, Part
 
 from ares.utils.image_utils import encode_image
 
-# TODO -- singleton, model specific rate limits
+# dependent on your key / organization tier
 RATE_LIMITS = {
     "openai": 10,  # 5000 RPM
     "anthropic": 4,  # 1000 RPM

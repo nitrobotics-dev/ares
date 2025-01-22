@@ -16,6 +16,7 @@ from run_trajectory_embedding_ingestion import (
     main as run_trajectory_embedding_ingestion,
 )
 
+from ares.constants import DATA_DIR
 from ares.databases.annotation_database import (
     TEST_ANNOTATION_DB_PATH,
     AnnotationDatabase,
@@ -36,8 +37,12 @@ from ares.databases.structured_database import (
     setup_database,
 )
 
-HEALING_EXCEPTIONS = {"utokyo_saytap_converted_externally_to_rlds": ["grounding"]}
-HEAL_INFO_DIR = "/workspaces/ares/data/heal_info"
+HEALING_EXCEPTIONS = {
+    "utokyo_saytap_converted_externally_to_rlds": ["grounding"],
+    "CMU Franka Exploration": ["CMU Franka Exploration-Franka-states"],
+    "USC Jaco Play": ["USC Jaco Play-Jaco 2-states"],
+}
+HEAL_INFO_DIR = os.path.join(DATA_DIR, "heal_info")
 
 
 @click.command("find-heal")
@@ -71,6 +76,8 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
             for suffix in ["states", "actions"]
         ] + META_INDEX_NAMES  # description, task
         for index_name in potential_index_names:
+            if index_name in HEALING_EXCEPTIONS.get(dataset_formalname, []):
+                continue
             if index_name not in embedding_db.indices:
                 missing_ids = id_df["id"].tolist()
                 existing_index_ids = []
@@ -83,8 +90,13 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
                 )
             if len(missing_ids) > 0:
                 n_existing = len(existing_index_ids)
+                pct_missing = (
+                    100
+                    * len(missing_ids)
+                    / (n_existing if n_existing > 0 else len(missing_ids))
+                )
                 print(
-                    f"Found {len(missing_ids)} missing ids for index {index_name} out of {n_existing} existing ids; {100 * len(missing_ids) / (n_existing if n_existing > 0 else len(missing_ids)):.2f}% missing"
+                    f"Found {len(missing_ids)} missing ids for index {index_name} out of {n_existing} existing ids; {pct_missing:.2f}% missing from dataset {dataset_formalname}"
                 )
                 to_update_embedding_index_ids.extend(missing_ids)
 
@@ -136,7 +148,7 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
     print(
         f"Found {len(to_update_grounding_ids)} ids to update in grounding database; saving to disk at {update_grounding_ids_path}"
     )
-    print(f"TIME DIR: {heal_dir}")
+    print(f"TIME DIR: {time_str}")
 
 
 @click.command("exec-heal")

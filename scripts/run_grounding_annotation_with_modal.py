@@ -1,4 +1,5 @@
 import asyncio
+import os
 import pickle
 import time
 import traceback
@@ -7,9 +8,10 @@ import typing as t
 import numpy as np
 from modal import App, Image, build, enter, method
 
+from ares.constants import DATA_DIR
 from ares.models.grounding import ANNOTATION_GROUNDING_FPS, GroundingAnnotator
 
-FAILURES_PATH = "/workspaces/ares/data/failures.pkl"
+FAILURES_PATH = os.path.join(DATA_DIR, "failures.pkl")
 
 image = (
     Image.debian_slim()
@@ -143,6 +145,7 @@ def run_modal_grounding(
     import numpy as np
 
     from ares.configs.base import Rollout
+    from ares.constants import DATASET_NAMES
     from ares.databases.annotation_database import (
         TEST_ANNOTATION_DB_PATH,
         AnnotationDatabase,
@@ -154,7 +157,6 @@ def run_modal_grounding(
         setup_database,
         setup_rollouts,
     )
-    from ares.DATASET_NAMES import DATASET_NAMES
     from ares.models.base import VLM
     from ares.models.grounding_utils import get_grounding_nouns_async
     from ares.models.shortcuts import get_gpt_4o

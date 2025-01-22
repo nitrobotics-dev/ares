@@ -42,12 +42,20 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
     # collect all the embeddings and get normalizing constants
     for k in embedding_packs[0].keys():
         try:
-            embeddings = np.concatenate([pack[k] for pack in embedding_packs])
+            packs = [
+                pack[k]
+                for pack in embedding_packs
+                if not all(x is None for x in pack[k])
+            ]
+            embeddings = np.concatenate(packs) if packs else None
         except Exception as e:
             print(e)
             breakpoint()
+
+        if k == "USC Jaco Play-Jaco 2-states":
+            breakpoint()
         # Check if embeddings array contains all None values
-        if all(x is None for x in embeddings.flatten()):
+        if embeddings is None or all(x is None for x in embeddings.flatten()):
             print(f"Skipping {k} - embeddings array contains all None values")
             continue
         print(f"found {embeddings.shape} for {k}; (N,K)")
@@ -69,12 +77,15 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
                 norm_means=means,  # normalize with dimension-specific means
                 norm_stds=stds,  # normalize with dimension-specific stds
             )
+
         # add the embeddings to the index! these will be normalized
         for rollout, pack in tqdm(
             zip(rollouts, embedding_packs), desc=f"Ingesting {k} embeddings"
         ):
             # some datasets do not provide this information
-            if isinstance(pack.get(k), np.ndarray):
+            if isinstance(pack.get(k), np.ndarray) and not all(
+                x is None for x in pack[k]
+            ):
                 index_manager.add_matrix(k, pack[k], str(rollout.id))
 
 
@@ -102,7 +113,9 @@ def ingest_language_embeddings_from_rollouts_per_dataset(
             index_manager.add_vector(name, embedding, str(rollout.id))
 
 
-def run_embedding_database_ingestion_per_dataset(rollouts: list[Rollout]) -> None:
+def run_embedding_database_ingestion_per_dataset(
+    rollouts: list[Rollout], embedder: Embedder
+) -> None:
     index_manager = IndexManager(TEST_EMBEDDING_DB_PATH_2, index_class=FaissIndex)
 
     tic = time.time()
@@ -113,7 +126,6 @@ def run_embedding_database_ingestion_per_dataset(rollouts: list[Rollout]) -> Non
 
     # add task and description embeddings to the index
     # (task, description)
-    embedder = get_nomic_embedder()
     ingest_language_embeddings_from_rollouts_per_dataset(
         rollouts, index_manager, embedder
     )
@@ -126,7 +138,7 @@ def run_embedding_database_ingestion_per_dataset(rollouts: list[Rollout]) -> Non
     relevant_metadata = {
         k: v
         for k, v in index_manager.metadata.items()
-        if rollouts[0].dataset_formalname in k
+        if rollouts[0].dataset_formalname in k or k in META_INDEX_NAMES
     }
     print(f"Metadata: {relevant_metadata}")
 
@@ -162,6 +174,7 @@ def main(
         dataset_formalname is not None or from_id_file is not None
     ), "Either dataset_formalname or from_id_file must be provided"
     engine = setup_database(RolloutSQLModel, path=engine_url)
+    embedder = get_nomic_embedder()
     if from_id_file is not None:
         with open(from_id_file, "r") as f:
             rollout_ids = [line.strip() for line in f.readlines()]
@@ -173,7 +186,7 @@ def main(
     for rollout in rollouts:
         dataset_to_rollouts[rollout.dataset_formalname].append(rollout)
     for dataset_formalname, dataset_rollouts in dataset_to_rollouts.items():
-        run_embedding_database_ingestion_per_dataset(dataset_rollouts)
+        run_embedding_database_ingestion_per_dataset(dataset_rollouts, embedder)
 
 
 if __name__ == "__main__":

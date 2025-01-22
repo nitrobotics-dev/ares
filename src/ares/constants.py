@@ -1,28 +1,33 @@
-# using oxe-downloader
-# oxe-download --dataset "name" !!!
+import os
 
+DATA_DIR = "/workspaces/ares/data"
+OXE_DIR = os.path.join(DATA_DIR, "oxe")
+VIDEO_DIR = os.path.join(DATA_DIR, "videos")
+
+# using oxe-downloader
+# oxe-download --dataset "name" --path $OXE_DIR!!!
 DATASET_NAMES = [
-    # {
-    #     "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",
-    #     "dataset_formalname": "UCSD Kitchen",
-    # },
-    # {
-    #     "dataset_filename": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
-    #     "dataset_formalname": "CMU Franka Exploration",
-    # },
-    # {
-    #     "dataset_filename": "berkeley_fanuc_manipulation",
-    #     "dataset_formalname": "Berkeley Fanuc Manipulation",
-    # },
-    # {
-    #     "dataset_filename": "cmu_stretch",
-    #     "dataset_formalname": "CMU Stretch",
-    # },
-    # {"dataset_filename": "cmu_play_fusion", "dataset_formalname": "CMU Play Fusion"},
-    # {
-    #     "dataset_filename": "jaco_play",
-    #     "dataset_formalname": "USC Jaco Play",
-    # },
+    {
+        "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "UCSD Kitchen",
+    },
+    {
+        "dataset_filename": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "CMU Franka Exploration",
+    },
+    {
+        "dataset_filename": "berkeley_fanuc_manipulation",
+        "dataset_formalname": "Berkeley Fanuc Manipulation",
+    },
+    {
+        "dataset_filename": "cmu_stretch",
+        "dataset_formalname": "CMU Stretch",
+    },
+    {"dataset_filename": "cmu_play_fusion", "dataset_formalname": "CMU Play Fusion"},
+    {
+        "dataset_filename": "jaco_play",
+        "dataset_formalname": "USC Jaco Play",
+    },
     {
         "dataset_filename": "dlr_edan_shared_control_converted_externally_to_rlds",
         "dataset_formalname": "DLR Wheelchair Shared Control",

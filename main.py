@@ -13,6 +13,7 @@ from ares.configs.open_x_embodiment_configs import (
     OpenXEmbodimentEpisode,
     get_dataset_information,
 )
+from ares.constants import DATASET_NAMES, OXE_DIR
 from ares.databases.embedding_database import (
     TEST_EMBEDDING_DB_PATH,
     TEST_TIME_STEPS,
@@ -28,7 +29,6 @@ from ares.databases.structured_database import (
     setup_database,
     setup_rollouts,
 )
-from ares.DATASET_NAMES import DATASET_NAMES
 from ares.models.extractor import InformationExtractor, RandomInformationExtractor
 from ares.models.shortcuts import Embedder, get_nomic_embedder
 from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
@@ -46,12 +46,12 @@ if __name__ == "__main__":
     hf_base = "jxu124/OpenX-Embodiment"
     random_extractor = RandomInformationExtractor()  # HACK!!
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    data_dir = "/workspaces/ares/data/oxe/"
+    embedder = get_nomic_embedder()
 
     for dataset_info in DATASET_NAMES:
         dataset_filename = dataset_info["dataset_filename"]
         dataset_formalname = dataset_info["dataset_formalname"]
-        builder, dataset_dict = build_dataset(dataset_filename, data_dir)
+        builder, dataset_dict = build_dataset(dataset_filename, OXE_DIR)
         print(
             f"working on {dataset_formalname} with splits {list(dataset_dict.keys())}"
         )
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
             # to db and videos to disk then reconstitute rollouts for indexing!
             rollouts = setup_rollouts(engine, dataset_formalname)
-            run_embedding_database_ingestion_per_dataset(rollouts)
+            run_embedding_database_ingestion_per_dataset(rollouts, embedder)
 
             # run grounding annotation with modal
             with modal_app.run():

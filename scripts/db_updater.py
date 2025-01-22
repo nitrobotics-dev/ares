@@ -5,6 +5,7 @@ import numpy as np
 from ares.configs.base import Rollout
 from ares.configs.open_x_embodiment_configs import get_dataset_information
 from ares.configs.pydantic_sql_helpers import create_flattened_model, recreate_model
+from ares.constants import DATASET_NAMES
 from ares.databases.structured_database import (
     TEST_ROBOT_DB_PATH,
     RolloutSQLModel,
@@ -15,7 +16,6 @@ from ares.databases.structured_database import (
     get_rollout_by_name,
     setup_database,
 )
-from ares.DATASET_NAMES import DATASET_NAMES
 
 engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 rollouts = get_all_rollouts(engine)
