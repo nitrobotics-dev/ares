@@ -23,6 +23,18 @@ class BaseConfig(BaseModel):
                 flattened[f"{prefix}{field_name}"] = field_value
         return flattened
 
+    def get_nested_attr(self, attr_path: str) -> t.Any:
+        """
+        Get nested attribute using flattened notation by leveraging flatten_fields.
+        e.g. rollout.get_nested_attr("task_language_instruction") returns rollout.task.language_instruction
+        """
+        flattened = self.flatten_fields()
+        if attr_path not in flattened:
+            raise AttributeError(
+                f"'{type(self).__name__}' has no attribute '{attr_path}'"
+            )
+        return flattened[attr_path]
+
 
 class Robot(BaseConfig):
     embodiment: str

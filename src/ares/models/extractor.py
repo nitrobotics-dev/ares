@@ -197,7 +197,7 @@ class VLMInformationExtractor(InformationExtractor):
 
         # Get VLM-extracted information
         images = [step.observation.image for step in episode.steps]
-        # HACK
+        # HACK # FIXME
         if len(images) > 10:
             # select 10 evenly spaced images --> update with FPS sampling
             images = images[:: len(images) // 10]

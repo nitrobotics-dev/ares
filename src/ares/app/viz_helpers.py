@@ -410,7 +410,7 @@ def show_hero_display(
     )
     text_embedding_viz_data = create_embedding_similarity_visualization(
         row,
-        name="description",  # HACK: fix naming convention
+        name=text_data_key,
         index_manager=index_manager,
         n_most_similar=retrieve_n_most_similar,
         filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
@@ -526,16 +526,16 @@ def total_statistics(df: pd.DataFrame) -> None:
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.subheader(f"Total rollouts:")
-        st.write(str(len(df)))
+        st.write(f"{len(df):,}")
     with col2:
         st.subheader(f"Total length:")
-        st.write(str(df.length.sum()) + " steps")
+        st.write(f"{df.length.sum():,} steps")
     with col3:
         st.subheader(f"Total robots:")
-        st.write(str(df["robot_embodiment"].nunique()))
+        st.write(f"{df['robot_embodiment'].nunique():,}")
     with col4:
         st.subheader(f"Total datasets:")
-        st.write(str(df["dataset_name"].nunique()))
+        st.write(f"{df['dataset_name'].nunique():,}")
 
 
 def annotation_statistics(ann_db: AnnotationDatabase) -> None:
@@ -545,14 +545,14 @@ def annotation_statistics(ann_db: AnnotationDatabase) -> None:
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.subheader(f"Total videos:")
-        st.write(str(stats["total_videos"]))
+        st.write(f"{stats['total_videos']:,}")
     with col2:
         st.subheader(f"Total annotated frames:")
-        st.write(str(stats["total_annotated_frames"]))
+        st.write(f"{stats['total_annotated_frames']:,}")
     with col3:
         st.subheader(f"Total annotations:")
-        st.write(str(stats["total_annotations"]))
+        st.write(f"{stats['total_annotations']:,}")
     with col4:
         st.subheader(f"Annotations by type:")
         for k, v in stats["annotations_by_type"].items():
-            st.write(f"{k}: {v}")
+            st.write(f"{k}: {v:,}")

@@ -11,7 +11,8 @@ from ares.databases.annotation_database import (
     AnnotationDatabase,
 )
 from ares.databases.embedding_database import (
-    TEST_EMBEDDING_DB_PATH,
+    META_INDEX_NAMES,
+    TEST_EMBEDDING_DB_PATH_2,
     FaissIndex,
     IndexManager,
 )
@@ -30,8 +31,13 @@ def load_cached_embeddings(
     """Try to load cached embeddings and clusters for given index"""
     embeddings_path = os.path.join(tmp_dump_dir, f"{index_name}_embeddings.npy")
     clusters_path = os.path.join(tmp_dump_dir, f"{index_name}_clusters.npz")
+    ids_path = os.path.join(tmp_dump_dir, f"{index_name}_ids.npy")  # New path for IDs
 
-    if not (os.path.exists(embeddings_path) and os.path.exists(clusters_path)):
+    if not (
+        os.path.exists(embeddings_path)
+        and os.path.exists(clusters_path)
+        and os.path.exists(ids_path)
+    ):
         return None
 
     loaded_embeddings = np.load(embeddings_path)
@@ -44,10 +50,12 @@ def load_cached_embeddings(
 
     # Valid cached data found - load everything
     clusters_data = np.load(clusters_path)
+    loaded_ids = np.load(ids_path)  # Load IDs
     return (
         loaded_embeddings,
         clusters_data["reduced"],
         clusters_data["labels"],
+        loaded_ids,  # Return IDs as well
     )
 
 
@@ -57,13 +65,16 @@ def save_embeddings(
     embeddings: np.ndarray,
     reduced: np.ndarray,
     labels: np.ndarray,
+    ids: np.ndarray,  # Add IDs parameter
 ) -> None:
-    """Save embeddings and clusters to disk"""
+    """Save embeddings, clusters, and IDs to disk"""
     embeddings_path = os.path.join(tmp_dump_dir, f"{index_name}_embeddings.npy")
     clusters_path = os.path.join(tmp_dump_dir, f"{index_name}_clusters.npz")
+    ids_path = os.path.join(tmp_dump_dir, f"{index_name}_ids.npy")  # New path for IDs
 
     np.save(embeddings_path, embeddings)
     np.savez(clusters_path, reduced=reduced, labels=labels)
+    np.save(ids_path, ids)  # Save IDs
 
 
 def store_in_session(
@@ -71,11 +82,13 @@ def store_in_session(
     embeddings: np.ndarray,
     reduced: np.ndarray,
     labels: np.ndarray,
+    stored_ids: np.ndarray,
 ) -> None:
     """Store embeddings and clusters in session state"""
     st.session_state[f"{index_name}_embeddings"] = embeddings
     st.session_state[f"{index_name}_reduced"] = reduced
     st.session_state[f"{index_name}_labels"] = labels
+    st.session_state[f"{index_name}_ids"] = stored_ids
 
 
 def initialize_data(tmp_dump_dir: str) -> None:
@@ -102,7 +115,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
 
     # Initialize index manager
     index_manager = IndexManager(
-        base_dir=TEST_EMBEDDING_DB_PATH, index_class=FaissIndex
+        base_dir=TEST_EMBEDDING_DB_PATH_2, index_class=FaissIndex
     )
     st.session_state.INDEX_MANAGER = index_manager
 
@@ -117,24 +130,25 @@ def initialize_data(tmp_dump_dir: str) -> None:
     os.makedirs(tmp_dump_dir, exist_ok=True)
 
     # Process each index type
-    for index_name in ["task", "description"]:
+    for index_name in META_INDEX_NAMES:
         stored_embeddings = index_manager.indices[index_name].get_all_vectors()
-        stored_ids = index_manager.indices[index_name].get_all_ids()  # Get IDs
+        stored_ids = index_manager.indices[index_name].get_all_ids()
 
         # Try loading from cache first
         cached_data = load_cached_embeddings(
             tmp_dump_dir, index_name, stored_embeddings
         )
         if cached_data is not None:
-            embeddings, reduced, labels = cached_data
+            embeddings, reduced, labels, ids = cached_data  # Unpack IDs from cache
         else:
             # Create new embeddings and clusters
             embeddings = stored_embeddings
             reduced, labels, _ = cluster_embeddings(embeddings)
-            save_embeddings(tmp_dump_dir, index_name, embeddings, reduced, labels)
+            ids = stored_ids  # Use the IDs from the index
+            save_embeddings(tmp_dump_dir, index_name, embeddings, reduced, labels, ids)
 
         # Store in session state
-        store_in_session(index_name, embeddings, reduced, labels)
+        store_in_session(index_name, embeddings, reduced, labels, stored_ids)
     st.session_state.models = dict()
     st.session_state.models["summarizer"] = VLM(provider="openai", name="gpt-4o-mini")
     st.session_state.annotations_db = AnnotationDatabase(
@@ -199,7 +213,7 @@ def display_state_info() -> None:
 
         # Embeddings Info
         st.subheader("Embedding Data")
-        for index_name in ["task", "description"]:
+        for index_name in META_INDEX_NAMES:
             st.write(f"\n**{index_name}:**")
 
             emb_key = f"{index_name}_embeddings"

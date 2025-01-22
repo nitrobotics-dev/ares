@@ -88,14 +88,13 @@ def visualize_clusters(
             f"Warning: More clusters ({n_clusters}) than available colors ({len(colors)}). Colors will be reused."
         )
     colors = colors[:n_clusters]
-
     df = pd.DataFrame(
         {
             "x": reduced_embeddings[:, 0],
             "y": reduced_embeddings[:, 1],
             "cluster": [str(x) if x != -1 else "Noise" for x in cluster_labels],
             "point_index": range(len(cluster_labels)),
-            "raw_data": [str(x)[:100] for x in raw_data],  # HACK
+            "raw_data": [str(x)[:100] for x in raw_data],
             "id": ids if ids is not None else range(len(cluster_labels)),
             "x_coord": reduced_embeddings[:, 0].round(3),
             "y_coord": reduced_embeddings[:, 1].round(3),

@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from ares.configs.base import Rollout
 from ares.databases.embedding_database import (
+    META_INDEX_NAMES,
     TEST_EMBEDDING_DB_PATH_2,
     TEST_TIME_STEPS,
     FaissIndex,
@@ -81,7 +82,7 @@ def ingest_language_embeddings_from_rollouts_per_dataset(
     rollouts: list[Rollout], index_manager: IndexManager, embedder: Embedder
 ) -> None:
     feature_dim = embedder.embed("test").shape[0]
-    for name in ["task", "description"]:
+    for name in META_INDEX_NAMES:
         for rollout in tqdm(rollouts, desc=f"Ingesting {name} embeddings"):
             if name not in index_manager.indices.keys():
                 index_manager.init_index(
@@ -93,12 +94,7 @@ def ingest_language_embeddings_from_rollouts_per_dataset(
                     extra_metadata={"model": embedder.name},
                 )
 
-            # HACK!!!! fix the lang instructuion and success criteria weirdness
-            inp = (
-                rollout.task.language_instruction
-                if name == "description"
-                else rollout.task.success_criteria
-            )
+            inp = rollout.get_nested_attr(name)
             # some datasets do not provide this information
             if inp is None:
                 continue

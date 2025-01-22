@@ -40,4 +40,4 @@ pdfkit
 matplotlib
 
 # database
-faiss-cpu #TODO: try faiss-gpu
+faiss-cpu # replace with faiss-gpu if available 

@@ -18,7 +18,7 @@ TEST_EMBEDDING_DB_PATH = "/workspaces/ares/data/tmp/test_embedding_data"
 TEST_EMBEDDING_DB_PATH_2 = "/workspaces/ares/data/tmp/test_embedding_data_2"
 
 TEST_TIME_STEPS = 100
-META_INDEX_NAMES = ["description", "task"]
+META_INDEX_NAMES = ["description", "task_language_instruction"]
 
 
 def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
@@ -582,7 +582,7 @@ class IndexManager:
 
 
 if __name__ == "__main__":
-    db = IndexManager(TEST_EMBEDDING_DB_PATH, FaissIndex)
+    db = IndexManager(TEST_EMBEDDING_DB_PATH_2, FaissIndex)
 
     breakpoint()
     print(db.get_overall_stats())

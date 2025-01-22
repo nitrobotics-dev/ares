@@ -98,35 +98,42 @@ def main() -> None:
         st.write(
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
-        filtered_df = value_filtered_df
-        cluster_fig = None
 
-        # print(kept_ids[:10])
         if len(kept_ids) == 0:
             breakpoint()
 
-    #     # # Embedding data filters
-    #     # state_key = "description"
-    #     # raw_data_key = "task_language_instruction"
-    #     # # state_key = "task"
-    #     # # raw_data_key = "task_success_criteria"
-    #     # # TODO: present SEVERAL embedding filter options
-    #     # filtered_df, cluster_fig, selection, selection_flag = (
-    #     #     embedding_data_filters_display(
-    #     #         df=df,
-    #     #         reduced=st.session_state[f"{state_key}_reduced"],
-    #     #         labels=st.session_state[f"{state_key}_labels"],
-    #     #         raw_data_key=raw_data_key,
-    #     #         id_key="id",
-    #     #         keep_mask=kept_ids,
-    #     #     )
-    #     # )
+        # Embedding data filters
+        id_key = "id"
+        state_key = "task_language_instruction"
+        raw_data_key = "task_language_instruction"
 
-    #     # if filtered_df.empty:
-    #     #     st.warning(
-    #     #         "No data available for the selected points! Try adjusting your selection to receive analytics."
-    #     #     )
-    #     #     return
+        # TODO: present description, task language instruction filter options
+        reduced_embeddings = st.session_state[f"{state_key}_reduced"]
+        labels = st.session_state[f"{state_key}_labels"]
+        state_ids = st.session_state[f"{state_key}_ids"]
+
+        desired_ids = df[id_key].apply(str)
+        id_to_idx_state = {_id: idx for idx, _id in enumerate(state_ids)}
+        desired_state_indices = [id_to_idx_state[_id] for _id in desired_ids]
+        reduced_embeddings = reduced_embeddings[desired_state_indices]
+        labels = labels[desired_state_indices]
+
+        filtered_df, cluster_fig, selection, selection_flag = (
+            embedding_data_filters_display(
+                df=df,
+                reduced=reduced_embeddings,
+                labels=labels,
+                raw_data_key=raw_data_key,
+                id_key=id_key,
+                keep_mask=kept_ids,
+            )
+        )
+
+        if filtered_df.empty:
+            st.warning(
+                "No data available for the selected points! Try adjusting your selection to receive analytics."
+            )
+            return
 
     # Add a button to refresh the sample
     st.button(
@@ -204,34 +211,34 @@ def main() -> None:
             st.info("Please select a row to display details")
     st.divider()
 
-    # section_plot_robots = "plot robot arrays"
-    # with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
-    #     if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
-    #         st.header("Robot Array Display")
-    #         # Number of trajectories to display in plots
-    #         robot_array_visualizations = generate_robot_array_plot_visualizations(
-    #             selected_row,  # need row to select dataset/robot embodiment of trajectories
-    #             st.session_state.all_vecs,
-    #             show_n=1000,
-    #         )
-    #     else:
-    #         st.write("No robot array plots generated")
-    #         robot_array_visualizations = []
-    # st.divider()
+    section_plot_robots = "plot robot arrays"
+    with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
+        if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
+            st.header("Robot Array Display")
+            # Number of trajectories to display in plots
+            robot_array_visualizations = generate_robot_array_plot_visualizations(
+                selected_row,  # need row to select dataset/robot embodiment of trajectories
+                st.session_state.all_vecs,
+                show_n=1000,
+            )
+        else:
+            st.write("No robot array plots generated")
+            robot_array_visualizations = []
+    st.divider()
 
-    # section_export = "exporting data"
-    # with filter_error_context(section_export), timer_context(section_export):
-    #     # Export controls
-    #     # Collect all visualizations
-    #     # TODO: add structured data filters to export
-    #     all_visualizations = [
-    #         *general_visualizations,
-    #         *success_visualizations,
-    #         *time_series_visualizations,
-    #         *robot_array_visualizations,
-    #         *hero_visualizations,  # Add hero visualizations to export
-    #     ]
-    #     export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
+    section_export = "exporting data"
+    with filter_error_context(section_export), timer_context(section_export):
+        # Export controls
+        # Collect all visualizations
+        # TODO: add structured data filters to export
+        all_visualizations = [
+            *general_visualizations,
+            *success_visualizations,
+            *time_series_visualizations,
+            *robot_array_visualizations,
+            *hero_visualizations,  # Add hero visualizations to export
+        ]
+        export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
 
     # Print timing report at the end
     print("\n=== Timing Report ===")

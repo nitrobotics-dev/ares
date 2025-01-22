@@ -9,6 +9,7 @@ from ares.configs.base import Rollout
 from ares.configs.pydantic_sql_helpers import recreate_model
 from ares.databases.embedding_database import (
     BASE_EMBEDDING_DB_PATH,
+    META_INDEX_NAMES,
     TEST_EMBEDDING_DB_PATH,
     FaissIndex,
     IndexManager,
@@ -48,7 +49,7 @@ unique_dataset_robots_list = list({r.robot.embodiment: r for r in rollouts}.valu
 
 # for task, description, video --> no env/robot specific! just one distribution
 embedding_dim = EMBEDDER.embed("dummy").shape[0]
-for key in ["task", "description"]:  # "video"!!!
+for key in META_INDEX_NAMES:  # "video"!!!
     name = key
     index_manager.init_index(
         name,
