@@ -90,7 +90,7 @@ def main() -> None:
         annotation_statistics(st.session_state.annotations_db)
         st.divider()
 
-    section_filters = "data filters"
+    section_filters = "structured data filters"
     print(section_filters)
     with filter_error_context(section_filters), timer_context(section_filters):
         # Structured data filters
@@ -100,46 +100,53 @@ def main() -> None:
         st.write(
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
+        filtered_df = None
 
         if len(kept_ids) == 0:
             breakpoint()
 
-        # Embedding data filters
-        id_key = "id"
-        state_key = "task_language_instruction"
-        raw_data_key = "task_language_instruction"
+    # section_embedding_filters = "embedding data filters"
+    # print(section_embedding_filters)
+    # with filter_error_context(section_embedding_filters), timer_context(section_embedding_filters):
+    #     # Embedding data filters
+    #     id_key = "id"
+    #     state_key = "task_language_instruction"
+    #     raw_data_key = "task_language_instruction"
 
-        # TODO: present description, task language instruction filter options
-        reduced_embeddings = st.session_state[f"{state_key}_reduced"]
-        labels = st.session_state[f"{state_key}_labels"]
-        state_ids = st.session_state[f"{state_key}_ids"]
-        try:
-            desired_ids = df[id_key].apply(str)
-            id_to_idx_state = {_id: idx for idx, _id in enumerate(state_ids)}
-            desired_state_indices = [id_to_idx_state[_id] for _id in desired_ids]
-            reduced_embeddings = reduced_embeddings[desired_state_indices]
-            labels = labels[desired_state_indices]
+    #     # TODO: present description, task language instruction filter options
+    #     reduced_embeddings = st.session_state[f"{state_key}_reduced"]
+    #     labels = st.session_state[f"{state_key}_labels"]
+    #     state_ids = st.session_state[f"{state_key}_ids"]
+    #     try:
+    #         desired_ids = df[id_key].apply(str)
+    #         id_to_idx_state = {_id: idx for idx, _id in enumerate(state_ids)}
+    #         desired_state_indices = [id_to_idx_state[_id] for _id in desired_ids]
+    #         reduced_embeddings = reduced_embeddings[desired_state_indices]
+    #         labels = labels[desired_state_indices]
 
-            filtered_df, cluster_fig, selection, selection_flag = (
-                embedding_data_filters_display(
-                    df=df,
-                    reduced=reduced_embeddings,
-                    labels=labels,
-                    raw_data_key=raw_data_key,
-                    id_key=id_key,
-                    keep_mask=kept_ids,
-                )
-            )
-        except Exception as e:
-            print(e)
-            print(traceback.format_exc())
-            breakpoint()
+    #         filtered_df, cluster_fig, selection, selection_flag = (
+    #             embedding_data_filters_display(
+    #                 df=df,
+    #                 reduced=reduced_embeddings,
+    #                 labels=labels,
+    #                 raw_data_key=raw_data_key,
+    #                 id_key=id_key,
+    #                 keep_mask=kept_ids,
+    #             )
+    #         )
+    #     except Exception as e:
+    #         print(e)
+    #         print(traceback.format_exc())
+    #         breakpoint()
 
-        if filtered_df.empty:
-            st.warning(
-                "No data available for the selected points! Try adjusting your selection to receive analytics."
-            )
-            return
+    #     if filtered_df.empty:
+    #         st.warning(
+    #             "No data available for the selected points! Try adjusting your selection to receive analytics."
+    #         )
+    #         return
+
+    if filtered_df is None:
+        filtered_df = value_filtered_df
 
     # Add a button to refresh the sample
     st.button(
@@ -165,28 +172,28 @@ def main() -> None:
             general_visualizations, [viz["title"] for viz in general_visualizations]
         )
 
-    # section_success_rate = "success rate analytics"
-    # with (
-    #     filter_error_context(section_success_rate),
-    #     timer_context(section_success_rate),
-    # ):
-    #     st.header("Success Rate Analytics")
-    #     success_visualizations = generate_success_rate_visualizations(filtered_df)
-    #     create_tabbed_visualizations(
-    #         success_visualizations, [viz["title"] for viz in success_visualizations]
-    #     )
-    # st.divider()
+    section_success_rate = "success rate analytics"
+    with (
+        filter_error_context(section_success_rate),
+        timer_context(section_success_rate),
+    ):
+        st.header("Success Rate Analytics")
+        success_visualizations = generate_success_rate_visualizations(filtered_df)
+        create_tabbed_visualizations(
+            success_visualizations, [viz["title"] for viz in success_visualizations]
+        )
+    st.divider()
 
-    # section_time_series = "time series trends"
-    # with filter_error_context(section_time_series), timer_context(section_time_series):
-    #     st.header("Time Series Trends")
-    #     time_series_visualizations = generate_time_series_visualizations(
-    #         filtered_df, time_column="ingestion_time"
-    #     )
-    #     create_tabbed_visualizations(
-    #         time_series_visualizations,
-    #         [viz["title"] for viz in time_series_visualizations],
-    #     )
+    section_time_series = "time series trends"
+    with filter_error_context(section_time_series), timer_context(section_time_series):
+        st.header("Time Series Trends")
+        time_series_visualizations = generate_time_series_visualizations(
+            filtered_df, time_column="ingestion_time"
+        )
+        create_tabbed_visualizations(
+            time_series_visualizations,
+            [viz["title"] for viz in time_series_visualizations],
+        )
 
     section_video_grid = "video grid"
     with filter_error_context(section_video_grid), timer_context(section_video_grid):
@@ -216,34 +223,34 @@ def main() -> None:
             st.info("Please select a row to display details")
     st.divider()
 
-    # section_plot_robots = "plot robot arrays"
-    # with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
-    #     if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
-    #         st.header("Robot Array Display")
-    #         # Number of trajectories to display in plots
-    #         robot_array_visualizations = generate_robot_array_plot_visualizations(
-    #             selected_row,  # need row to select dataset/robot embodiment of trajectories
-    #             st.session_state.all_vecs,
-    #             show_n=1000,
-    #         )
-    #     else:
-    #         st.write("No robot array plots generated")
-    #         robot_array_visualizations = []
-    # st.divider()
+    section_plot_robots = "plot robot arrays"
+    with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
+        if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
+            st.header("Robot Array Display")
+            # Number of trajectories to display in plots
+            robot_array_visualizations = generate_robot_array_plot_visualizations(
+                selected_row,  # need row to select dataset/robot embodiment of trajectories
+                st.session_state.all_vecs,
+                show_n=1000,
+            )
+        else:
+            st.write("No robot array plots generated")
+            robot_array_visualizations = []
+    st.divider()
 
-    # section_export = "exporting data"
-    # with filter_error_context(section_export), timer_context(section_export):
-    #     # Export controls
-    #     # Collect all visualizations
-    #     # TODO: add structured data filters to export
-    #     all_visualizations = [
-    #         *general_visualizations,
-    #         *success_visualizations,
-    #         *time_series_visualizations,
-    #         *robot_array_visualizations,
-    #         *hero_visualizations,  # Add hero visualizations to export
-    #     ]
-    #     export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
+    section_export = "exporting data"
+    with filter_error_context(section_export), timer_context(section_export):
+        # Export controls
+        # Collect all visualizations
+        # TODO: add structured data filters to export
+        all_visualizations = [
+            *general_visualizations,
+            *success_visualizations,
+            *time_series_visualizations,
+            *robot_array_visualizations,
+            *hero_visualizations,  # Add hero visualizations to export
+        ]
+        export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
 
     # Print timing report at the end
     print("\n=== Timing Report ===")

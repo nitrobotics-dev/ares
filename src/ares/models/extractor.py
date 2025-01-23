@@ -145,36 +145,13 @@ class VLMInformationExtractor(InformationExtractor):
     def __init__(self, vlm: VLM):
         self.vlm = vlm
 
-    def extract(
+    def _prepare_prompt_info(
         self,
         episode: OpenXEmbodimentEpisode,
-        dataset_info: DatasetInfo,
-        *,  # Force keyword arguments
-        robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-        trajectory_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
-    ) -> Rollout:
-        # Initialize kwargs
-        robot_kwargs = robot_kwargs or {}
-        environment_kwargs = environment_kwargs or {}
-        task_kwargs = task_kwargs or {}
-        model_kwargs = model_kwargs or {}
-        trajectory_kwargs = trajectory_kwargs or {}
-
-        # Get hardcoded information
-        dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
-        episode_info_dict = hard_coded_episode_info_extraction(episode)
-        hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
-        # collect frames according to fps
-        dataset_filename = dataset_info_dict["rollout"]["dataset_filename"]
-        episode_fname = episode_info_dict["rollout"]["filename"]
-        images, _ = load_video_frames(dataset_filename, episode_fname, target_fps=1)
-
-        # create information for the jinja prompt template:
-        # task language instruction, field instructions for required fields, example of response format
-        info = {
+        hardcoded_info: dict,
+    ) -> dict:
+        """Prepare the prompt information for VLM."""
+        return {
             "task": episode.steps[0].language_instruction,
             "field_instructions": (
                 "Please provide the following required information:\n"
@@ -188,48 +165,120 @@ class VLMInformationExtractor(InformationExtractor):
                 Rollout, exclude_fields=hardcoded_info, required_only=True
             ),
         }
-        messages, response = self.vlm.ask(
-            info=info,
-            prompt_filename=model_kwargs.get(
-                "prompt_filename", "extractor_prompt.jinja2"
-            ),
-            images=images,
-        )
-        try:
-            # Parse the response content as JSON if it's a string
-            content = response.choices[0].message.content
-            # Remove markdown code block formatting
-            content = (
-                content.strip().removeprefix("```json").removesuffix("```").strip()
-            )
-            structured_info = (
-                json.loads(content) if isinstance(content, str) else content
-            )
-        except Exception as e:
-            print(f"Error parsing response: {e}")
-            print(traceback.format_exc())
-            breakpoint()
+
+    def _create_rollout(
+        self,
+        hardcoded_info: dict,
+        structured_info: dict,
+        component_kwargs: dict,
+    ) -> Rollout:
+        """Create a rollout from structured and hardcoded information."""
         components = {
-            "robot": (Robot, robot_kwargs),
-            "environment": (Environment, environment_kwargs),
-            "task": (Task, task_kwargs),
-            "trajectory": (Trajectory, trajectory_kwargs),
+            "robot": (Robot, component_kwargs.get("robot_kwargs", {})),
+            "environment": (
+                Environment,
+                component_kwargs.get("environment_kwargs", {}),
+            ),
+            "task": (Task, component_kwargs.get("task_kwargs", {})),
+            "trajectory": (Trajectory, component_kwargs.get("trajectory_kwargs", {})),
         }
+
         objects = {
             name: merge_config_sources(
                 ConfigCls, hardcoded_info, structured_info, kwargs
             )
             for name, (ConfigCls, kwargs) in components.items()
         }
-        # Create final rollout with all components
-        # Include both hardcoded rollout info and top-level fields from structured_info, e.g. description
+
         rollout_kwargs = {
             **hardcoded_info["rollout"],
             **{k: v for k, v in structured_info.items() if not isinstance(v, dict)},
             **objects,
         }
-        rollout = Rollout(**rollout_kwargs)
-        return rollout
+        return Rollout(**rollout_kwargs)
+
+    async def extract_batch(
+        self,
+        episodes: list[OpenXEmbodimentEpisode],
+        dataset_info: DatasetInfo,
+        *,  # Force keyword arguments
+        robot_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        trajectory_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> list[Rollout]:
+        """Process a batch of episodes in parallel."""
+        component_kwargs = {
+            "robot_kwargs": robot_kwargs or {},
+            "environment_kwargs": environment_kwargs or {},
+            "task_kwargs": task_kwargs or {},
+            "model_kwargs": model_kwargs or {},
+            "trajectory_kwargs": trajectory_kwargs or {},
+        }
+
+        # Get hardcoded information
+        dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
+        episode_info_dicts = [hard_coded_episode_info_extraction(ep) for ep in episodes]
+        hardcoded_infos = [
+            merge_dicts(dataset_info_dict, ep_info) for ep_info in episode_info_dicts
+        ]
+
+        # Prepare prompts and images
+        prompts = []
+        images_list = []
+        for episode, hardcoded_info in zip(episodes, hardcoded_infos):
+            # Load video frames
+            dataset_filename = dataset_info_dict["rollout"]["dataset_filename"]
+            episode_fname = hardcoded_info["rollout"]["filename"]
+            images, _ = load_video_frames(
+                dataset_filename, episode_fname, target_fps=1, include_last_frame=True
+            )
+            images_list.append(images)
+
+            # Prepare prompt
+            prompts.append(self._prepare_prompt_info(episode, hardcoded_info))
+
+        # Batch process with VLM
+        results = await self.vlm.ask_batch_async(
+            infos=prompts,
+            prompt_filename=component_kwargs["model_kwargs"].get(
+                "prompt_filename", "extractor_prompt.jinja2"
+            ),
+            images_list=images_list,
+        )
+        # Unpack the responses from the results
+        responses = [response for _, response in results]
+
+        # Process responses and create rollouts
+        rollouts = []
+        for hardcoded_info, response in zip(hardcoded_infos, responses):
+            try:
+                content = response.choices[0].message.content.strip()
+                content = content.removeprefix("```json").removesuffix("```").strip()
+                structured_info = (
+                    json.loads(content) if isinstance(content, str) else content
+                )
+
+                rollout = self._create_rollout(
+                    hardcoded_info=hardcoded_info,
+                    structured_info=structured_info,
+                    component_kwargs=component_kwargs,
+                )
+                rollouts.append(rollout)
+
+            except Exception as e:
+                print(f"Error parsing response: {e}")
+                print(traceback.format_exc())
+                error_dict = {
+                    "path": hardcoded_info["rollout"]["path"],
+                    "error_pattern": "extraction_failure",
+                    "error": traceback.format_exc(),
+                }
+                breakpoint()
+                rollouts.append(error_dict)
+
+        return rollouts
 
 
 class RandomInformationExtractor(InformationExtractor):

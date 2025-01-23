@@ -1,9 +1,12 @@
+import asyncio
+import pickle
+
 import tensorflow_datasets as tfds
 
 from ares.configs.open_x_embodiment_configs import get_dataset_information
 from ares.constants import ARES_OXE_DIR, DATASET_NAMES
 from ares.databases.structured_database import (
-    TEST_ROBOT_DB_PATH,
+    ROBOT_DB_PATH,
     RolloutSQLModel,
     setup_database,
     setup_rollouts,
@@ -21,13 +24,13 @@ from scripts.run_trajectory_embedding_ingestion import (
 )
 
 if __name__ == "__main__":
-    # vlm = get_gpt_4o()
-    vlm = get_gpt_4o_mini()
-    vlm_extractor = VLMInformationExtractor(vlm)
-    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+    vlm_name = "gpt-4o-mini"
+    engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     embedder = get_nomic_embedder()
 
     for i, dataset_info in enumerate(DATASET_NAMES):
+        if i > 0:
+            break
         dataset_filename = dataset_info["dataset_filename"]
         dataset_formalname = dataset_info["dataset_formalname"]
         builder, dataset_dict = build_dataset(dataset_filename, ARES_OXE_DIR)
@@ -46,20 +49,23 @@ if __name__ == "__main__":
             dataset_info["Split"] = split
 
             # run structured ingestion
-            run_structured_database_ingestion(
-                ds,
-                dataset_info,
-                dataset_formalname,
-                vlm_extractor,
-                engine,
-                dataset_filename,
+            asyncio.run(
+                run_structured_database_ingestion(
+                    ds,
+                    dataset_info,
+                    dataset_formalname,
+                    vlm_name,
+                    engine,
+                    dataset_filename,
+                )
             )
 
-            # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
-            # to db and videos to disk then reconstitute rollouts for indexing!
-            rollouts = setup_rollouts(engine, dataset_formalname)
-            run_embedding_database_ingestion_per_dataset(rollouts, embedder)
+            # # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
+            # # to db and videos to disk then reconstitute rollouts for indexing!
+            # rollouts = setup_rollouts(engine, dataset_formalname)
+            # rollouts = [r for r in rollouts if r.id in new_rollout_ids]
+            # run_embedding_database_ingestion_per_dataset(rollouts, embedder)
 
-            # run grounding annotation with modal
-            with modal_app.run():
-                run_modal_grounding(dataset_filename=dataset_filename, split=split)
+            # # run grounding annotation with modal
+            # with modal_app.run():
+            #     run_modal_grounding(rollout_ids=new_rollout_ids)

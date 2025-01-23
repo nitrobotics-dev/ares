@@ -224,7 +224,10 @@ def get_frame_indices_for_fps(
 
 
 def load_video_frames(
-    dataset_filename: str, fname: str, target_fps: int | float = 1
+    dataset_filename: str,
+    fname: str,
+    target_fps: int | float = 1,
+    include_last_frame: bool = False,
 ) -> tuple[t.List[np.ndarray], t.List[int]]:
     """Load video frames at specified FPS."""
     video_path = get_video_from_path(dataset_filename, fname)
@@ -234,6 +237,9 @@ def load_video_frames(
         frame_indices = [0, -1]
     else:
         frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
+        if include_last_frame and frame_indices[-1] != -1:
+            frame_indices.append(-1)
+
     # some videos/frame sequences are too long for context lengths or API limits
     # so we downsample to a max number of frames but maintain the first and last frames
     if len(frame_indices) > MAX_N_FRAMES:

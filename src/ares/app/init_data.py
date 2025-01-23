@@ -17,7 +17,7 @@ from ares.databases.embedding_database import (
     IndexManager,
 )
 from ares.databases.structured_database import (
-    TEST_ROBOT_DB_PATH,
+    ROBOT_DB_PATH,
     RolloutSQLModel,
     setup_database,
 )
@@ -102,7 +102,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
 
     # Initialize database and session
     print("Initializing database and session")
-    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+    engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     sess = Session(engine)
     st.session_state.ENGINE = engine
     st.session_state.SESSION = sess

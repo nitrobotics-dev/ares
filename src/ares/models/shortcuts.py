@@ -48,16 +48,27 @@ def get_claude_3_5_haiku() -> VLM:
     return VLM(provider="anthropic", name="claude-3-5-haiku-20241022")
 
 
-def get_all_vlms() -> dict[str, VLM]:
-    return {
-        "gemini-1.5-pro": get_gemini_15_pro(),
-        "gemini-2-flash": get_gemini_2_flash(),
-        "gemini-1.5-flash": get_gemini_15_flash(),
-        "gpt-4o-mini": get_gpt_4o_mini(),
-        "gpt-4o": get_gpt_4o(),
-        "gpt-o1-mini": get_gpt_o1_mini(),
-        "claude-3-5-sonnet": get_claude_3_5_sonnet(),
-    }
+name_to_vlm_fn_mapping = {
+    "gemini-1.5-pro": get_gemini_15_pro,
+    "gemini-2-flash": get_gemini_2_flash,
+    "gemini-1.5-flash": get_gemini_15_flash,
+    "gpt-4o-mini": get_gpt_4o_mini,
+    "gpt-4o": get_gpt_4o,
+    "gpt-o1-mini": get_gpt_o1_mini,
+    "claude-3-5-sonnet": get_claude_3_5_sonnet,
+}
+
+
+def get_all_vlm_fns() -> dict[str, VLM]:
+    return name_to_vlm_fn_mapping
+
+
+def get_vlm(name: str) -> VLM:
+    if name not in name_to_vlm_fn_mapping:
+        raise ValueError(
+            f"VLM {name} not found from name_to_vlm_fn_mapping: {name_to_vlm_fn_mapping.keys()}"
+        )
+    return name_to_vlm_fn_mapping[name]()
 
 
 def summarize(vlm: VLM, data: list[str], description: str) -> str:

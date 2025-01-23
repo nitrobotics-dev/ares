@@ -14,7 +14,7 @@ from ares.constants import ARES_DATA_DIR
 SQLITE_PREFIX = "sqlite:///"
 SQLITE_ABS_PREFIX = SQLITE_PREFIX + "/"
 
-BASE_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(ARES_DATA_DIR, "robot_data.db")
+ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(ARES_DATA_DIR, "robot_data.db")
 TEST_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(
     ARES_DATA_DIR, "test_robot_data.db"
 )
@@ -22,7 +22,7 @@ TEST_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(
 RolloutSQLModel = create_flattened_model(Rollout)
 
 
-def setup_database(RolloutSQLModel: SQLModel, path: str = BASE_ROBOT_DB_PATH) -> Engine:
+def setup_database(RolloutSQLModel: SQLModel, path: str = ROBOT_DB_PATH) -> Engine:
     engine = create_engine(path)
     inspector = inspect(engine)
 

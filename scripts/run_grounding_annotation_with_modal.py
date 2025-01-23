@@ -138,6 +138,7 @@ async def run_annotation_parallel(
 def run_modal_grounding(
     dataset_filename: str | None = None,
     split: str | None = None,
+    rollout_ids: list[str] | None = None,
     outer_batch_size: int = 200,  # RAM limits number of concurrent rollouts formatted into requests
     retry_failed_path: str = None,  # path to pickle file with failures to retry
     annotation_fps: int = ANNOTATION_GROUNDING_FPS,
@@ -247,6 +248,8 @@ def run_modal_grounding(
             rollouts = get_rollouts_by_ids(engine, failed_ids)
         else:
             raise ValueError(f"Unknown file type: {retry_failed_path}")
+    elif rollout_ids:
+        rollouts = get_rollouts_by_ids(engine, rollout_ids)
     else:
         dataset_info = [
             d for d in DATASET_NAMES if d["dataset_filename"] == dataset_filename
