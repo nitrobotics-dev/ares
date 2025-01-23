@@ -7,9 +7,7 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, Field, model_validator
 
-COLOR_PATTERN = (
-    "^(white|black|gray|red|green|blue|yellow|purple|orange|brown|pink|gray|other)$"
-)
+COLOR_PATTERN = "^(white|black|gray|red|green|blue|yellow|purple|orange|brown|pink|gray|other|unknown)$"
 
 
 class BaseConfig(BaseModel):
@@ -38,6 +36,19 @@ class BaseConfig(BaseModel):
                 f"'{type(self).__name__}' has no attribute '{attr_path}'"
             )
         return flattened[attr_path]
+
+    @model_validator(mode="before")
+    def convert_sequences_to_json(cls, data: dict) -> dict:
+        # Convert any sequence fields to JSON strings
+        # this is a workaround for converting to sql formats
+        for field, value in data.items():
+            if isinstance(value, (list, np.ndarray)):
+                # Convert numpy arrays to lists first if needed
+                value = data[field]
+                if isinstance(value, np.ndarray):
+                    value = value.tolist()
+                data[field] = json.dumps(value)
+        return data
 
 
 def merge_dicts(dict1: dict, dict2: dict) -> dict:
@@ -117,11 +128,11 @@ class Environment(BaseConfig):
         description="The surface that the task is taking place on",
         pattern="^(wood|metal|plastic|glass|concrete|carpet|tile|rubber|fabric|composite|marble|granite|cardboard|other)$",
     )
-    focus_objects_estimate: list[str] = Field(
+    focus_objects_estimate: str = Field(
         description="The object(s) is the robot supposed to interact with.",
         default_factory=list,
     )
-    distractor_objects_estimate: list[str] = Field(
+    distractor_objects_estimate: str = Field(
         description="Objects present in the scene that the robot is NOT supposed to interact with.",
         default_factory=list,
     )
@@ -175,18 +186,6 @@ class Trajectory(BaseConfig):
     reward_step: int | None = (
         None  # if -1; never reach reward. if > 0, the index of the first step to recieve reward of 1. If None, we do not have reward data.
     )
-
-    @model_validator(mode="before")
-    def convert_sequences_to_json(cls, data: dict) -> dict:
-        # Convert any list fields to JSON strings
-        for field in ["actions", "states", "rewards"]:
-            if isinstance(data.get(field), (list, np.ndarray)):
-                # Convert numpy arrays to lists first if needed
-                value = data[field]
-                if isinstance(value, np.ndarray):
-                    value = value.tolist()
-                data[field] = json.dumps(value)
-        return data
 
     @property
     def actions_array(self) -> np.ndarray:

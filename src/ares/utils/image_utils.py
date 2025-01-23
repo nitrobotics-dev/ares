@@ -113,7 +113,7 @@ def get_video_mp4(dataset_filename: str, filename: str) -> str:
     """Get path to the MP4 video file."""
     if not filename.endswith(".mp4"):
         filename += ".mp4"
-    print("mp4: ", dataset_filename, filename)
+    filename = filename.lstrip("/")
     mp4_path = os.path.join(ARES_VIDEO_DIR, dataset_filename, filename)
     if not os.path.exists(mp4_path):
         raise FileNotFoundError(f"MP4 file not found: {mp4_path}")

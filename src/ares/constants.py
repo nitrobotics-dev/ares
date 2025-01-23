@@ -53,10 +53,6 @@ DATASET_NAMES = [
         "dataset_formalname": "ASU TableTop Manipulation",
     },
     {
-        "dataset_filename": "utokyo_saytap_converted_externally_to_rlds",
-        "dataset_formalname": "Saytap",
-    },
-    {
         "dataset_filename": "viola",
         "dataset_formalname": "Austin VIOLA",
     },
@@ -68,4 +64,9 @@ DATASET_NAMES = [
         "dataset_filename": "berkeley_mvp_converted_externally_to_rlds",
         "dataset_formalname": "Berkeley MVP Data",
     },
+    # Saytap does not have pixel data
+    # {
+    #     "dataset_filename": "utokyo_saytap_converted_externally_to_rlds",
+    #     "dataset_formalname": "Saytap",
+    # },
 ]

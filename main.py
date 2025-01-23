@@ -28,8 +28,6 @@ if __name__ == "__main__":
     embedder = get_nomic_embedder()
 
     for i, dataset_info in enumerate(DATASET_NAMES):
-        if i == 0:
-            continue
         dataset_filename = dataset_info["dataset_filename"]
         dataset_formalname = dataset_info["dataset_formalname"]
         builder, dataset_dict = build_dataset(dataset_filename, ARES_OXE_DIR)
@@ -57,11 +55,11 @@ if __name__ == "__main__":
                 dataset_filename,
             )
 
-            # # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
-            # # to db and videos to disk then reconstitute rollouts for indexing!
-            # rollouts = setup_rollouts(engine, dataset_formalname)
-            # run_embedding_database_ingestion_per_dataset(rollouts, embedder)
+            # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
+            # to db and videos to disk then reconstitute rollouts for indexing!
+            rollouts = setup_rollouts(engine, dataset_formalname)
+            run_embedding_database_ingestion_per_dataset(rollouts, embedder)
 
-            # # run grounding annotation with modal
-            # with modal_app.run():
-            #     run_modal_grounding(dataset_filename=dataset_filename, split=split)
+            # run grounding annotation with modal
+            with modal_app.run():
+                run_modal_grounding(dataset_filename=dataset_filename, split=split)
