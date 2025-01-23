@@ -1,3 +1,7 @@
+"""
+Helper script to run annotation predictions. We adopt Modal as the serverless compute provider in order to launch a large number of requests in parallel.
+"""
+
 import asyncio
 import os
 import pickle
@@ -8,10 +12,10 @@ import typing as t
 import numpy as np
 from modal import App, Image, build, enter, method
 
-from ares.constants import DATA_DIR
+from ares.constants import ARES_DATA_DIR
 from ares.models.grounding import ANNOTATION_GROUNDING_FPS, GroundingAnnotator
 
-FAILURES_PATH = os.path.join(DATA_DIR, "failures.pkl")
+FAILURES_PATH = os.path.join(ARES_DATA_DIR, "failures.pkl")
 
 image = (
     Image.debian_slim()
@@ -261,7 +265,7 @@ def run_modal_grounding(
     overall_stats = dict()
     overall_failures = []
 
-    # limited by CPU RAM (cant actually create all the potential requests at once, so run in batches)
+    # limited by CPU RAM (cant actually create all the potential requests at once, so run in "outer" batches as opposed to on-device gpu "inner" batches)
     for i in range(0, len(rollouts), outer_batch_size):
         print(
             f"processing batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"

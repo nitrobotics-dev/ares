@@ -1,12 +1,14 @@
-import os
+"""
+Helper script to ingest a rollout into the embedding database. We ingest the trajectory matrices (such a states and actions) as well as description and task_language_instruction embeddings.
+This enables us to perform efficient nearest neighbor search on the embeddings in order to find similar rollouts in the physical or language space.
+"""
+
 import time
 from collections import defaultdict
-from pathlib import Path
 from typing import Union
 
 import click
 import numpy as np
-from sqlalchemy import Engine
 from tqdm import tqdm
 
 from ares.configs.base import Rollout
@@ -25,8 +27,8 @@ from ares.databases.structured_database import (
     setup_database,
     setup_rollouts,
 )
-from ares.models.extractor import RandomInformationExtractor
-from ares.models.shortcuts import Embedder, get_nomic_embedder
+from ares.models.base import Embedder
+from ares.models.shortcuts import get_nomic_embedder
 
 
 def ingest_trajectory_matrices_from_rollouts_per_dataset(
@@ -52,8 +54,6 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
             print(e)
             breakpoint()
 
-        if k == "USC Jaco Play-Jaco 2-states":
-            breakpoint()
         # Check if embeddings array contains all None values
         if embeddings is None or all(x is None for x in embeddings.flatten()):
             print(f"Skipping {k} - embeddings array contains all None values")

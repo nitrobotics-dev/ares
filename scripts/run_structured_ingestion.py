@@ -1,27 +1,31 @@
+"""
+Helper script to ingest structured data into the database. This script is used in `main` in order to ingest a dataset into the database. We do this by converting a
+dataset into a RLDS-style TFDS, extracting the rollouts from the TFDS, and then adding the rollouts to the database.
+"""
+
 import os
 import time
 import traceback
 from pathlib import Path
 
 import click
-import numpy as np
 import tensorflow_datasets as tfds
 from sqlalchemy import Engine
 from tqdm import tqdm
 
-from ares.configs.base import Rollout
 from ares.configs.open_x_embodiment_configs import (
     OpenXEmbodimentEpisode,
     construct_openxembodiment_episode,
     get_dataset_information,
 )
+from ares.constants import ARES_VIDEO_DIR
 from ares.databases.structured_database import (
     RolloutSQLModel,
     add_rollout,
     setup_database,
 )
 from ares.models.extractor import InformationExtractor
-from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
+from ares.utils.image_utils import save_video
 
 
 def build_dataset(
@@ -39,7 +43,7 @@ def maybe_save_video(
     video = [step.observation.image for step in episode.steps]
     fname = str(Path(path.removeprefix("/")).with_suffix(""))
     if not os.path.exists(
-        os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, fname + ".mp4")
+        os.path.join(ARES_VIDEO_DIR, dataset_filename, fname + ".mp4")
     ):
         save_video(video, dataset_filename, fname)
 
@@ -62,15 +66,17 @@ def run_structured_database_ingestion(
             # construct the OpenXEmbodiment Episode
             episode = construct_openxembodiment_episode(ep, dataset_info, i)
 
-            # complete the raw information with the rollout request (random for now)
-            rollout = extractor.extract(episode=episode, dataset_info=dataset_info)
-            # potentially save the video as mp4 and frames
+            # potentially save the video as mp4 and frames if it doesnt exist
             maybe_save_video(
                 episode, dataset_filename, episode.episode_metadata.file_path
             )
 
+            # complete the raw information with the rollout request (random for now)
+            rollout = extractor.extract(episode=episode, dataset_info=dataset_info)
+            breakpoint()
+
             # add the rollout to the database
-            add_rollout(engine, rollout, RolloutSQLModel)
+            # add_rollout(engine, rollout, RolloutSQLModel)
             n_rollouts += 1
         except Exception as e:
             print(f"Error processing episode {i} during rollout extraction: {e}")

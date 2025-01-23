@@ -1,6 +1,7 @@
 import json
 import re
 import string
+import traceback
 import typing as t
 from datetime import datetime
 from pathlib import Path
@@ -16,28 +17,15 @@ from ares.configs.base import (
     Rollout,
     Task,
     Trajectory,
+    merge_config_sources,
+    merge_dicts,
+    merge_several_dicts,
     pydantic_to_example_dict,
     pydantic_to_field_instructions,
 )
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
 from ares.models.base import VLM
-
-
-def merge_dicts(dict1: dict, dict2: dict) -> dict:
-    merged = dict1.copy()
-    for key, value in dict2.items():
-        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            merged[key] = merge_dicts(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
-
-
-def merge_several_dicts(dicts: list[dict]) -> dict:
-    merged = dicts[0].copy()
-    for d in dicts[1:]:
-        merged = merge_dicts(merged, d)
-    return merged
+from ares.utils.image_utils import load_video_frames
 
 
 def hard_coded_dataset_info_extraction_spreadsheet(dataset_info: dict) -> dict:
@@ -157,23 +145,6 @@ class VLMInformationExtractor(InformationExtractor):
     def __init__(self, vlm: VLM):
         self.vlm = vlm
 
-    def finish_vlm_object(
-        self,
-        object: t.Type[BaseConfig],
-        hardcoded_info: dict,
-        structured_info: dict,
-        extra_kwargs: dict,
-    ) -> BaseConfig:
-        # Merge all sources of information for this object
-        merged_info = merge_several_dicts(
-            [
-                hardcoded_info.get(object.__name__.lower(), {}),
-                structured_info.get(object.__name__.lower(), {}),
-                extra_kwargs,
-            ]
-        )
-        return object(**merged_info)
-
     def extract(
         self,
         episode: OpenXEmbodimentEpisode,
@@ -183,25 +154,26 @@ class VLMInformationExtractor(InformationExtractor):
         environment_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         task_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         model_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+        trajectory_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
     ) -> Rollout:
         # Initialize kwargs
         robot_kwargs = robot_kwargs or {}
         environment_kwargs = environment_kwargs or {}
         task_kwargs = task_kwargs or {}
         model_kwargs = model_kwargs or {}
+        trajectory_kwargs = trajectory_kwargs or {}
 
         # Get hardcoded information
         dataset_info_dict = hard_coded_dataset_info_extraction_spreadsheet(dataset_info)
         episode_info_dict = hard_coded_episode_info_extraction(episode)
         hardcoded_info = merge_dicts(dataset_info_dict, episode_info_dict)
+        # collect frames according to fps
+        dataset_filename = dataset_info_dict["rollout"]["dataset_filename"]
+        episode_fname = episode_info_dict["rollout"]["filename"]
+        images, _ = load_video_frames(dataset_filename, episode_fname, target_fps=1)
 
-        # Get VLM-extracted information
-        images = [step.observation.image for step in episode.steps]
-        # HACK # FIXME
-        if len(images) > 10:
-            # select 10 evenly spaced images --> update with FPS sampling
-            images = images[:: len(images) // 10]
-
+        # create information for the jinja prompt template:
+        # task language instruction, field instructions for required fields, example of response format
         info = {
             "task": episode.steps[0].language_instruction,
             "field_instructions": (
@@ -216,7 +188,6 @@ class VLMInformationExtractor(InformationExtractor):
                 Rollout, exclude_fields=hardcoded_info, required_only=True
             ),
         }
-        breakpoint()
         messages, response = self.vlm.ask(
             info=info,
             prompt_filename=model_kwargs.get(
@@ -224,32 +195,41 @@ class VLMInformationExtractor(InformationExtractor):
             ),
             images=images,
         )
-        # Parse the response content as JSON if it's a string
-        content = response.choices[0].message.content
-        # Remove markdown code block formatting
-        content = content.strip().removeprefix("```json").removesuffix("```").strip()
-        structured_info = json.loads(content) if isinstance(content, str) else content
-        # Create component objects in a loop
+        try:
+            # Parse the response content as JSON if it's a string
+            content = response.choices[0].message.content
+            # Remove markdown code block formatting
+            content = (
+                content.strip().removeprefix("```json").removesuffix("```").strip()
+            )
+            structured_info = (
+                json.loads(content) if isinstance(content, str) else content
+            )
+        except Exception as e:
+            print(f"Error parsing response: {e}")
+            print(traceback.format_exc())
+            breakpoint()
         components = {
             "robot": (Robot, robot_kwargs),
             "environment": (Environment, environment_kwargs),
             "task": (Task, task_kwargs),
-            "trajectory": (Trajectory, {}),
+            "trajectory": (Trajectory, trajectory_kwargs),
         }
         objects = {
-            name: self.finish_vlm_object(cls, hardcoded_info, structured_info, kwargs)
-            for name, (cls, kwargs) in components.items()
+            name: merge_config_sources(
+                ConfigCls, hardcoded_info, structured_info, kwargs
+            )
+            for name, (ConfigCls, kwargs) in components.items()
         }
-
         # Create final rollout with all components
-        # Include both hardcoded rollout info and top-level fields from structured_info
+        # Include both hardcoded rollout info and top-level fields from structured_info, e.g. description
         rollout_kwargs = {
             **hardcoded_info["rollout"],
             **{k: v for k, v in structured_info.items() if not isinstance(v, dict)},
             **objects,
         }
-        breakpoint()
-        return Rollout(**rollout_kwargs)
+        rollout = Rollout(**rollout_kwargs)
+        return rollout
 
 
 class RandomInformationExtractor(InformationExtractor):

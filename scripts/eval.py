@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 
 from ares.configs.base import pydantic_to_field_instructions
-from ares.constants import DATA_DIR
+from ares.constants import ARES_DATA_DIR
 from ares.extras.pi_demo_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 from ares.models.base import VLM
 from ares.utils.image_utils import load_video_frames
@@ -40,20 +40,8 @@ def save_frames_to_mp4(frames: list[np.ndarray], fname: str) -> None:
 def easy_get_frames(
     dataset_filename: str, task: str, success_flag: str, fps: int | float
 ) -> list[np.ndarray]:
-    # Note: FPS of 0 means to use just the first and last frames
     fname = f"{PI_DEMO_TASKS[task]['filename_prefix']}_{success_flag}.mp4"
-    frames, frame_indices = load_video_frames(
-        dataset_filename, fname, target_fps=fps if fps != 0 else 1
-    )
-    if fps == 0:
-        frames = [frames[0], frames[-1]]
-
-    if len(frames) > MAX_N_FRAMES:
-        print(
-            f"received {len(frames)} frames; downsampling to 40 frames. do you still need me?"
-        )
-        middle_indices = np.linspace(1, len(frames) - 2, MAX_N_FRAMES - 2, dtype=int)
-        frames = [frames[0]] + [frames[i] for i in middle_indices] + [frames[-1]]
+    frames, _ = load_video_frames(dataset_filename, fname, target_fps=fps)
     return frames
 
 
@@ -193,12 +181,9 @@ async def process_task_async(
 
 
 if __name__ == "__main__":
-    dataset_filename = "pi_demos"
-
-    # fps_options = [1]
+    # FPS of 0 just means first and last frames
     fps_options = [0, 0.25, 0.5, 1, 2]
-    # fps_options = [2]
-    # fps_options = [0]  # 2]
+    dataset_filename = "pi_demos"
 
     tasks = [
         "Eggs in carton",
@@ -279,7 +264,7 @@ if __name__ == "__main__":
                 # Save results for this VLM
                 if results:
                     path = os.path.join(
-                        DATA_DIR,
+                        ARES_DATA_DIR,
                         f"eval_dump/eval_results_{vlm.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{method}.csv",
                     )
                     df = pd.DataFrame(results)

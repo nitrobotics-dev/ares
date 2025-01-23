@@ -1,11 +1,11 @@
 import os
 
-DATA_DIR = "/workspaces/ares/data"
-OXE_DIR = os.path.join(DATA_DIR, "oxe")
-VIDEO_DIR = os.path.join(DATA_DIR, "videos")
+ARES_DATA_DIR = "/workspaces/ares/data"
+ARES_OXE_DIR = os.path.join(ARES_DATA_DIR, "oxe")
+ARES_VIDEO_DIR = os.path.join(ARES_DATA_DIR, "videos")
 
 # using oxe-downloader
-# oxe-download --dataset "name" --path $OXE_DIR!!!
+# oxe-download --dataset "name" --path $ARES_OXE_DIR!!!
 DATASET_NAMES = [
     {
         "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",

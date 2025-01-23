@@ -13,7 +13,9 @@ import requests
 from moviepy.editor import ImageSequenceClip
 from PIL import Image
 
-from ares.constants import VIDEO_DIR
+from ares.constants import ARES_VIDEO_DIR
+
+MAX_N_FRAMES = 40
 
 
 def get_image_from_path(path: str) -> Image.Image:
@@ -26,9 +28,8 @@ def get_image_from_path(path: str) -> Image.Image:
 def get_video_from_path(
     dataset: str, path: str
 ) -> str | bytes | io.BytesIO | np.ndarray:
-    if not path.endswith(".mp4"):
-        path += ".mp4"
-    return os.path.join(ARES_DATASET_VIDEO_PATH, dataset, path)
+    path = Path(path).with_suffix(".mp4")
+    return os.path.join(ARES_VIDEO_DIR, dataset, path)
 
 
 def save_video(
@@ -44,8 +45,8 @@ def save_video(
     # Remove .mp4 extension if present and create paths
     if "mp4" in filename:
         raise ValueError("Base filename should not contain .mp4; received: ", filename)
-    mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, f"{filename}.mp4")
-    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset, filename)
+    mp4_path = os.path.join(ARES_VIDEO_DIR, dataset, f"{filename}.mp4")
+    frames_dir = os.path.join(ARES_VIDEO_DIR, dataset, filename)
 
     # Create frames directory if it doesn't exist
     os.makedirs(frames_dir, exist_ok=True)
@@ -92,7 +93,7 @@ def get_video_frames(
 ) -> list[np.ndarray | str]:
     """Get video as a list of frames from the frames directory."""
 
-    frames_dir = os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, filename)
+    frames_dir = os.path.join(ARES_VIDEO_DIR, dataset_filename, filename)
 
     if not os.path.exists(frames_dir):
         raise FileNotFoundError(f"Frames directory not found: {frames_dir}")
@@ -113,7 +114,7 @@ def get_video_mp4(dataset_filename: str, filename: str) -> str:
     if not filename.endswith(".mp4"):
         filename += ".mp4"
     print("mp4: ", dataset_filename, filename)
-    mp4_path = os.path.join(ARES_DATASET_VIDEO_PATH, dataset_filename, filename)
+    mp4_path = os.path.join(ARES_VIDEO_DIR, dataset_filename, filename)
     if not os.path.exists(mp4_path):
         raise FileNotFoundError(f"MP4 file not found: {mp4_path}")
     return mp4_path
@@ -227,10 +228,32 @@ def load_video_frames(
 ) -> tuple[t.List[np.ndarray], t.List[int]]:
     """Load video frames at specified FPS."""
     video_path = get_video_from_path(dataset_filename, fname)
-    frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
+
+    # FPS of 0 means to just use the first and last frames
+    if target_fps == 0:
+        frame_indices = [0, -1]
+    else:
+        frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
+    # some videos/frame sequences are too long for context lengths or API limits
+    # so we downsample to a max number of frames but maintain the first and last frames
+    if len(frame_indices) > MAX_N_FRAMES:
+        print(
+            f"Downsampling video from {len(frame_indices)} frames to {MAX_N_FRAMES} frames"
+        )
+        middle_indices = np.linspace(
+            1, len(frame_indices) - 2, MAX_N_FRAMES - 2, dtype=int
+        )
+        frame_indices = (
+            [frame_indices[0]]
+            + [frame_indices[i] for i in middle_indices]
+            + [frame_indices[-1]]
+        )
+
+    # get all frame paths (just strings to avoid memory issues)
     all_frames = get_video_frames(
         dataset_filename, fname, n_frames=None, just_path=True
     )
+    # select the frames
     frames_to_process = choose_and_preprocess_frames(
         all_frames, specified_frames=frame_indices
     )

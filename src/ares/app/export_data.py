@@ -7,7 +7,7 @@ import pdfkit
 import plotly.graph_objects as go
 import streamlit as st
 
-from ares.constants import DATA_DIR
+from ares.constants import ARES_DATA_DIR
 
 
 def export_dataframe(df: pd.DataFrame, base_path: str) -> str:
@@ -180,7 +180,7 @@ def export_options(
     with export_col1:
         export_path = st.text_input(
             "Export Directory",
-            value=DATA_DIR,
+            value=ARES_DATA_DIR,
             help="Directory where exported files will be saved",
         )
 

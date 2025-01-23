@@ -9,13 +9,15 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from ares.configs.base import Rollout
 from ares.configs.pydantic_sql_helpers import create_flattened_model, recreate_model
-from ares.constants import DATA_DIR
+from ares.constants import ARES_DATA_DIR
 
 SQLITE_PREFIX = "sqlite:///"
 SQLITE_ABS_PREFIX = SQLITE_PREFIX + "/"
 
-BASE_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(DATA_DIR, "robot_data.db")
-TEST_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(DATA_DIR, "test_robot_data.db")
+BASE_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(ARES_DATA_DIR, "robot_data.db")
+TEST_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(
+    ARES_DATA_DIR, "test_robot_data.db"
+)
 
 RolloutSQLModel = create_flattened_model(Rollout)
 

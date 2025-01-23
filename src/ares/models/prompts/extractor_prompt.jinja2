@@ -8,12 +8,9 @@ Required Fields:
 {% endfor %}
 
 Example Response Format:
-{{ example_response_format | tojson(indent=2) }}
+{{ example_response_format | tojson(indent=2) }} where "..." represents the actual information.
 
-Please provide a structured response following the example format above. Focus on:
-1. Observable robot and environment details from the images
-2. Task execution details and outcomes
-3. Relevant trajectory information
+Please provide a structured response following the example format above. 
 
 Your response should be valid JSON matching the example format. Ignore any text superimposed on the images.
 Begin the response with ```json and end with ```.

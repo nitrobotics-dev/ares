@@ -1,22 +1,18 @@
 """
 Errors happen! We want a service to self-heal -- that is, ensure that our databases are synced.
+This script is a two-step process: 
+1. Run `find-heal` to find which rollouts are missing from the embedding database and annotation database. This saves a list of ids to disk to be used in the next step.
+2. Run `exec-heal` to ingest the missing rollouts into the embedding database and update the annotation database.
+This ensures our databases are in sync.
 """
 
 import os
 from datetime import datetime
-from pathlib import Path
 
 import click
 import pandas as pd
-from run_grounding_annotation_with_modal import app as modal_app
-from run_grounding_annotation_with_modal import run_modal_grounding
 
-# relative imports fine in our scripts package
-from run_trajectory_embedding_ingestion import (
-    main as run_trajectory_embedding_ingestion,
-)
-
-from ares.constants import DATA_DIR
+from ares.constants import ARES_DATA_DIR
 from ares.databases.annotation_database import (
     TEST_ANNOTATION_DB_PATH,
     AnnotationDatabase,
@@ -26,7 +22,6 @@ from ares.databases.embedding_database import (
     TEST_EMBEDDING_DB_PATH_2,
     FaissIndex,
     IndexManager,
-    rollout_to_embedding_pack,
     rollout_to_index_name,
 )
 from ares.databases.structured_database import (
@@ -42,7 +37,7 @@ HEALING_EXCEPTIONS = {
     "CMU Franka Exploration": ["CMU Franka Exploration-Franka-states"],
     "USC Jaco Play": ["USC Jaco Play-Jaco 2-states"],
 }
-HEAL_INFO_DIR = os.path.join(DATA_DIR, "heal_info")
+HEAL_INFO_DIR = os.path.join(ARES_DATA_DIR, "heal_info")
 
 
 @click.command("find-heal")

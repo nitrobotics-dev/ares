@@ -1,37 +1,15 @@
-import os
-import time
-import traceback
-from pathlib import Path
-
-import numpy as np
 import tensorflow_datasets as tfds
-from sqlalchemy import Engine
-from tqdm import tqdm
 
-from ares.configs.base import Rollout
-from ares.configs.open_x_embodiment_configs import (
-    OpenXEmbodimentEpisode,
-    get_dataset_information,
-)
-from ares.constants import DATASET_NAMES, OXE_DIR
-from ares.databases.embedding_database import (
-    TEST_EMBEDDING_DB_PATH,
-    TEST_TIME_STEPS,
-    FaissIndex,
-    IndexManager,
-    rollout_to_embedding_pack,
-)
+from ares.configs.open_x_embodiment_configs import get_dataset_information
+from ares.constants import ARES_OXE_DIR, DATASET_NAMES
 from ares.databases.structured_database import (
-    SQLITE_PREFIX,
     TEST_ROBOT_DB_PATH,
     RolloutSQLModel,
-    add_rollout,
     setup_database,
     setup_rollouts,
 )
-from ares.models.extractor import InformationExtractor, RandomInformationExtractor
-from ares.models.shortcuts import Embedder, get_nomic_embedder
-from ares.utils.image_utils import ARES_DATASET_VIDEO_PATH, save_video
+from ares.models.extractor import VLMInformationExtractor
+from ares.models.shortcuts import get_gpt_4o, get_nomic_embedder
 from scripts.run_grounding_annotation_with_modal import app as modal_app
 from scripts.run_grounding_annotation_with_modal import run_modal_grounding
 from scripts.run_structured_ingestion import (
@@ -43,22 +21,20 @@ from scripts.run_trajectory_embedding_ingestion import (
 )
 
 if __name__ == "__main__":
-    hf_base = "jxu124/OpenX-Embodiment"
-    random_extractor = RandomInformationExtractor()  # HACK!!
+    vlm = get_gpt_4o()
+    vlm_extractor = VLMInformationExtractor(vlm)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     embedder = get_nomic_embedder()
 
     for dataset_info in DATASET_NAMES:
         dataset_filename = dataset_info["dataset_filename"]
         dataset_formalname = dataset_info["dataset_formalname"]
-        builder, dataset_dict = build_dataset(dataset_filename, OXE_DIR)
+        builder, dataset_dict = build_dataset(dataset_filename, ARES_OXE_DIR)
         print(
             f"working on {dataset_formalname} with splits {list(dataset_dict.keys())}"
         )
 
         for split in dataset_dict.keys():
-            if split == "train":
-                continue
             ds = dataset_dict[split]
             print(f"found {len(ds)} episodes in {split}")
             dataset_info = get_dataset_information(dataset_filename)
@@ -73,7 +49,7 @@ if __name__ == "__main__":
                 ds,
                 dataset_info,
                 dataset_formalname,
-                random_extractor,
+                vlm_extractor,
                 engine,
                 dataset_filename,
             )

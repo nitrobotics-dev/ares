@@ -31,12 +31,12 @@ from ares.app.viz_helpers import (
     show_hero_display,
     total_statistics,
 )
-from ares.constants import DATA_DIR
+from ares.constants import ARES_DATA_DIR
 from ares.databases.structured_database import RolloutSQLModel
 
 # top level variables
 title = "ARES Dashboard"
-tmp_dump_dir = os.path.join(DATA_DIR, "tmp2")
+tmp_dump_dir = os.path.join(ARES_DATA_DIR, "tmp2")
 section_times: dict[str, float] = defaultdict(float)
 
 
@@ -183,11 +183,11 @@ def main() -> None:
     #         [viz["title"] for viz in time_series_visualizations],
     #     )
 
-    # section_video_grid = "video grid"
-    # with filter_error_context(section_video_grid), timer_context(section_video_grid):
-    #     # show video cards of first 5 rows in a horizontal layout
-    #     display_video_grid(filtered_df, lazy_load=True)
-    # st.divider()
+    section_video_grid = "video grid"
+    with filter_error_context(section_video_grid), timer_context(section_video_grid):
+        # show video cards of first 5 rows in a horizontal layout
+        display_video_grid(filtered_df, lazy_load=True)
+    st.divider()
 
     section_plot_hero = "plot hero display"
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):

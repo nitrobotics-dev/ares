@@ -7,6 +7,10 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, Field, model_validator
 
+COLOR_PATTERN = (
+    "^(white|black|gray|red|green|blue|yellow|purple|orange|brown|pink|gray|other)$"
+)
+
 
 class BaseConfig(BaseModel):
     def flatten_fields(self, prefix: str = "") -> t.Dict[str, t.Any]:
@@ -36,6 +40,50 @@ class BaseConfig(BaseModel):
         return flattened[attr_path]
 
 
+def merge_dicts(dict1: dict, dict2: dict) -> dict:
+    merged = dict1.copy()
+    for key, value in dict2.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = merge_dicts(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def merge_several_dicts(dicts: list[dict]) -> dict:
+    merged = dicts[0].copy()
+    for d in dicts[1:]:
+        merged = merge_dicts(merged, d)
+    return merged
+
+
+def merge_config_sources(
+    object_cls: t.Type[BaseConfig],
+    hardcoded_info: dict,
+    structured_info: dict,
+    extra_kwargs: dict,
+) -> BaseConfig:
+    """Merge multiple sources of configuration information and create a config object.
+
+    Args:
+        object_cls: The BaseConfig class to instantiate
+        hardcoded_info: Dictionary containing hardcoded configuration values
+        structured_info: Dictionary containing structured configuration values
+        extra_kwargs: Additional keyword arguments to override other sources
+
+    Returns:
+        Instantiated config object with merged information
+    """
+    merged_info = merge_several_dicts(
+        [
+            hardcoded_info.get(object_cls.__name__.lower(), {}),
+            structured_info.get(object_cls.__name__.lower(), {}),
+            extra_kwargs,
+        ]
+    )
+    return object_cls(**merged_info)
+
+
 class Robot(BaseConfig):
     embodiment: str
     gripper: str | None = None
@@ -44,18 +92,45 @@ class Robot(BaseConfig):
     rgb_cams: int
     depth_cams: int
     wrist_cams: int
+    color: str = Field(
+        description="The main color of the robot",
+        pattern=COLOR_PATTERN,
+    )
+    camera_angle: str = Field(
+        description="The angle of the camera",
+        pattern="^(front|side|top|angled|wrist|other)$",
+    )
 
 
 class Environment(BaseConfig):
     name: str
     lighting: str = Field(
         description="Lighting conditions in the environment",
-        # pattern="^(dim|normal|bright)$",
+        pattern="^(dim|normal|bright|other)$",
     )
     simulation: bool = Field(
-        description="Whether the input is from a simulation (True) or the real world (False)"
+        description="Whether the frames are from a simulation (True) or the real world (False)"
     )
     data_collection_method: str | None = None
+    background: str = Field(description="The background of the environment")
+    surface: str = Field(
+        description="The surface that the task is taking place on",
+        pattern="^(wood|metal|plastic|glass|concrete|carpet|tile|rubber|fabric|composite|marble|granite|cardboard|other)$",
+    )
+    focus_objects: list[str] = Field(
+        description="The object(s) is the robot supposed to interact with.",
+        default_factory=list,
+    )
+    distractor_objects: list[str] = Field(
+        description="Objects present in the scene that the robot is NOT supposed to interact with.",
+        default_factory=list,
+    )
+    people: bool = Field(
+        description="Whether there are people present in the scene",
+    )
+    static: bool = Field(
+        description="Whether the scene is static (meaning no motion in the background) or dynamic (motion in the background). This ignores the motion of the robot and objects it interacts with.",
+    )
 
 
 class Task(BaseConfig):
@@ -63,6 +138,25 @@ class Task(BaseConfig):
     language_instruction_type: str
     success_criteria: str | None = None
     success: float | None = None
+    success_estimate: float = Field(
+        description="An estimate of the success of the task",
+        ge=0,
+        le=1,
+    )
+    complexity_category: str = Field(
+        description="The complexity of the task",
+        pattern="^(simple|medium|complex|other)$",
+    )
+    complexity_score: float = Field(
+        description="The complexity score of the task",
+        ge=0,
+        le=1,
+    )
+    rarity: float = Field(
+        description="The subjective interestingness of the episode. 0 means it is not interesting at all, 1 means it is very interesting. Episodes may be interesting for different reasons, e.g. the robot is performing a difficult task, the robot is interacting with a rare object, the robot is interacting with a person, a novel edge case, etc.",
+        ge=0,
+        le=1,
+    )
 
     @model_validator(mode="after")
     def check_success(self) -> "Task":
@@ -124,8 +218,8 @@ class Rollout(BaseConfig):
     dataset_filename: str
     dataset_formalname: str
     description: str | None = Field(
-        description="A detailed description of the input video. Include analysis of the task the robot is completing, including success criteria and performance.",
-        default=None,
+        description="A detailed description of the entire episode, meaning everything that happens in the images. Include analysis of the task the robot is completing, including success criteria and performance.",
+        # default=None,
     )
     length: int
     robot: Robot
@@ -184,6 +278,12 @@ def pydantic_to_field_instructions(
                 for meta in field.metadata:
                     if hasattr(meta, "pattern"):
                         field_info += f" (valid values: {meta.pattern})"
+                    if hasattr(meta, "ge"):
+                        field_info += f" (minimum value: {meta.ge})"
+                    if hasattr(meta, "le"):
+                        field_info += f" (maximum value: {meta.le})"
+                    if hasattr(meta, "multiple_of"):
+                        field_info += f" (multiple of: {meta.multiple_of})"
 
             field_instructions.append(f"    - {field_info}")
     return field_instructions

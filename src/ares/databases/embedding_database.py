@@ -13,11 +13,11 @@ import pandas as pd
 from scipy.interpolate import interp1d
 
 from ares.configs.base import Rollout
-from ares.constants import DATA_DIR
+from ares.constants import ARES_DATA_DIR
 
-BASE_EMBEDDING_DB_PATH = os.path.join(DATA_DIR, "tmp/embedding_data")
-TEST_EMBEDDING_DB_PATH = os.path.join(DATA_DIR, "tmp/test_embedding_data")
-TEST_EMBEDDING_DB_PATH_2 = os.path.join(DATA_DIR, "tmp/test_embedding_data_2")
+BASE_EMBEDDING_DB_PATH = os.path.join(ARES_DATA_DIR, "tmp/embedding_data")
+TEST_EMBEDDING_DB_PATH = os.path.join(ARES_DATA_DIR, "tmp/test_embedding_data")
+TEST_EMBEDDING_DB_PATH_2 = os.path.join(ARES_DATA_DIR, "tmp/test_embedding_data_2")
 
 TEST_TIME_STEPS = 100
 META_INDEX_NAMES = ["description", "task_language_instruction"]
