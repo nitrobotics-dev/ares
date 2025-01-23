@@ -92,11 +92,11 @@ class Robot(BaseConfig):
     rgb_cams: int
     depth_cams: int
     wrist_cams: int
-    color: str = Field(
+    color_estimate: str = Field(
         description="The main color of the robot",
         pattern=COLOR_PATTERN,
     )
-    camera_angle: str = Field(
+    camera_angle_estimate: str = Field(
         description="The angle of the camera",
         pattern="^(front|side|top|angled|wrist|other)$",
     )
@@ -104,31 +104,31 @@ class Robot(BaseConfig):
 
 class Environment(BaseConfig):
     name: str
-    lighting: str = Field(
+    lighting_estimate: str = Field(
         description="Lighting conditions in the environment",
         pattern="^(dim|normal|bright|other)$",
     )
-    simulation: bool = Field(
+    simulation_estimate: bool = Field(
         description="Whether the frames are from a simulation (True) or the real world (False)"
     )
     data_collection_method: str | None = None
-    background: str = Field(description="The background of the environment")
-    surface: str = Field(
+    background_estimate: str = Field(description="The background of the environment")
+    surface_estimate: str = Field(
         description="The surface that the task is taking place on",
         pattern="^(wood|metal|plastic|glass|concrete|carpet|tile|rubber|fabric|composite|marble|granite|cardboard|other)$",
     )
-    focus_objects: list[str] = Field(
+    focus_objects_estimate: list[str] = Field(
         description="The object(s) is the robot supposed to interact with.",
         default_factory=list,
     )
-    distractor_objects: list[str] = Field(
+    distractor_objects_estimate: list[str] = Field(
         description="Objects present in the scene that the robot is NOT supposed to interact with.",
         default_factory=list,
     )
-    people: bool = Field(
+    people_estimate: bool = Field(
         description="Whether there are people present in the scene",
     )
-    static: bool = Field(
+    static_estimate: bool = Field(
         description="Whether the scene is static (meaning no motion in the background) or dynamic (motion in the background). This ignores the motion of the robot and objects it interacts with.",
     )
 
@@ -143,16 +143,16 @@ class Task(BaseConfig):
         ge=0,
         le=1,
     )
-    complexity_category: str = Field(
+    complexity_category_estimate: str = Field(
         description="The complexity of the task",
         pattern="^(simple|medium|complex|other)$",
     )
-    complexity_score: float = Field(
+    complexity_score_estimate: float = Field(
         description="The complexity score of the task",
         ge=0,
         le=1,
     )
-    rarity: float = Field(
+    rarity_estimate: float = Field(
         description="The subjective interestingness of the episode. 0 means it is not interesting at all, 1 means it is very interesting. Episodes may be interesting for different reasons, e.g. the robot is performing a difficult task, the robot is interacting with a rare object, the robot is interacting with a person, a novel edge case, etc.",
         ge=0,
         le=1,
@@ -217,9 +217,8 @@ class Rollout(BaseConfig):
     dataset_name: str
     dataset_filename: str
     dataset_formalname: str
-    description: str | None = Field(
+    description_estimate: str | None = Field(
         description="A detailed description of the entire episode, meaning everything that happens in the images. Include analysis of the task the robot is completing, including success criteria and performance.",
-        # default=None,
     )
     length: int
     robot: Robot
@@ -227,6 +226,10 @@ class Rollout(BaseConfig):
     task: Task
     trajectory: Trajectory
     split: str | None = None
+
+    @property
+    def full_path(self) -> str:
+        return f"{self.dataset_filename}/{self.filename}"
 
 
 def pydantic_to_field_instructions(

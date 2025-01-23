@@ -74,6 +74,7 @@ def run_structured_database_ingestion(
             # complete the raw information with the rollout request (random for now)
             rollout = extractor.extract(episode=episode, dataset_info=dataset_info)
             breakpoint()
+            return
 
             # add the rollout to the database
             # add_rollout(engine, rollout, RolloutSQLModel)

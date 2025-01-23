@@ -34,6 +34,8 @@ from ares.app.viz_helpers import (
 from ares.constants import ARES_DATA_DIR
 from ares.databases.structured_database import RolloutSQLModel
 
+print(f"finished imports")
+
 # top level variables
 title = "ARES Dashboard"
 tmp_dump_dir = os.path.join(ARES_DATA_DIR, "tmp2")
@@ -73,6 +75,7 @@ def load_data() -> pd.DataFrame:
 def main() -> None:
     # Define section names
     section_loading = "loading data"
+    print(section_loading)
     with filter_error_context(section_loading), timer_context(section_loading):
         print("\n" + "=" * 100 + "\n")
         st.set_page_config(page_title=title, page_icon="📊", layout="wide")
@@ -80,6 +83,7 @@ def main() -> None:
         df = load_data()
 
     section_state_info = "state info"
+    print(section_state_info)
     with filter_error_context(section_state_info), timer_context(section_state_info):
         display_state_info()
         total_statistics(df)
@@ -87,6 +91,7 @@ def main() -> None:
         st.divider()
 
     section_filters = "data filters"
+    print(section_filters)
     with filter_error_context(section_filters), timer_context(section_filters):
         # Structured data filters
         st.header(f"Data Filters")
@@ -193,7 +198,6 @@ def main() -> None:
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
         st.header("Rollout Display")
         # initialize or persist selected row in state
-        # NOTE: SELECT ROW FROM FILTERED DF!
         select_row_from_df_user(filtered_df)
         selected_row = st.session_state.get("selected_row")
 
@@ -201,7 +205,7 @@ def main() -> None:
             show_dataframe(pd.DataFrame([selected_row]), title="Selected Row")
             st.write(f"Selected row ID: {selected_row.id}")
             hero_visualizations = show_hero_display(
-                df,  # NOTE: compare SELECTED ROW to ENTIRE DF!
+                df,  # compare selected row from filtered_df to all rows in df
                 selected_row,
                 st.session_state.all_vecs,
                 index_manager=st.session_state.INDEX_MANAGER,
@@ -212,20 +216,20 @@ def main() -> None:
             st.info("Please select a row to display details")
     st.divider()
 
-    section_plot_robots = "plot robot arrays"
-    with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
-        if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
-            st.header("Robot Array Display")
-            # Number of trajectories to display in plots
-            robot_array_visualizations = generate_robot_array_plot_visualizations(
-                selected_row,  # need row to select dataset/robot embodiment of trajectories
-                st.session_state.all_vecs,
-                show_n=1000,
-            )
-        else:
-            st.write("No robot array plots generated")
-            robot_array_visualizations = []
-    st.divider()
+    # section_plot_robots = "plot robot arrays"
+    # with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
+    #     if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
+    #         st.header("Robot Array Display")
+    #         # Number of trajectories to display in plots
+    #         robot_array_visualizations = generate_robot_array_plot_visualizations(
+    #             selected_row,  # need row to select dataset/robot embodiment of trajectories
+    #             st.session_state.all_vecs,
+    #             show_n=1000,
+    #         )
+    #     else:
+    #         st.write("No robot array plots generated")
+    #         robot_array_visualizations = []
+    # st.divider()
 
     # section_export = "exporting data"
     # with filter_error_context(section_export), timer_context(section_export):

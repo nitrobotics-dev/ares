@@ -101,12 +101,14 @@ def initialize_data(tmp_dump_dir: str) -> None:
         return
 
     # Initialize database and session
+    print("Initializing database and session")
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     sess = Session(engine)
     st.session_state.ENGINE = engine
     st.session_state.SESSION = sess
 
     # Load dataframe
+    print("Loading dataframe")
     query = select(RolloutSQLModel)
     df = pd.read_sql(query, engine)
     # Filter out unnamed columns
@@ -114,12 +116,14 @@ def initialize_data(tmp_dump_dir: str) -> None:
     st.session_state.df = df
 
     # Initialize index manager
+    print("Initializing index manager")
     index_manager = IndexManager(
         base_dir=TEST_EMBEDDING_DB_PATH_2, index_class=FaissIndex
     )
     st.session_state.INDEX_MANAGER = index_manager
 
     # Get all vectors and their IDs
+    print("Getting all vectors and their IDs")
     all_data = index_manager.get_all_matrices()
     st.session_state.all_vecs = {
         name: data["arrays"] for name, data in all_data.items()
@@ -131,6 +135,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
 
     # Process each index type
     for index_name in META_INDEX_NAMES:
+        print(f"Processing {index_name} index")
         stored_embeddings = index_manager.indices[index_name].get_all_vectors()
         stored_ids = index_manager.indices[index_name].get_all_ids()
 
@@ -149,11 +154,15 @@ def initialize_data(tmp_dump_dir: str) -> None:
 
         # Store in session state
         store_in_session(index_name, embeddings, reduced, labels, stored_ids)
+
+    print("Setting up models")
     st.session_state.models = dict()
     st.session_state.models["summarizer"] = VLM(provider="openai", name="gpt-4o-mini")
+    print("Setting up annotations database")
     st.session_state.annotations_db = AnnotationDatabase(
         connection_string=TEST_ANNOTATION_DB_PATH
     )
+    print("Getting annotations database stats")
     st.session_state.annotation_db_stats = (
         st.session_state.annotations_db.get_database_stats()
     )

@@ -3,9 +3,7 @@ You are an AI assistant helping to analyze robot task execution data. Please exa
 Task Instruction: {{ task }}
 
 Required Fields:
-{% for instruction in field_instructions %}
-{{ instruction }}
-{% endfor %}
+{{field_instructions}}
 
 Example Response Format:
 {{ example_response_format | tojson(indent=2) }} where "..." represents the actual information.
