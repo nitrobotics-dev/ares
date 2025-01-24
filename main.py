@@ -29,8 +29,7 @@ if __name__ == "__main__":
     embedder = get_nomic_embedder()
 
     for i, dataset_info in enumerate(DATASET_NAMES):
-        if i > 0:
-            break
+
         dataset_filename = dataset_info["dataset_filename"]
         dataset_formalname = dataset_info["dataset_formalname"]
         builder, dataset_dict = build_dataset(dataset_filename, ARES_OXE_DIR)

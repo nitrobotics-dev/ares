@@ -249,10 +249,25 @@ def get_rollouts_by_ids(engine: Engine, ids: list[str]) -> list[Rollout]:
         return [recreate_model(row[0], Rollout) for row in rows]
 
 
-if __name__ == "__main__":
-    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
-    df = db_to_df(engine)
+def delete_rows_by_dataset_name(engine: Engine, dataset_name: str) -> None:
+    len_existing = len(get_dataset_rollouts(engine, dataset_name))
+    print(f"Are you sure you want to delete all rows for dataset {dataset_name}?")
+    print(f"There are {len_existing} rows in the dataset.")
     breakpoint()
+    with engine.begin() as conn:
+        conn.execute(
+            text(f"DELETE FROM rollout WHERE dataset_name = :dataset_name"),
+            {"dataset_name": dataset_name},
+        )
+
+
+if __name__ == "__main__":
+    engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
+    df = db_to_df(engine)
+    print(df.dataset_name.value_counts())
+    breakpoint()
+
+    # breakpoint()
     # add_rollout(engine, ROLL1, RolloutSQLModel)
     # add_rollout(engine, ROLL2, RolloutSQLModel)
 

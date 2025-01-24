@@ -223,36 +223,60 @@ class VLMInformationExtractor(InformationExtractor):
         hardcoded_infos = [
             merge_dicts(dataset_info_dict, ep_info) for ep_info in episode_info_dicts
         ]
-
+        print(f"found {len(hardcoded_infos)} hardcoded infos")
         # Prepare prompts and images
         prompts = []
         images_list = []
+        rollouts = []
         for episode, hardcoded_info in zip(episodes, hardcoded_infos):
-            # Load video frames
-            dataset_filename = dataset_info_dict["rollout"]["dataset_filename"]
-            episode_fname = hardcoded_info["rollout"]["filename"]
-            images, _ = load_video_frames(
-                dataset_filename, episode_fname, target_fps=1, include_last_frame=True
+            try:
+                # Load video frames
+                dataset_filename = dataset_info_dict["rollout"]["dataset_filename"]
+                episode_fname = hardcoded_info["rollout"]["filename"]
+                images, _ = load_video_frames(
+                    dataset_filename,
+                    episode_fname,
+                    target_fps=1,
+                    include_last_frame=True,
+                )
+                images_list.append(images)
+
+                # Prepare prompt
+                prompts.append(self._prepare_prompt_info(episode, hardcoded_info))
+            except Exception as e:
+                print(f"Error preparing prompt: {e}")
+                print(traceback.format_exc())
+                error_dict = {
+                    "path": hardcoded_info["rollout"]["path"],
+                    "error_pattern": "prompt_preparation_failure",
+                    "error": traceback.format_exc(),
+                }
+                # Add None placeholders to keep lists aligned
+                prompts.append(None)
+                images_list.append(None)
+                rollouts.append(error_dict)
+
+        # Filter out failed prompts before batch processing
+        valid_indices = [i for i, p in enumerate(prompts) if p is not None]
+        valid_prompts = [prompts[i] for i in valid_indices]
+        valid_images = [images_list[i] for i in valid_indices]
+
+        # Batch process with VLM (only if we have valid prompts)
+        responses = []
+        if valid_prompts:
+            print(f"batching {len(valid_prompts)} prompts")
+            results = await self.vlm.ask_batch_async(
+                infos=valid_prompts,
+                prompt_filename=component_kwargs["model_kwargs"].get(
+                    "prompt_filename", "extractor_prompt.jinja2"
+                ),
+                images_list=valid_images,
             )
-            images_list.append(images)
-
-            # Prepare prompt
-            prompts.append(self._prepare_prompt_info(episode, hardcoded_info))
-
-        # Batch process with VLM
-        results = await self.vlm.ask_batch_async(
-            infos=prompts,
-            prompt_filename=component_kwargs["model_kwargs"].get(
-                "prompt_filename", "extractor_prompt.jinja2"
-            ),
-            images_list=images_list,
-        )
-        # Unpack the responses from the results
-        responses = [response for _, response in results]
+            # Unpack the responses from the results
+            responses = [response for _, response in results]
 
         # Process responses and create rollouts
-        rollouts = []
-        for hardcoded_info, response in zip(hardcoded_infos, responses):
+        for i, response in enumerate(responses):
             try:
                 content = response.choices[0].message.content.strip()
                 content = content.removeprefix("```json").removesuffix("```").strip()
@@ -261,7 +285,7 @@ class VLMInformationExtractor(InformationExtractor):
                 )
 
                 rollout = self._create_rollout(
-                    hardcoded_info=hardcoded_info,
+                    hardcoded_info=hardcoded_infos[valid_indices[i]],
                     structured_info=structured_info,
                     component_kwargs=component_kwargs,
                 )
@@ -271,13 +295,11 @@ class VLMInformationExtractor(InformationExtractor):
                 print(f"Error parsing response: {e}")
                 print(traceback.format_exc())
                 error_dict = {
-                    "path": hardcoded_info["rollout"]["path"],
+                    "path": hardcoded_infos[valid_indices[i]]["rollout"]["path"],
                     "error_pattern": "extraction_failure",
                     "error": traceback.format_exc(),
                 }
-                breakpoint()
                 rollouts.append(error_dict)
-
         return rollouts
 
 

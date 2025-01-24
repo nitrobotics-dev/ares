@@ -12,7 +12,7 @@ import typing as t
 import numpy as np
 from modal import App, Image, build, enter, method
 
-from ares.constants import ARES_DATA_DIR
+from ares.constants import ARES_DATA_DIR, OUTER_BATCH_SIZE
 from ares.models.grounding import ANNOTATION_GROUNDING_FPS, GroundingAnnotator
 
 FAILURES_PATH = os.path.join(ARES_DATA_DIR, "failures.pkl")
@@ -139,7 +139,7 @@ def run_modal_grounding(
     dataset_filename: str | None = None,
     split: str | None = None,
     rollout_ids: list[str] | None = None,
-    outer_batch_size: int = 200,  # RAM limits number of concurrent rollouts formatted into requests
+    outer_batch_size: int = OUTER_BATCH_SIZE,  # RAM limits number of concurrent rollouts formatted into requests
     retry_failed_path: str = None,  # path to pickle file with failures to retry
     annotation_fps: int = ANNOTATION_GROUNDING_FPS,
 ) -> None:

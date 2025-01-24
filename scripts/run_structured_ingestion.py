@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import click
+import psutil
 import tensorflow_datasets as tfds
 from sqlalchemy import Engine
 from tqdm import tqdm
@@ -21,7 +22,7 @@ from ares.configs.open_x_embodiment_configs import (
     construct_openxembodiment_episode,
     get_dataset_information,
 )
-from ares.constants import ARES_VIDEO_DIR
+from ares.constants import ARES_VIDEO_DIR, OUTER_BATCH_SIZE
 from ares.databases.structured_database import (
     RolloutSQLModel,
     add_rollout,
@@ -40,6 +41,13 @@ class BatchResult:
     fails: list[dict] = field(default_factory=list)
     new_ids: set[uuid.UUID] = field(default_factory=set)
 
+    def update(self, other: "BatchResult") -> None:
+        """Update this BatchResult with results from another BatchResult."""
+        self.n_new += other.n_new
+        self.n_skipped += other.n_skipped
+        self.fails.extend(other.fails)
+        self.new_ids.update(other.new_ids)
+
 
 def build_dataset(
     dataset_name: str, data_dir: str
@@ -56,8 +64,9 @@ def maybe_save_video(episode: OpenXEmbodimentEpisode, dataset_filename: str) -> 
     video = [step.observation.image for step in episode.steps]
     path = episode.episode_metadata.file_path
     fname = str(Path(path.removeprefix("/")).with_suffix(""))
-    if not os.path.exists(
-        os.path.join(ARES_VIDEO_DIR, dataset_filename, fname + ".mp4")
+    base_path = os.path.join(ARES_VIDEO_DIR, dataset_filename, fname)
+    if not os.path.exists(base_path + ".mp4") and not (
+        os.path.exists(base_path) and os.listdir(base_path)
     ):
         save_video(video, dataset_filename, fname)
 
@@ -74,24 +83,29 @@ async def process_batch(
     result = BatchResult()
     valid_episodes = []
 
+    # Add debug print
+    print(f"Initial batch size: {len(episodes)}")
+
     # Filter and construct episodes
-    for i, ep in episodes:
+    for i, ep in tqdm(episodes, desc="Processing episodes"):
         try:
             episode = construct_openxembodiment_episode(ep, dataset_info, i)
-            if episode.episode_metadata.file_path in existing_paths:
+            if episode.episode_metadata.file_path.removeprefix("/") in existing_paths:
                 result.n_skipped += 1
                 continue
             valid_episodes.append((i, episode))
         except Exception as e:
+            print(f"Failed to construct episode {i}: {str(e)}")  # Add debug print
             result.fails.append(
                 {"index": i, "error": e, "traceback": traceback.format_exc()}
             )
 
+    print(f"Valid episodes after filtering: {len(valid_episodes)}")  # Add debug print
     if not valid_episodes:
         return result
 
     # Save videos before VLM extraction
-    for _, episode in valid_episodes:
+    for _, episode in tqdm(valid_episodes, desc="Saving videos"):
         try:
             maybe_save_video(episode, dataset_filename)
         except Exception as e:
@@ -141,7 +155,7 @@ async def run_structured_database_ingestion(
     vlm_name: str,
     engine: Engine,
     dataset_filename: str,
-    batch_size: int = 200,
+    outer_batch_size: int = OUTER_BATCH_SIZE,
 ) -> tuple[list[dict], set[uuid.UUID]]:
     """Process dataset in batches with parallel VLM requests."""
     tic = time.time()
@@ -162,13 +176,21 @@ async def run_structured_database_ingestion(
     # Process in streaming batches
     current_batch = []
 
-    for i, ep in tqdm(enumerate(ds), desc=f"Ingesting {dataset_formalname} rollouts"):
+    for i, ep in tqdm(
+        enumerate(ds), desc=f"Ingesting {dataset_formalname} rollouts", total=len(ds)
+    ):
         if i == 0:
             print(list(ep["steps"])[0]["observation"].keys())
 
         current_batch.append((i, ep))
+        # Monitor both CPU and Memory usage
+        cpu_percent = psutil.cpu_percent()
+        memory = psutil.Process().memory_info()
+        memory_gb = memory.rss / (1024 * 1024 * 1024)  # Convert bytes to GB
+        print(f"CPU Usage: {cpu_percent}% | Memory Usage: {memory_gb:.2f} GB")
 
-        if len(current_batch) >= batch_size:
+        if len(current_batch) >= outer_batch_size:
+            print(f"Processing batch of size {len(current_batch)}")
             result = await process_batch(
                 current_batch,
                 dataset_info,
@@ -177,13 +199,12 @@ async def run_structured_database_ingestion(
                 dataset_filename,
                 existing_paths,
             )
-            total_result.n_new += result.n_new
-            total_result.n_skipped += result.n_skipped
-            total_result.fails.extend(result.fails)
-            total_result.new_ids.update(result.new_ids)
-            current_batch = []
+            total_result.update(result)
             if result.n_new == 0 and result.n_skipped == 0 and len(result.fails) != 0:
+                print(f"Batch failed: {result.fails}")
                 breakpoint()
+            current_batch = []
+
     # Process final batch if any
     if current_batch:
         result = await process_batch(
@@ -194,12 +215,10 @@ async def run_structured_database_ingestion(
             dataset_filename,
             existing_paths,
         )
-        total_result.n_new += result.n_new
-        total_result.n_skipped += result.n_skipped
-        total_result.fails.extend(result.fails)
-        total_result.new_ids.update(result.new_ids)
+        total_result.update(result)
 
     if total_result.n_new == 0 and total_result.n_skipped == 0:
+        print(f"Total failed: {total_result.fails}")
         breakpoint()
 
     print(f"Structured database new rollouts: {total_result.n_new}")

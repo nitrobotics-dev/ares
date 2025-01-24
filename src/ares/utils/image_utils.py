@@ -72,16 +72,18 @@ def save_video(
         raise ValueError(f"No frames to save for {filename}; received {frames}")
 
     # Save MP4 using moviepy
-    clip = ImageSequenceClip(frames, fps=30)
-    clip.write_videofile(mp4_path, codec="libx264", logger=None)
+    if not os.path.exists(mp4_path):
+        clip = ImageSequenceClip(frames, fps=30)
+        clip.write_videofile(mp4_path, codec="libx264", logger=None)
 
     # Save individual frames
-    for i, frame in enumerate(frames):
-        frame_path = os.path.join(frames_dir, f"frame_{i:04d}.jpg")
-        if isinstance(frame, str):
-            # constant memory usage
-            frame = cv2.imread(frame)
-        cv2.imwrite(frame_path, frame)
+    if not (os.path.exists(frames_dir) and os.listdir(frames_dir)):
+        for i, frame in enumerate(frames):
+            frame_path = os.path.join(frames_dir, f"frame_{i:04d}.jpg")
+            if isinstance(frame, str):
+                # constant memory usage
+                frame = cv2.imread(frame)
+            cv2.imwrite(frame_path, frame)
     return mp4_path, frames_dir
 
 
@@ -232,13 +234,29 @@ def load_video_frames(
     """Load video frames at specified FPS."""
     video_path = get_video_from_path(dataset_filename, fname)
 
+    # Get all frame paths first to know the total number of frames
+    all_frames = get_video_frames(
+        dataset_filename, fname, n_frames=None, just_path=True
+    )
+
+    if not all_frames:
+        raise ValueError(f"No frames found for video: {fname}")
+
+    total_frames = len(all_frames)
+
     # FPS of 0 means to just use the first and last frames
     if target_fps == 0:
-        frame_indices = [0, -1]
+        frame_indices = [0, total_frames - 1] if total_frames > 1 else [0]
     else:
         frame_indices = get_frame_indices_for_fps(video_path, target_fps=target_fps)
-        if include_last_frame and frame_indices[-1] != -1:
-            frame_indices.append(-1)
+        # Ensure indices don't exceed total frames
+        frame_indices = [i for i in frame_indices if i < total_frames]
+        if (
+            include_last_frame
+            and frame_indices
+            and frame_indices[-1] != total_frames - 1
+        ):
+            frame_indices.append(total_frames - 1)
 
     # some videos/frame sequences are too long for context lengths or API limits
     # so we downsample to a max number of frames but maintain the first and last frames
@@ -255,10 +273,6 @@ def load_video_frames(
             + [frame_indices[-1]]
         )
 
-    # get all frame paths (just strings to avoid memory issues)
-    all_frames = get_video_frames(
-        dataset_filename, fname, n_frames=None, just_path=True
-    )
     # select the frames
     frames_to_process = choose_and_preprocess_frames(
         all_frames, specified_frames=frame_indices

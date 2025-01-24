@@ -7,7 +7,8 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, Field, model_validator
 
-COLOR_PATTERN = "^(white|black|gray|red|green|blue|yellow|purple|orange|brown|pink|gray|other|unknown)$"
+PATTERN_EXTRA_CHOICES = "|other|unknown"
+COLOR_PATTERN = f"^(white|black|gray|red|green|blue|yellow|purple|orange|brown|pink|gray{PATTERN_EXTRA_CHOICES})$"
 
 
 class BaseConfig(BaseModel):
@@ -104,12 +105,12 @@ class Robot(BaseConfig):
     depth_cams: int
     wrist_cams: int
     color_estimate: str = Field(
-        description="The main color of the robot",
+        description="The main color of the robot. 'other' implies a color that is not in the list of valid colors; 'unknown' implies that the color of the robot is not known.",
         pattern=COLOR_PATTERN,
     )
     camera_angle_estimate: str = Field(
-        description="The angle of the camera",
-        pattern="^(front|side|top|angled|wrist|other)$",
+        description="The angle of the camera. 'other' implies an angle that is not in the list of valid angles.",
+        pattern=f"^(front|side|top|angled|wrist{PATTERN_EXTRA_CHOICES})$",
     )
 
 
@@ -117,7 +118,7 @@ class Environment(BaseConfig):
     name: str
     lighting_estimate: str = Field(
         description="Lighting conditions in the environment",
-        pattern="^(dim|normal|bright|other)$",
+        pattern=f"^(dim|normal|bright{PATTERN_EXTRA_CHOICES})$",
     )
     simulation_estimate: bool = Field(
         description="Whether the frames are from a simulation (True) or the real world (False)"
@@ -126,7 +127,7 @@ class Environment(BaseConfig):
     background_estimate: str = Field(description="The background of the environment")
     surface_estimate: str = Field(
         description="The surface that the task is taking place on",
-        pattern="^(wood|metal|plastic|glass|concrete|carpet|tile|rubber|fabric|composite|marble|granite|cardboard|other)$",
+        pattern=f"^(wood|metal|plastic|glass|concrete|carpet|tile|rubber|fabric|composite|marble|granite|cardboard|foam{PATTERN_EXTRA_CHOICES})$",
     )
     focus_objects_estimate: str = Field(
         description="The object(s) is the robot supposed to interact with.",
@@ -137,11 +138,18 @@ class Environment(BaseConfig):
         default_factory=list,
     )
     people_estimate: bool = Field(
-        description="Whether there are people present in the scene",
+        description="Whether there are people present in the scene or not.",
     )
     static_estimate: bool = Field(
         description="Whether the scene is static (meaning no motion in the background) or dynamic (motion in the background). This ignores the motion of the robot and objects it interacts with.",
     )
+
+    @model_validator(mode="before")
+    def validate_surface(cls, values):
+        for k in ["surface_estimate", "background_estimate", "lighting_estimate"]:
+            if k in values:
+                values[k] = values[k].lower()
+        return values
 
 
 class Task(BaseConfig):
@@ -156,7 +164,7 @@ class Task(BaseConfig):
     )
     complexity_category_estimate: str = Field(
         description="The complexity of the task",
-        pattern="^(simple|medium|complex|other)$",
+        pattern=f"^(simple|medium|complex{PATTERN_EXTRA_CHOICES})$",
     )
     complexity_score_estimate: float = Field(
         description="The complexity score of the task",
