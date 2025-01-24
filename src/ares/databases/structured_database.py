@@ -250,6 +250,7 @@ def get_rollouts_by_ids(engine: Engine, ids: list[str]) -> list[Rollout]:
 
 
 def delete_rows_by_dataset_name(engine: Engine, dataset_name: str) -> None:
+    # careful! this is a destructive operation and for the most part should not be used
     len_existing = len(get_dataset_rollouts(engine, dataset_name))
     print(f"Are you sure you want to delete all rows for dataset {dataset_name}?")
     print(f"There are {len_existing} rows in the dataset.")
@@ -265,6 +266,10 @@ if __name__ == "__main__":
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     df = db_to_df(engine)
     print(df.dataset_name.value_counts())
+    # uniqueness check
+    scores = {k: (len(v), v.path.nunique()) for k, v in df.groupby("dataset_name")}
+    failed_unique = {k: v for k, v in scores.items() if v[0] != v[1]}
+    print(f"failed unique! {failed_unique}")
     breakpoint()
 
     # breakpoint()

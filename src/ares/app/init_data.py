@@ -6,10 +6,7 @@ import streamlit as st
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ares.databases.annotation_database import (
-    TEST_ANNOTATION_DB_PATH,
-    AnnotationDatabase,
-)
+from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 from ares.databases.embedding_database import (
     META_INDEX_NAMES,
     TEST_EMBEDDING_DB_PATH_2,
@@ -160,7 +157,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
     st.session_state.models["summarizer"] = VLM(provider="openai", name="gpt-4o-mini")
     print("Setting up annotations database")
     st.session_state.annotations_db = AnnotationDatabase(
-        connection_string=TEST_ANNOTATION_DB_PATH
+        connection_string=ANNOTATION_DB_PATH
     )
     print("Getting annotations database stats")
     st.session_state.annotation_db_stats = (

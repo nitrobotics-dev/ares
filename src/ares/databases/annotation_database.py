@@ -9,7 +9,7 @@ from pymongo import MongoClient
 
 from ares.configs.annotations import Annotation
 
-TEST_ANNOTATION_DB_PATH = "mongodb://localhost:27017"
+ANNOTATION_DB_PATH = "mongodb://localhost:27017"
 
 
 class AnnotationDatabase:
@@ -296,7 +296,7 @@ class AnnotationDatabase:
 
 
 if __name__ == "__main__":
-    db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
+    db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
     # db.add_video("test_video", {"test": "test"})
     # db.add_annotation("test_video", "test_annotation", "test_value", "test_type", 1)
     # anns = db.get_annotations("test_video", "test_type", 1)

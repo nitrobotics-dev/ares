@@ -5,6 +5,8 @@ import tensorflow_datasets as tfds
 
 from ares.configs.open_x_embodiment_configs import get_dataset_information
 from ares.constants import ARES_OXE_DIR, DATASET_NAMES
+from ares.databases.annotation_database import ANNOTATION_DB_PATH
+from ares.databases.embedding_database import EMBEDDING_DB_PATH
 from ares.databases.structured_database import (
     ROBOT_DB_PATH,
     RolloutSQLModel,
@@ -48,23 +50,27 @@ if __name__ == "__main__":
             dataset_info["Split"] = split
 
             # run structured ingestion
-            asyncio.run(
-                run_structured_database_ingestion(
-                    ds,
-                    dataset_info,
-                    dataset_formalname,
-                    vlm_name,
-                    engine,
-                    dataset_filename,
-                )
-            )
+            new_rollout_ids = None
+            # fails, new_rollout_ids = asyncio.run(
+            #     run_structured_database_ingestion(
+            #         ds,
+            #         dataset_info,
+            #         dataset_formalname,
+            #         vlm_name,
+            #         engine,
+            #         dataset_filename,
+            #     )
+            # )
 
             # # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
             # # to db and videos to disk then reconstitute rollouts for indexing!
-            # rollouts = setup_rollouts(engine, dataset_formalname)
-            # rollouts = [r for r in rollouts if r.id in new_rollout_ids]
-            # run_embedding_database_ingestion_per_dataset(rollouts, embedder)
+            rollouts = setup_rollouts(engine, dataset_formalname)
+            if new_rollout_ids is not None:
+                rollouts = [r for r in rollouts if r.id in new_rollout_ids]
+            run_embedding_database_ingestion_per_dataset(
+                rollouts, embedder, index_path=EMBEDDING_DB_PATH
+            )
 
-            # # run grounding annotation with modal
+            # run grounding annotation with modal
             # with modal_app.run():
-            #     run_modal_grounding(rollout_ids=new_rollout_ids)
+            #     run_modal_grounding(engine_path=ROBOT_DB_PATH, ann_db_path=ANNOTATION_DB_PATH, rollout_ids=[r.id for r in rollouts])

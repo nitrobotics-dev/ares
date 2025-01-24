@@ -136,6 +136,8 @@ async def run_annotation_parallel(
 
 @app.local_entrypoint()
 def run_modal_grounding(
+    engine_path: str,
+    ann_db_path: str,
     dataset_filename: str | None = None,
     split: str | None = None,
     rollout_ids: list[str] | None = None,
@@ -151,12 +153,8 @@ def run_modal_grounding(
 
     from ares.configs.base import Rollout
     from ares.constants import DATASET_NAMES
-    from ares.databases.annotation_database import (
-        TEST_ANNOTATION_DB_PATH,
-        AnnotationDatabase,
-    )
+    from ares.databases.annotation_database import AnnotationDatabase
     from ares.databases.structured_database import (
-        TEST_ROBOT_DB_PATH,
         RolloutSQLModel,
         get_rollouts_by_ids,
         setup_database,
@@ -234,7 +232,7 @@ def run_modal_grounding(
         )
         return stats, failures
 
-    ann_db = AnnotationDatabase(connection_string=TEST_ANNOTATION_DB_PATH)
+    ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
 
     if retry_failed_path:

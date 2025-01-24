@@ -13,8 +13,8 @@ from tqdm import tqdm
 
 from ares.configs.base import Rollout
 from ares.databases.embedding_database import (
+    EMBEDDING_DB_PATH,
     META_INDEX_NAMES,
-    TEST_EMBEDDING_DB_PATH_2,
     TEST_TIME_STEPS,
     FaissIndex,
     IndexManager,
@@ -114,9 +114,9 @@ def ingest_language_embeddings_from_rollouts_per_dataset(
 
 
 def run_embedding_database_ingestion_per_dataset(
-    rollouts: list[Rollout], embedder: Embedder
+    rollouts: list[Rollout], embedder: Embedder, index_path: str
 ) -> None:
-    index_manager = IndexManager(TEST_EMBEDDING_DB_PATH_2, index_class=FaissIndex)
+    index_manager = IndexManager(index_path, index_class=FaissIndex)
 
     tic = time.time()
     # add the trajectory matrices to the index and get normalizing constants for this dataset
@@ -164,10 +164,18 @@ def run_embedding_database_ingestion_per_dataset(
     help="File containing rollout ids to ingest",
     default=None,
 )
+@click.option(
+    "--index-path",
+    type=str,
+    required=False,
+    help="Path to the index to ingest",
+    default=EMBEDDING_DB_PATH,
+)
 def main(
     engine_url: str,
     dataset_formalname: Union[str, None],
     from_id_file: Union[str, None],
+    index_path: str,
 ):
     """Run embedding database ingestion for trajectory data."""
     assert (
@@ -186,7 +194,9 @@ def main(
     for rollout in rollouts:
         dataset_to_rollouts[rollout.dataset_formalname].append(rollout)
     for dataset_formalname, dataset_rollouts in dataset_to_rollouts.items():
-        run_embedding_database_ingestion_per_dataset(dataset_rollouts, embedder)
+        run_embedding_database_ingestion_per_dataset(
+            dataset_rollouts, embedder, index_path
+        )
 
 
 if __name__ == "__main__":

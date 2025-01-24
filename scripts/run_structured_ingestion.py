@@ -90,6 +90,7 @@ async def process_batch(
     for i, ep in tqdm(episodes, desc="Processing episodes"):
         try:
             episode = construct_openxembodiment_episode(ep, dataset_info, i)
+            # we patch this during rollout creation but need to check here
             if episode.episode_metadata.file_path.removeprefix("/") in existing_paths:
                 result.n_skipped += 1
                 continue
