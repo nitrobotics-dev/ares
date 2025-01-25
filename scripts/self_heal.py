@@ -15,8 +15,8 @@ import pandas as pd
 from ares.constants import ARES_DATA_DIR
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 from ares.databases.embedding_database import (
+    EMBEDDING_DB_PATH,
     META_INDEX_NAMES,
-    TEST_EMBEDDING_DB_PATH_2,
     FaissIndex,
     IndexManager,
     rollout_to_index_name,
@@ -42,7 +42,7 @@ HEAL_INFO_DIR = os.path.join(ARES_DATA_DIR, "heal_info")
 def find_heal_opportunities(heal_info_dir: str) -> str:
     engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
     ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
-    embedding_db = IndexManager(TEST_EMBEDDING_DB_PATH_2, FaissIndex)
+    embedding_db = IndexManager(EMBEDDING_DB_PATH, FaissIndex)
     time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     heal_dir = os.path.join(heal_info_dir, time_str)
     os.makedirs(heal_dir, exist_ok=True)

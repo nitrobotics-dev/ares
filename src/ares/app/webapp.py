@@ -172,12 +172,12 @@ def main() -> None:
             general_visualizations, [viz["title"] for viz in general_visualizations]
         )
 
-    section_success_rate = "success rate analytics"
+    section_success_rate = "success estimate analytics"
     with (
         filter_error_context(section_success_rate),
         timer_context(section_success_rate),
     ):
-        st.header("Success Rate Analytics")
+        st.header("Success Estimate Analytics")
         success_visualizations = generate_success_rate_visualizations(filtered_df)
         create_tabbed_visualizations(
             success_visualizations, [viz["title"] for viz in success_visualizations]
@@ -198,6 +198,7 @@ def main() -> None:
     section_video_grid = "video grid"
     with filter_error_context(section_video_grid), timer_context(section_video_grid):
         # show video cards of first 5 rows in a horizontal layout
+        st.header("Rollout Examples")
         display_video_grid(filtered_df, lazy_load=True)
     st.divider()
 

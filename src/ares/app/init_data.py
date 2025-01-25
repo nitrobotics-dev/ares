@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 from ares.databases.embedding_database import (
+    EMBEDDING_DB_PATH,
     META_INDEX_NAMES,
-    TEST_EMBEDDING_DB_PATH_2,
     FaissIndex,
     IndexManager,
 )
@@ -114,9 +114,7 @@ def initialize_data(tmp_dump_dir: str) -> None:
 
     # Initialize index manager
     print("Initializing index manager")
-    index_manager = IndexManager(
-        base_dir=TEST_EMBEDDING_DB_PATH_2, index_class=FaissIndex
-    )
+    index_manager = IndexManager(base_dir=EMBEDDING_DB_PATH, index_class=FaissIndex)
     st.session_state.INDEX_MANAGER = index_manager
 
     # Get all vectors and their IDs

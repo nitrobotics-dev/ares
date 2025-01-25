@@ -185,13 +185,13 @@ async def run_structured_database_ingestion(
 
         current_batch.append((i, ep))
         # Monitor both CPU and Memory usage
-        cpu_percent = psutil.cpu_percent()
-        memory = psutil.Process().memory_info()
-        memory_gb = memory.rss / (1024 * 1024 * 1024)  # Convert bytes to GB
-        print(f"CPU Usage: {cpu_percent}% | Memory Usage: {memory_gb:.2f} GB")
 
         if len(current_batch) >= outer_batch_size:
             print(f"Processing batch of size {len(current_batch)}")
+            cpu_percent = psutil.cpu_percent()
+            memory = psutil.Process().memory_info()
+            memory_gb = memory.rss / (1024 * 1024 * 1024)  # Convert bytes to GB
+            print(f"CPU Usage: {cpu_percent}% | Memory Usage: {memory_gb:.2f} GB")
             result = await process_batch(
                 current_batch,
                 dataset_info,

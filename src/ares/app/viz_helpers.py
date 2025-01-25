@@ -34,8 +34,15 @@ from ares.utils.image_utils import (
 )
 
 
-def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
-    """Generate success rate visualizations for categorical columns."""
+def generate_success_rate_visualizations(
+    df: pd.DataFrame, success_col: str = "task_success_estimate"
+) -> list[dict]:
+    """Generate success rate visualizations for categorical columns.
+
+    Args:
+        df: DataFrame containing rollout data
+        success_col: Name of column containing success values
+    """
     visualizations = []
     categorical_cols = sorted(
         [
@@ -46,12 +53,11 @@ def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
     )
 
     for col in categorical_cols:
-        # Use groupby and rename the column to match the expected name
         success_rates = (
-            df.groupby(col)["task_success"]
+            df.groupby(col)[success_col]
             .mean()
+            .rename(f"{success_col}_mean")
             .reset_index()
-            .rename(columns={"task_success": "success_rate"})
         )
 
         col_title = col.replace("_", " ").replace("-", " ").title()
@@ -61,12 +67,15 @@ def generate_success_rate_visualizations(df: pd.DataFrame) -> list[dict]:
                 "figure": create_bar_plot(
                     success_rates,
                     x=col,
-                    y="success_rate",
+                    y=f"{success_col}_mean",
                     color="#2ecc71",
-                    title=f"Success Rate by {col_title}",
-                    labels={col: col_title, "success_rate": "Success Rate"},
+                    title=f"Success Estimate Rate by {col_title}",
+                    labels={
+                        col: col_title,
+                        f"{success_col}_mean": "Success Rate Estimate",
+                    },
                 ),
-                "title": f"{col_title} Success Rate",
+                "title": f"{col_title} Success Estimate Rate",
             }
         )
 
@@ -130,11 +139,10 @@ def display_video_grid(
         filtered_df: DataFrame containing rollout data
         max_videos: Maximum number of videos to display in the grid
     """
-    st.header("Rollout Examples")
     n_videos = min(max_videos, len(filtered_df))
     video_cols = st.columns(n_videos)
 
-    for i, (_, row) in enumerate(filtered_df.head(n_videos).iterrows()):
+    for i, (_, row) in enumerate(filtered_df.sample(n_videos).iterrows()):
         with video_cols[i]:
             display_video_card(dict(row), lazy_load=lazy_load, key=f"video_card_{i}")
 

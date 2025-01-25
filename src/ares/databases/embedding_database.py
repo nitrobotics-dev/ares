@@ -584,7 +584,7 @@ class IndexManager:
 
 
 if __name__ == "__main__":
-    db = IndexManager(TEST_EMBEDDING_DB_PATH_2, FaissIndex)
+    db = IndexManager(EMBEDDING_DB_PATH, FaissIndex)
+    print(db.get_overall_stats())
 
     breakpoint()
-    print(db.get_overall_stats())

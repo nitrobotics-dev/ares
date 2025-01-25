@@ -239,7 +239,6 @@ def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -
             st.write(f"**{row['id']}**")
             st.write(f"Task: {row['task_language_instruction']}")
             st.write(f"Dataset: {row['dataset_formalname']}")
-            st.divider()
         except Exception as e:
             st.warning(f"Error loading video for {row['id']}: {e}")
     else:

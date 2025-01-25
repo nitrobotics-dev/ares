@@ -67,6 +67,8 @@ if __name__ == "__main__":
             rollouts = setup_rollouts(engine, dataset_formalname)
             if new_rollout_ids is not None:
                 rollouts = [r for r in rollouts if r.id in new_rollout_ids]
+            if len(rollouts) == 0:
+                breakpoint()
             run_embedding_database_ingestion_per_dataset(
                 rollouts, embedder, index_path=EMBEDDING_DB_PATH
             )
