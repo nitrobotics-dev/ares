@@ -240,13 +240,20 @@ def add_column_with_vals_and_defaults(
                 )
 
 
-def get_rollouts_by_ids(engine: Engine, ids: list[str]) -> list[Rollout]:
-    # convert str ids to uuid.UUID
-    ids = [uuid.UUID(id) for id in ids]
-    with Session(engine) as session:
-        query = select(RolloutSQLModel).where(RolloutSQLModel.id.in_(ids))
-        rows = session.exec(query).all()
-        return [recreate_model(row[0], Rollout) for row in rows]
+def get_rollouts_by_ids(
+    engine: Engine, ids: list[str] | list[uuid.UUID], return_df: bool = False
+) -> list[Rollout] | pd.DataFrame:
+    if isinstance(ids[0], str):
+        # convert str ids to uuid.UUID
+        ids = [uuid.UUID(id) for id in ids]
+    if not return_df:
+        with Session(engine) as session:
+            query = select(RolloutSQLModel).where(RolloutSQLModel.id.in_(ids))
+            rows = session.exec(query).all()
+            return [recreate_model(row[0], Rollout) for row in rows]
+    else:
+        df = db_to_df(engine)
+        return df[df.id.isin(ids)]
 
 
 def delete_rows_by_dataset_name(engine: Engine, dataset_name: str) -> None:
