@@ -243,6 +243,7 @@ def add_column_with_vals_and_defaults(
 def get_rollouts_by_ids(
     engine: Engine, ids: list[str] | list[uuid.UUID], return_df: bool = False
 ) -> list[Rollout] | pd.DataFrame:
+
     if isinstance(ids[0], str):
         # convert str ids to uuid.UUID
         ids = [uuid.UUID(id) for id in ids]

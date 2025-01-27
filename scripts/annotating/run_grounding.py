@@ -7,26 +7,28 @@ import os
 import pickle
 import time
 import traceback
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-from pydantic import dataclass
 
+from ares.configs.base import Rollout
 from ares.constants import (
-    ANNOTATION_GROUNDING_FPS,
     ARES_DATA_DIR,
     DATASET_NAMES,
     OUTER_BATCH_SIZE,
     get_dataset_info_by_key,
 )
-from ares.databases.annotation_database import AnnotationDatabase
+from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 from ares.databases.structured_database import (
+    ROBOT_DB_PATH,
     RolloutSQLModel,
     get_rollouts_by_ids,
     setup_database,
     setup_rollouts,
 )
 from ares.models.base import VLM
+from ares.models.grounding import ANNOTATION_GROUNDING_FPS
 from ares.models.grounding_utils import get_grounding_nouns_async
 from ares.models.shortcuts import get_gpt_4o
 from ares.utils.image_utils import load_video_frames
@@ -50,7 +52,7 @@ class ResultTracker:
     annotations: int = 0
     video_ids: List[str] = field(default_factory=list)
 
-    def update_batch(
+    def update_via_batch(
         self, n_videos: int, n_frames: int, n_annotations: int, video_ids: List[str]
     ):
         self.videos += n_videos
@@ -58,7 +60,7 @@ class ResultTracker:
         self.annotations += n_annotations
         self.video_ids.extend(video_ids)
 
-    def update_tracker(self, tracker: ResultTracker):
+    def update_tracker(self, tracker: "ResultTracker"):
         self.videos += tracker.videos
         self.frames += tracker.frames
         self.annotations += tracker.annotations
@@ -92,17 +94,20 @@ async def run_annotate_and_ingest(
     """
     id_to_rollout = {r.id: r for r in rollouts}
     id_to_annotation_inputs = {}
+    tracker = ResultTracker()
+    failures = []
 
     # Await all preparation tasks
     results = await asyncio.gather(*annotation_input_futures, return_exceptions=True)
 
     tasks = []
-    failures = []
 
     for res in results:
         if isinstance(res, ErrorResult):
             failures.append(res)
             continue
+        elif isinstance(res, Exception):
+            breakpoint()
         else:
             rollout_id, frames, frame_indices, label_str = res
         print(
@@ -119,7 +124,10 @@ async def run_annotate_and_ingest(
         tasks.append((rollout_id, frames, label_str))
 
     # Submit annotation tasks to Modal
-    annotation_results = await annotator.annotate_videos(tasks)
+    with annotator.app.run():
+        annotation_results = await annotator.annotate_videos(tasks)
+
+    breakpoint()
 
     for rollout_id, all_frame_annotation_dicts in annotation_results:
         try:
@@ -133,7 +141,7 @@ async def run_annotate_and_ingest(
                 annotations=all_frame_annotation_dicts,
                 label_str=label_str,
             )
-            tracker.update(
+            tracker.update_via_batch(
                 n_videos=1,
                 n_frames=len(all_frame_annotation_dicts),
                 n_annotations=sum(
@@ -276,7 +284,10 @@ def setup_rollouts(
 
 
 def orchestrate_grounding_batch(
-    rollouts: List[Rollout], ann_db: AnnotationDatabase, outer_batch_size: int
+    rollouts: List[Rollout],
+    ann_db: AnnotationDatabase,
+    outer_batch_size: int,
+    annotation_fps: int,
 ):
     # initialize objects for batches
     overall_tracker = ResultTracker()
@@ -339,7 +350,9 @@ def orchestrate_grounding(
     engine = setup_database(RolloutSQLModel, path=engine_path)
     rollouts = setup_rollouts(
         engine, rollout_ids, retry_failed_path, dataset_filename, split
-    )
+    )[
+        :1
+    ]  # HACK # TODO
     print(f"\n\nFound {len(rollouts)} total rollouts\n\n")
     if not rollouts:
         print(
@@ -349,7 +362,7 @@ def orchestrate_grounding(
 
     tic = time.time()
     overall_tracker, overall_failures = orchestrate_grounding_batch(
-        rollouts, ann_db, outer_batch_size
+        rollouts, ann_db, outer_batch_size, annotation_fps
     )
     print(f"\n\nFailures: {overall_failures}\n\n")
 
@@ -361,3 +374,14 @@ def orchestrate_grounding(
     print(f"\n\n")
     overall_tracker.print_stats()
     print(f"\nNumber of failures: {len(overall_failures)}")
+
+
+if __name__ == "__main__":
+    fails_path = (
+        "/workspaces/ares/data/heal_info/2025-01-27_18-51-45/update_grounding_ids.txt"
+    )
+    orchestrate_grounding(
+        engine_path=ROBOT_DB_PATH,
+        ann_db_path=ANNOTATION_DB_PATH,
+        retry_failed_path=fails_path,
+    )

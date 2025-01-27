@@ -15,26 +15,32 @@ class GroundingWorker(BaseWorker):
 
     @enter()
     def setup(self) -> None:
-        pass
+        """Initialize resources needed for grounding."""
+        self.worker = GroundingAnnotator(segmenter_id=None)
 
     @method()
     async def process(
-        self, rollout_id: str, frames: list, label_str: str
-    ) -> Tuple[str, list]:
+        self, batch: List[Tuple[str, list, str]]
+    ) -> List[Tuple[str, list]]:
         """
-        Process method to annotate a single video.
+        Process method to annotate multiple videos in a batch.
 
         Args:
-            rollout_id (str): Identifier for the rollout.
-            frames (list): List of video frames.
-            label_str (str): Label string for annotation.
+            batch: List of tuples containing (rollout_id, frames, label_str)
 
         Returns:
-            Tuple[str, list]: Annotation result.
+            List[Tuple[str, list]]: List of annotation results
         """
-        worker = GroundingAnnotator(segmenter_id=None)
-        result = await worker.annotate_video(rollout_id, frames, label_str)
-        return rollout_id, result
+        results = []
+        for rollout_id, frames, label_str in batch:
+            try:
+                result = self.worker.annotate_video(rollout_id, frames, label_str)
+                results.append(result)
+            except Exception as e:
+                print(f"Error processing {rollout_id}: {e}")
+                # Return empty annotations for failed items
+                results.append((rollout_id, []))
+        return results
 
 
 class GroundingModalWrapper(BaseModalWrapper):

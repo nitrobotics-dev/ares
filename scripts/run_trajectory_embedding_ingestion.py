@@ -185,7 +185,8 @@ def main(
     if from_id_file is not None:
         with open(from_id_file, "r") as f:
             rollout_ids = [line.strip() for line in f.readlines()]
-        rollouts = get_rollouts_by_ids(engine, rollout_ids)
+
+        rollouts = get_rollouts_by_ids(engine, rollout_ids) if rollout_ids else []
     else:
         rollouts = setup_rollouts(engine, dataset_formalname)
 
