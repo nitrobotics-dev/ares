@@ -21,7 +21,6 @@ from ares.databases.embedding_database import (
     rollout_to_embedding_pack,
 )
 from ares.databases.structured_database import (
-    TEST_ROBOT_DB_PATH,
     RolloutSQLModel,
     get_rollouts_by_ids,
     setup_database,

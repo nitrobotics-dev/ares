@@ -8,6 +8,7 @@ This ensures our databases are in sync.
 
 import os
 from datetime import datetime
+from pathlib import Path
 
 import click
 import pandas as pd
@@ -22,7 +23,7 @@ from ares.databases.embedding_database import (
     rollout_to_index_name,
 )
 from ares.databases.structured_database import (
-    TEST_ROBOT_DB_PATH,
+    ROBOT_DB_PATH,
     RolloutSQLModel,
     get_partial_df,
     get_rollout_by_name,
@@ -40,7 +41,7 @@ HEAL_INFO_DIR = os.path.join(ARES_DATA_DIR, "heal_info")
 @click.command("find-heal")
 @click.option("--heal-info-dir", type=str, default=HEAL_INFO_DIR)
 def find_heal_opportunities(heal_info_dir: str) -> str:
-    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+    engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
     embedding_db = IndexManager(EMBEDDING_DB_PATH, FaissIndex)
     time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -151,7 +152,7 @@ def execute_heal(time_dir: str):
     # run embedding ingestion via click's command from our embedding ingestion script
     update_embedding_ids_path = os.path.join(heal_dir, "update_embedding_ids.txt")
     run_trajectory_embedding_ingestion.callback(
-        engine_url=TEST_ROBOT_DB_PATH,
+        engine_url=ROBOT_DB_PATH,
         dataset_formalname=None,
         from_id_file=update_embedding_ids_path,
     )

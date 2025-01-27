@@ -232,8 +232,8 @@ def run_modal_grounding(
         )
         return stats, failures
 
-    ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
-    engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+    ann_db = AnnotationDatabase(connection_string=ann_db_path)
+    engine = setup_database(RolloutSQLModel, path=engine_path)
 
     if retry_failed_path:
         if "pkl" in retry_failed_path:

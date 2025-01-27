@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 
 ARES_DATA_DIR = "/workspaces/ares/data"
 ARES_OXE_DIR = os.path.join(ARES_DATA_DIR, "oxe")
@@ -70,6 +71,21 @@ DATASET_NAMES = [
     #     "dataset_formalname": "Saytap",
     # },
 ]
+
+DATASET_KEY_TO_DATASET_INFO = defaultdict(dict)
+keys = ["dataset_filename", "dataset_formalname"]
+for dataset_info in DATASET_NAMES:
+    for key in keys:
+        DATASET_KEY_TO_DATASET_INFO[key][dataset_info[key]] = dataset_info
+
+
+def get_dataset_info_by_key(key_type: str, key: str) -> dict:
+    if key_type not in DATASET_KEY_TO_DATASET_INFO:
+        raise ValueError(f"Invalid key type: {key_type}")
+    if key not in DATASET_KEY_TO_DATASET_INFO[key_type]:
+        raise ValueError(f"Invalid key: {key}")
+    return DATASET_KEY_TO_DATASET_INFO[key_type][key]
+
 
 # for many async operations, we're loading a large number of rollouts into memory at once.
 # this is a hard limit on the number of rollouts/requests to avoid memory issues.

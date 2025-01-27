@@ -9,14 +9,14 @@ import numpy as np
 from ares.configs.open_x_embodiment_configs import get_dataset_information
 from ares.constants import DATASET_NAMES
 from ares.databases.structured_database import (
-    TEST_ROBOT_DB_PATH,
+    ROBOT_DB_PATH,
     RolloutSQLModel,
     add_column_with_vals_and_defaults,
     get_all_rollouts,
     setup_database,
 )
 
-engine = setup_database(RolloutSQLModel, path=TEST_ROBOT_DB_PATH)
+engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
 rollouts = get_all_rollouts(engine)
 
 DATASET_INFOS = dict()
