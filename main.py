@@ -74,5 +74,4 @@ if __name__ == "__main__":
             )
 
             # run grounding annotation with modal
-            # with modal_app.run():
-            #     run_modal_grounding(engine_path=ROBOT_DB_PATH, ann_db_path=ANNOTATION_DB_PATH, rollout_ids=[r.id for r in rollouts])
+            # run_modal_grounding(engine_path=ROBOT_DB_PATH, ann_db_path=ANNOTATION_DB_PATH, rollout_ids=[r.id for r in rollouts])

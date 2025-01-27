@@ -320,7 +320,7 @@ def orchestrate_grounding_batch(
     return overall_tracker, overall_failures
 
 
-def orchestrate_grounding(
+def run_modal_grounding(
     engine_path: str,
     ann_db_path: str,
     dataset_filename: str | None = None,
@@ -380,10 +380,11 @@ def orchestrate_grounding(
 
 if __name__ == "__main__":
     fails_path = (
-        "/workspaces/ares/data/heal_info/2025-01-27_21-59-22/update_grounding_ids.txt"
+        "/workspaces/ares/data/heal_info/2025-01-27_22-04-01/update_grounding_ids.txt"
     )
-    orchestrate_grounding(
+    run_modal_grounding(
         engine_path=ROBOT_DB_PATH,
         ann_db_path=ANNOTATION_DB_PATH,
         retry_failed_path=fails_path,
+        outer_batch_size=100,
     )
