@@ -2,7 +2,7 @@
 
 import asyncio
 
-from modal import App, Image, build, enter, method
+from modal import App, Image, enter, method
 
 # Base Modal image with common dependencies
 base_image = (

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+from tqdm import tqdm
 
 from ares.configs.base import Rollout
 from ares.constants import (
@@ -124,10 +125,8 @@ async def run_annotate_and_ingest(
         tasks.append((rollout_id, frames, label_str))
 
     # Submit annotation tasks to Modal
-    with annotator.app.run():
-        annotation_results = await annotator.annotate_videos(tasks)
-
-    breakpoint()
+    # with annotator.app.run():
+    annotation_results = await annotator.annotate_videos(tasks)
 
     for rollout_id, all_frame_annotation_dicts in annotation_results:
         try:
@@ -212,7 +211,7 @@ async def setup_query(
         return ErrorResult(
             rollout_id=rollout.id,
             error_pattern="grounding_request_failure",
-            error=str(e),
+            error=f"Refusal phrase triggered: '{label_str}' with refusal phrases {refusal_phrases}",
         )
     return rollout.id, frames, frame_indices, label_str
 
@@ -221,7 +220,8 @@ async def run_ground_and_annotate(
     rollouts: List[Any],
     vlm: VLM,
     ann_db: AnnotationDatabase,
-    target_fps: int = 5,
+    annotator: GroundingModalWrapper,
+    target_fps: int = ANNOTATION_GROUNDING_FPS,
 ) -> Tuple[ResultTracker, List[ErrorResult]]:
     """
     Process, ground, and annotate list of rollouts.
@@ -243,7 +243,6 @@ async def run_ground_and_annotate(
         for rollout in rollouts
     ]
 
-    annotator = GroundingModalWrapper()
     tracker, failures = await run_annotate_and_ingest(
         annotator,
         rollout_ids,
@@ -293,26 +292,31 @@ def orchestrate_grounding_batch(
     overall_tracker = ResultTracker()
     overall_failures = []
 
-    # Limited by CPU RAM (can't create all requests at once)
-    for i in range(0, len(rollouts), outer_batch_size):
-        print(
-            f"Processing batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"
-        )
-        vlm = get_gpt_4o()
-        rollouts_batch = rollouts[i : i + outer_batch_size]
-        tracker, failures = asyncio.run(
-            run_ground_and_annotate(
-                rollouts_batch,
-                vlm,
-                ann_db,
-                annotation_fps,
+    annotator = GroundingModalWrapper()
+    with annotator.app.run():
+        # Limited by CPU RAM (can't create all requests at once)
+        for i in tqdm(
+            range(0, len(rollouts), outer_batch_size), desc="Processing outer batches"
+        ):
+            print(
+                f"Processing batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"
             )
-        )
-        print(
-            f"Completed batch {i // outer_batch_size + 1} of {max(1, len(rollouts) // outer_batch_size)}"
-        )
-        overall_tracker.update_tracker(tracker)
-        overall_failures.extend(failures)
+            vlm = get_gpt_4o()
+            rollouts_batch = rollouts[i : i + outer_batch_size]
+            tracker, failures = asyncio.run(
+                run_ground_and_annotate(
+                    rollouts_batch,
+                    vlm,
+                    ann_db,
+                    annotator,
+                    annotation_fps,
+                )
+            )
+            print(
+                f"Completed batch {i // outer_batch_size + 1} of {max(1, len(rollouts) // outer_batch_size)}"
+            )
+            overall_tracker.update_tracker(tracker)
+            overall_failures.extend(failures)
     return overall_tracker, overall_failures
 
 
@@ -350,9 +354,7 @@ def orchestrate_grounding(
     engine = setup_database(RolloutSQLModel, path=engine_path)
     rollouts = setup_rollouts(
         engine, rollout_ids, retry_failed_path, dataset_filename, split
-    )[
-        :1
-    ]  # HACK # TODO
+    )
     print(f"\n\nFound {len(rollouts)} total rollouts\n\n")
     if not rollouts:
         print(
@@ -378,7 +380,7 @@ def orchestrate_grounding(
 
 if __name__ == "__main__":
     fails_path = (
-        "/workspaces/ares/data/heal_info/2025-01-27_18-51-45/update_grounding_ids.txt"
+        "/workspaces/ares/data/heal_info/2025-01-27_21-59-22/update_grounding_ids.txt"
     )
     orchestrate_grounding(
         engine_path=ROBOT_DB_PATH,
