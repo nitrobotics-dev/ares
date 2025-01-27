@@ -190,6 +190,12 @@ def main(
     else:
         rollouts = setup_rollouts(engine, dataset_formalname)
 
+    if len(rollouts) == 0:
+        print(
+            f"No rollouts found for dataset_formalname: {dataset_formalname}, from_id_file: {from_id_file}"
+        )
+        return
+
     dataset_to_rollouts = defaultdict(list)
     for rollout in rollouts:
         dataset_to_rollouts[rollout.dataset_formalname].append(rollout)

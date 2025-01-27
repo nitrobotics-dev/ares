@@ -31,6 +31,7 @@ from ares.databases.structured_database import (
 from ares.models.base import VLM
 from ares.models.grounding import ANNOTATION_GROUNDING_FPS
 from ares.models.grounding_utils import get_grounding_nouns_async
+from ares.models.refusal import check_refusal
 from ares.models.shortcuts import get_gpt_4o
 from ares.utils.image_utils import load_video_frames
 
@@ -107,8 +108,6 @@ async def run_annotate_and_ingest(
         if isinstance(res, ErrorResult):
             failures.append(res)
             continue
-        elif isinstance(res, Exception):
-            breakpoint()
         else:
             rollout_id, frames, frame_indices, label_str = res
         print(
@@ -125,7 +124,6 @@ async def run_annotate_and_ingest(
         tasks.append((rollout_id, frames, label_str))
 
     # Submit annotation tasks to Modal
-    # with annotator.app.run():
     annotation_results = await annotator.annotate_videos(tasks)
 
     for rollout_id, all_frame_annotation_dicts in annotation_results:
@@ -166,7 +164,6 @@ async def setup_query(
     rollout: Any,
     vlm: VLM,
     target_fps: int = 5,
-    refusal_phrases: List[str] | None = None,
 ) -> Tuple[str, List[np.ndarray], List[int], str] | Dict[str, Any]:
     """
     Prepare annotation inputs for a rollout.
@@ -175,7 +172,6 @@ async def setup_query(
         rollout (Any): Rollout object.
         vlm (VLM): Vision-Language Model instance.
         target_fps (int, optional): Target FPS for frame extraction.
-        refusal_phrases (List[str], optional): Phrases indicating refusal.
 
     Returns:
         Tuple[str, List[np.ndarray], List[int], str] | Dict[str, Any]: Prepared data or error dict.
@@ -206,8 +202,7 @@ async def setup_query(
             error=str(e),
         )
 
-    refusal_phrases = refusal_phrases or ["I'm"]
-    if any(phrase in label_str for phrase in refusal_phrases):
+    if check_refusal(label_str):
         return ErrorResult(
             rollout_id=rollout.id,
             error_pattern="grounding_request_failure",
