@@ -319,7 +319,7 @@ def show_hero_display(
                 k: (v if len(str(v)) < 1000 else str(v)[:1000] + "...")
                 for k, v in sorted(row.to_dict().items(), key=lambda x: x[0])
             }
-            st.json(json_repr)
+            st.json(json_repr, expanded=False)
 
         if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
             array_figs = generate_robot_array_plot_visualizations(
@@ -342,33 +342,36 @@ def show_hero_display(
                     )
                 else:
                     detection_data = annotation_data.get("detection")
-                    frame_inds = list(detection_data.keys())
-                    all_frame_paths = get_video_frames(
-                        dataset, fname, n_frames=None, just_path=True
-                    )
-                    selected_frames = choose_and_preprocess_frames(
-                        all_frame_paths,
-                        specified_frames=frame_inds,
-                    )
-                    annotated_frames = [
-                        draw_annotations(frame, anns)
-                        for frame, anns in zip(selected_frames, detection_data.values())
-                    ]
-                    with st.expander("Annotated Frames", expanded=False):
-                        max_cols = 3
-                        cols = st.columns(max_cols)
-                        for i, (frame_ind, frame) in enumerate(
-                            zip(frame_inds, annotated_frames)
-                        ):
-                            with cols[i % max_cols]:
-                                st.write(f"Frame {frame_ind}")
-                                st.image(frame)
+                    if detection_data:
+                        frame_inds = list(detection_data.keys())
+                        all_frame_paths = get_video_frames(
+                            dataset, fname, n_frames=None, just_path=True
+                        )
+                        selected_frames = choose_and_preprocess_frames(
+                            all_frame_paths,
+                            specified_frames=frame_inds,
+                        )
+                        annotated_frames = [
+                            draw_annotations(frame, anns)
+                            for frame, anns in zip(
+                                selected_frames, detection_data.values()
+                            )
+                        ]
+                        with st.expander("Annotated Frames", expanded=False):
+                            max_cols = 3
+                            cols = st.columns(max_cols)
+                            for i, (frame_ind, frame) in enumerate(
+                                zip(frame_inds, annotated_frames)
+                            ):
+                                with cols[i % max_cols]:
+                                    st.write(f"Frame {frame_ind}")
+                                    st.image(frame)
 
                     with st.expander("Raw Annotation Data (as JSON)", expanded=False):
                         st.write("Video Data:")
-                        st.json(db_data["video_data"])
+                        st.json(db_data["video_data"], expanded=False)
                         st.write("Annotations:")
-                        st.json(db_data["annotations"])
+                        st.json(db_data["annotations"], expanded=False)
             else:
                 st.warning(f"No video or annotation data found for {video_id}")
         except Exception as e:

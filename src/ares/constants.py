@@ -87,6 +87,10 @@ def get_dataset_info_by_key(key_type: str, key: str) -> dict:
     return DATASET_KEY_TO_DATASET_INFO[key_type][key]
 
 
-# for many async operations, we're loading a large number of rollouts into memory at once.
+# for ingestion operations, we're loading large amounts of data into memory at once.
 # this is a hard limit on the number of rollouts/requests to avoid memory issues.
 OUTER_BATCH_SIZE = 20
+
+# for annotation operations, the objects in memory are smaller (eg no point clouds),
+# so we can load more into memory at once.
+ANNOTATION_OUTER_BATCH_SIZE = 100

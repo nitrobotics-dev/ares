@@ -30,7 +30,8 @@ from ares.databases.structured_database import (
     setup_database,
 )
 
-from .annotating.run_grounding import run_modal_grounding
+from .annotating.annotation_base import orchestrate_annotating
+from .annotating.run_grounding import GroundingModalAnnotatingFn
 from .run_trajectory_embedding_ingestion import (
     main as run_trajectory_embedding_ingestion,
 )
@@ -165,10 +166,11 @@ def execute_heal(time_dir: str):
 
     # update grounding database
     update_grounding_ids_path = os.path.join(heal_dir, "update_grounding_ids.txt")
-    run_modal_grounding(
+    orchestrate_annotating(
         engine_path=ROBOT_DB_PATH,
         ann_db_path=ANNOTATION_DB_PATH,
-        retry_failed_path=update_grounding_ids_path,
+        annotating_fn=GroundingModalAnnotatingFn(),
+        ids_path=update_grounding_ids_path,
     )
 
     print(f"Finished healing")

@@ -75,7 +75,6 @@ def hard_coded_dataset_info_extraction_tfds(dataset_info: DatasetInfo) -> dict:
         match = re.search(r"year\s*=\s*\{(\d{4})\}", dataset_info.citation)
         if match:
             year = int(match.group(1))
-    # TODO: can also get month, try to be a bit more precise
 
     return {"rollout": {"dataset_name": dataset_info.name, "creation_time": year}}
 

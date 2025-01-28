@@ -278,12 +278,6 @@ def pydantic_to_field_instructions(
             field_info = f"{prefix}{field_name}: {str(field.annotation)}"
             if field.description:
                 field_info += f" - {field.description}"
-
-            # TODO: add more metadata! we can support
-            # - str fields: min length, max length
-            # - numeric fields: gt, ge, lt, le, multiple_of
-            # - list fields: min length, max length, unique
-            # - enum fields! e.g. LightingConditions
             if field.metadata:
                 for meta in field.metadata:
                     if hasattr(meta, "pattern"):

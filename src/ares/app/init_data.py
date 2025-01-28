@@ -213,7 +213,7 @@ def display_state_info() -> None:
                 st.session_state.annotation_db_stats = (
                     st.session_state.annotations_db.get_database_stats()
                 )
-            st.json(st.session_state.annotation_db_stats)
+            st.json(st.session_state.annotation_db_stats, expanded=False)
 
         # Embeddings Info
         st.subheader("Embedding Data")

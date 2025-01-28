@@ -15,8 +15,8 @@ from ares.databases.structured_database import (
 )
 from ares.models.extractor import VLMInformationExtractor
 from ares.models.shortcuts import get_gpt_4o_mini, get_nomic_embedder
-from scripts.run_grounding_annotation_with_modal import app as modal_app
-from scripts.run_grounding_annotation_with_modal import run_modal_grounding
+from scripts.annotating.annotation_base import orchestrate_annotating
+from scripts.annotating.run_grounding import GroundingModalAnnotatingFn
 from scripts.run_structured_ingestion import (
     build_dataset,
     run_structured_database_ingestion,
@@ -50,17 +50,17 @@ if __name__ == "__main__":
             dataset_info["Split"] = split
 
             # run structured ingestion
-            new_rollout_ids = None
-            # fails, new_rollout_ids = asyncio.run(
-            #     run_structured_database_ingestion(
-            #         ds,
-            #         dataset_info,
-            #         dataset_formalname,
-            #         vlm_name,
-            #         engine,
-            #         dataset_filename,
-            #     )
-            # )
+            # new_rollout_ids = None
+            fails, new_rollout_ids = asyncio.run(
+                run_structured_database_ingestion(
+                    ds,
+                    dataset_info,
+                    dataset_formalname,
+                    vlm_name,
+                    engine,
+                    dataset_filename,
+                )
+            )
 
             # # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
             # # to db and videos to disk then reconstitute rollouts for indexing!
@@ -74,4 +74,9 @@ if __name__ == "__main__":
             )
 
             # run grounding annotation with modal
-            # run_modal_grounding(engine_path=ROBOT_DB_PATH, ann_db_path=ANNOTATION_DB_PATH, rollout_ids=[r.id for r in rollouts])
+            orchestrate_annotating(
+                engine_path=ROBOT_DB_PATH,
+                ann_db_path=ANNOTATION_DB_PATH,
+                annotating_fn=GroundingModalAnnotatingFn(),
+                rollout_ids=[r.id for r in rollouts],
+            )

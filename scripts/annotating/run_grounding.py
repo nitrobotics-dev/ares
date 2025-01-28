@@ -1,33 +1,19 @@
 """
-Orchestration script to run grounding annotation using Modal.
+Orchestration script to run grounding annotations using Modal.
 """
 
 import asyncio
 import os
-import pickle
-import time
 import traceback
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from tqdm import tqdm
 
 from ares.configs.base import Rollout
-from ares.constants import (
-    ARES_DATA_DIR,
-    DATASET_NAMES,
-    OUTER_BATCH_SIZE,
-    get_dataset_info_by_key,
-)
+from ares.constants import ANNOTATION_OUTER_BATCH_SIZE
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
-from ares.databases.structured_database import (
-    ROBOT_DB_PATH,
-    RolloutSQLModel,
-    get_rollouts_by_ids,
-    setup_database,
-    setup_rollouts,
-)
+from ares.databases.structured_database import ROBOT_DB_PATH
 from ares.models.base import VLM
 from ares.models.grounding import ANNOTATION_GROUNDING_FPS
 from ares.models.grounding_utils import get_grounding_nouns_async
@@ -35,43 +21,13 @@ from ares.models.refusal import check_refusal
 from ares.models.shortcuts import get_gpt_4o
 from ares.utils.image_utils import load_video_frames
 
+from .annotation_base import (
+    AnnotatingFn,
+    ErrorResult,
+    ResultTracker,
+    orchestrate_annotating,
+)
 from .modal_grounding import GroundingModalWrapper
-
-FAILURES_PATH = os.path.join(ARES_DATA_DIR, "failures.pkl")
-
-
-@dataclass
-class ErrorResult:
-    rollout_id: str
-    error_pattern: str
-    error: str
-
-
-@dataclass
-class ResultTracker:
-    videos: int = 0
-    frames: int = 0
-    annotations: int = 0
-    video_ids: List[str] = field(default_factory=list)
-
-    def update_via_batch(
-        self, n_videos: int, n_frames: int, n_annotations: int, video_ids: List[str]
-    ):
-        self.videos += n_videos
-        self.frames += n_frames
-        self.annotations += n_annotations
-        self.video_ids.extend(video_ids)
-
-    def update_tracker(self, tracker: "ResultTracker"):
-        self.videos += tracker.videos
-        self.frames += tracker.frames
-        self.annotations += tracker.annotations
-        self.video_ids.extend(tracker.video_ids)
-
-    def print_stats(self):
-        print(
-            f"Processed {self.videos} videos, {self.frames} frames, {len(self.video_ids)} videos with annotations"
-        )
 
 
 async def run_annotate_and_ingest(
@@ -248,138 +204,61 @@ async def run_ground_and_annotate(
     return tracker, failures
 
 
-def setup_rollouts(
-    engine, rollout_ids, retry_failed_path, dataset_filename, split
-) -> List[Rollout]:
-    if retry_failed_path:
-        if retry_failed_path.endswith(".pkl"):
-            with open(retry_failed_path, "rb") as f:
-                failures = pickle.load(f)
-            failed_ids = [str(f["rollout_id"]) for f in failures]
-            return get_rollouts_by_ids(engine, failed_ids)
-        elif retry_failed_path.endswith(".txt"):
-            with open(retry_failed_path, "r") as f:
-                failed_ids = [line.strip() for line in f.readlines()]
-            return get_rollouts_by_ids(engine, failed_ids)
-        else:
-            raise ValueError(f"Unknown file type: {retry_failed_path}")
-    elif rollout_ids:
-        return get_rollouts_by_ids(engine, rollout_ids)
-    else:
-        dataset_info = get_dataset_info_by_key("dataset_filename", dataset_filename)
-        if not dataset_info:
-            print(f"Dataset filename {dataset_filename} not found.")
-            return
-        dataset_formalname = dataset_info["dataset_formalname"]
-        rollouts = setup_rollouts(engine, dataset_formalname)
-        if split:
-            rollouts = [r for r in rollouts if r.split == split]
-    return rollouts
+class GroundingModalAnnotatingFn(AnnotatingFn):
+    def __call__(
+        self,
+        rollouts: List[Rollout],
+        ann_db: AnnotationDatabase,
+        outer_batch_size: int,
+        annotation_fps: int,
+    ):
+        """
+        Main function to run grounding annotation using Modal.
+        """
+        # initialize objects for batches
+        overall_tracker = ResultTracker()
+        overall_failures = []
 
-
-def orchestrate_grounding_batch(
-    rollouts: List[Rollout],
-    ann_db: AnnotationDatabase,
-    outer_batch_size: int,
-    annotation_fps: int,
-):
-    # initialize objects for batches
-    overall_tracker = ResultTracker()
-    overall_failures = []
-
-    annotator = GroundingModalWrapper()
-    with annotator.app.run():
-        # Limited by CPU RAM (can't create all requests at once)
-        for i in tqdm(
-            range(0, len(rollouts), outer_batch_size), desc="Processing outer batches"
-        ):
-            print(
-                f"Processing batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"
-            )
-            vlm = get_gpt_4o()
-            rollouts_batch = rollouts[i : i + outer_batch_size]
-            tracker, failures = asyncio.run(
-                run_ground_and_annotate(
-                    rollouts_batch,
-                    vlm,
-                    ann_db,
-                    annotator,
-                    annotation_fps,
+        annotator = GroundingModalWrapper()
+        with annotator.app.run():
+            # Limited by CPU RAM (can't create all requests at once)
+            for i in tqdm(
+                range(0, len(rollouts), outer_batch_size),
+                desc="Processing outer batches",
+            ):
+                print(
+                    f"Processing batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"
                 )
-            )
-            print(
-                f"Completed batch {i // outer_batch_size + 1} of {max(1, len(rollouts) // outer_batch_size)}"
-            )
-            overall_tracker.update_tracker(tracker)
-            overall_failures.extend(failures)
-    return overall_tracker, overall_failures
-
-
-def run_modal_grounding(
-    engine_path: str,
-    ann_db_path: str,
-    dataset_filename: str | None = None,
-    split: str | None = None,
-    rollout_ids: List[str] | None = None,
-    outer_batch_size: int = OUTER_BATCH_SIZE,  # RAM limits number of concurrent rollouts formatted into requests
-    retry_failed_path: str = None,  # Path to pickle file with failures to retry
-    annotation_fps: int = ANNOTATION_GROUNDING_FPS,
-) -> None:
-    """
-    Main function to run grounding annotation using Modal.
-
-    Args:
-        engine_path (str): Path to the database engine.
-        ann_db_path (str): Path to the annotation database.
-        dataset_filename (str, optional): Dataset filename.
-        split (str, optional): Data split.
-        rollout_ids (List[str], optional): Specific rollout IDs to process.
-        outer_batch_size (int, optional): Batch size for processing rollouts.
-        retry_failed_path (str, optional): Path to retry failed annotations.
-        annotation_fps (int, optional): Frames per second for annotation.
-    """
-    assert (
-        dataset_filename is not None
-        or retry_failed_path is not None
-        or rollout_ids is not None
-    ), f"Must provide either dataset_filename, retry_failed_path, or rollout_ids. Received: dataset_filename={dataset_filename}, retry_failed_path={retry_failed_path}, rollout_ids={rollout_ids}"
-
-    # Initialize databases
-    ann_db = AnnotationDatabase(connection_string=ann_db_path)
-    engine = setup_database(RolloutSQLModel, path=engine_path)
-    rollouts = setup_rollouts(
-        engine, rollout_ids, retry_failed_path, dataset_filename, split
-    )
-    print(f"\n\nFound {len(rollouts)} total rollouts\n\n")
-    if not rollouts:
-        print(
-            f"No rollouts found for dataset filename {dataset_filename}, retry failed path {retry_failed_path}"
-        )
-        return
-
-    tic = time.time()
-    overall_tracker, overall_failures = orchestrate_grounding_batch(
-        rollouts, ann_db, outer_batch_size, annotation_fps
-    )
-    print(f"\n\nFailures: {overall_failures}\n\n")
-
-    # Write failures to file to retry
-    with open(FAILURES_PATH, "wb") as f:
-        pickle.dump(overall_failures, f)
-
-    print("Time taken:", time.time() - tic)
-    print(f"\n\n")
-    overall_tracker.print_stats()
-    print(f"\nNumber of failures: {len(overall_failures)}")
+                vlm = get_gpt_4o()
+                rollouts_batch = rollouts[i : i + outer_batch_size]
+                tracker, failures = asyncio.run(
+                    run_ground_and_annotate(
+                        rollouts_batch,
+                        vlm,
+                        ann_db,
+                        annotator,
+                        annotation_fps,
+                    )
+                )
+                print(
+                    f"Completed batch {i // outer_batch_size + 1} of {max(1, len(rollouts) // outer_batch_size)}"
+                )
+                overall_tracker.update_tracker(tracker)
+                overall_failures.extend(failures)
+        return overall_tracker, overall_failures
 
 
 if __name__ == "__main__":
-    fails_path = (
+    ids_path = (
         "/workspaces/ares/data/heal_info/2025-01-27_22-04-01/update_grounding_ids.txt"
     )
-    run_modal_grounding(
+    orchestrate_annotating(
         engine_path=ROBOT_DB_PATH,
         ann_db_path=ANNOTATION_DB_PATH,
-        retry_failed_path=fails_path,
-        outer_batch_size=100,
+        annotating_fn=GroundingModalAnnotatingFn(),
+        ids_path=ids_path,
+        outer_batch_size=ANNOTATION_OUTER_BATCH_SIZE,
+        annotating_kwargs=dict(
+            annotation_fps=ANNOTATION_GROUNDING_FPS,
+        ),
     )
