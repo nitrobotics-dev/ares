@@ -142,7 +142,7 @@ def display_video_grid(
     n_videos = min(max_videos, len(filtered_df))
     video_cols = st.columns(n_videos)
 
-    for i, (_, row) in enumerate(filtered_df.sample(n_videos).iterrows()):
+    for i, (_, row) in enumerate(filtered_df.head(n_videos).iterrows()):
         with video_cols[i]:
             display_video_card(dict(row), lazy_load=lazy_load, key=f"video_card_{i}")
 
@@ -263,7 +263,7 @@ def get_video_annotation_data(video_id: str) -> dict | None:
     # Get all annotations for this video
     annotations: dict[int, list[Annotation]] = (
         st.session_state.annotations_db.get_annotations(
-            video_id, annotation_type="detection", frame=None
+            video_id, annotation_type=None, frame=None
         )
     )
     return {"video_data": video_data, "annotations": annotations}
@@ -315,7 +315,11 @@ def show_hero_display(
             else:
                 st.write(f"Failure episode!")
         with st.expander("Row Details", expanded=False):
-            st.json(row.to_dict())
+            json_repr = {
+                k: (v if len(str(v)) < 1000 else str(v)[:1000] + "...")
+                for k, v in sorted(row.to_dict().items(), key=lambda x: x[0])
+            }
+            st.json(json_repr)
 
         if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
             array_figs = generate_robot_array_plot_visualizations(
@@ -337,7 +341,8 @@ def show_hero_display(
                         f"No annotation data found for this video for {video_id}"
                     )
                 else:
-                    frame_inds = list(annotation_data.keys())
+                    detection_data = annotation_data.get("detection")
+                    frame_inds = list(detection_data.keys())
                     all_frame_paths = get_video_frames(
                         dataset, fname, n_frames=None, just_path=True
                     )
@@ -347,9 +352,7 @@ def show_hero_display(
                     )
                     annotated_frames = [
                         draw_annotations(frame, anns)
-                        for frame, anns in zip(
-                            selected_frames, annotation_data.values()
-                        )
+                        for frame, anns in zip(selected_frames, detection_data.values())
                     ]
                     with st.expander("Annotated Frames", expanded=False):
                         max_cols = 3
@@ -468,6 +471,10 @@ def generate_robot_array_plot_visualizations(
     figs = []
     for key in keys:
         name_key = row.dataset_name + "-" + row.robot_embodiment + "-" + key
+        if name_key not in all_vecs:
+            st.warning(f"No data found for name key {name_key}")
+            breakpoint()
+            continue
         these_vecs = all_vecs[name_key]
         these_scores = scores.get(name_key) if scores else None
 

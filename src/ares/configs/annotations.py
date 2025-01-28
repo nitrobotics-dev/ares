@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from pycocotools import mask as mask_utils
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 def rle_to_binary_mask(rle: dict) -> np.ndarray:
@@ -22,8 +22,13 @@ def binary_mask_to_rle(mask: np.ndarray) -> dict:
 
 
 class Annotation(BaseModel):
+    """
+    Base object to hold annotation data.
+    """
+
     # Core detection attributes
-    bbox: list[float]  # [x1, y1, x2, y2] / LTRBformat
+    description: str | None = None
+    bbox: list[float] | None = None  # [x1, y1, x2, y2] / LTRBformat
     category_id: int | None = None
     category_name: str | None = None
     # denotes confidence of the detection if float else None if ground truth
@@ -37,9 +42,24 @@ class Annotation(BaseModel):
     # Tracking and metadata
     track_id: Optional[int] = None
     attributes: Dict[str, Any] = Field(default_factory=dict)
+    annotation_type: str | None = None
 
     class Config:
         arbitrary_types_allowed = True
+
+    @model_validator(mode="after")
+    def sanity_check(self) -> "Annotation":
+        # some portion of the annotation must be present!
+        if (
+            self.description is None
+            and self.bbox is None
+            and self.segmentation is None
+            and self.attributes is None
+        ):
+            raise ValueError(
+                "Annotation must have at least one attribute; description, bbox, segmentation, or attributes"
+            )
+        return self
 
     @property
     def bbox_xyxy(self) -> tuple[float, float, float, float]:
@@ -55,11 +75,12 @@ class Annotation(BaseModel):
     # Add this validation method
     def model_post_init(self, __context: Any) -> None:
         """Validate bbox format after initialization."""
-        x1, y1, x2, y2 = self.bbox
-        if x1 > x2:
-            raise ValueError(f"Invalid bbox: x1 ({x1}) must be <= x2 ({x2})")
-        if y1 > y2:
-            raise ValueError(f"Invalid bbox: y1 ({y1}) must be <= y2 ({y2})")
+        if self.bbox is not None:
+            x1, y1, x2, y2 = self.bbox
+            if x1 > x2:
+                raise ValueError(f"Invalid bbox: x1 ({x1}) must be <= x2 ({x2})")
+            if y1 > y2:
+                raise ValueError(f"Invalid bbox: y1 ({y1}) must be <= y2 ({y2})")
 
     @property
     def mask(self) -> np.ndarray | None:

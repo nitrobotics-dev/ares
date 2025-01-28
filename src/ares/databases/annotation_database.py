@@ -96,9 +96,20 @@ class AnnotationDatabase:
         if frame is not None:
             query["frame"] = frame
         anns = list(self.annotations.find(query))
-        output = defaultdict(list)
+        output = dict()
+        # outputs tiered by type and then frame
         for ann in anns:
-            output[ann["frame"]].append(Annotation.from_dict(ann["value"]))
+            ann_dict = ann["value"]
+            if "annotation_type" not in ann_dict:
+                ann_dict["annotation_type"] = ann["type"]
+            if ann["frame"] is not None:
+                if ann["type"] not in output:
+                    output[ann["type"]] = defaultdict(list)
+                output[ann["type"]][ann["frame"]].append(Annotation.from_dict(ann_dict))
+            else:
+                if ann["type"] not in output:
+                    output[ann["type"]] = list()
+                output[ann["type"]].append(Annotation.from_dict(ann_dict))
         return output
 
     def add_frame_annotations(
@@ -253,11 +264,19 @@ class AnnotationDatabase:
             "video_path": video_path,
             "num_frames": len(frames),
             "frame_indices": frame_indices,
-            "label_str": label_str,
         }
 
         # Add video metadata
         self.add_video(video_id, metadata)
+
+        # Add grounding string annotation
+        self.add_annotation(
+            video_id=video_id,
+            key="nouns",
+            value=label_str,
+            annotation_type="grounding_string",
+            frame=None,
+        )
 
         # Add annotations for each frame
         for frame_idx, frame_annotations in enumerate(annotations):
@@ -274,19 +293,33 @@ class AnnotationDatabase:
         self.delete_video(video_id)
         self.delete_annotations(video_id)
 
-    def peek_database(self, limit: int = 5) -> Dict[str, List[Dict[str, Any]]]:
+    def peek_database(self, limit: int = 5) -> Dict[str, Any]:
         """Preview entries from both videos and annotations collections.
 
         Args:
             limit: Number of entries to return from each collection
 
         Returns:
-            Dictionary containing sample entries from both collections
+            Dictionary containing sample entries from both collections and examples per annotation type
         """
-        return {
+        # Get sample entries
+        samples = {
             "videos": list(self.videos.find().limit(limit)),
             "annotations": list(self.annotations.find().limit(limit)),
         }
+
+        # Get examples for each annotation type
+        pipeline = [
+            {"$group": {"_id": "$type", "examples": {"$push": "$$ROOT"}}},
+            {"$project": {"examples": {"$slice": ["$examples", limit]}}},
+        ]
+
+        type_examples = list(self.annotations.aggregate(pipeline))
+        samples["annotation_types"] = {
+            stat["_id"]: stat["examples"] for stat in type_examples
+        }
+
+        return samples
 
     def get_video_ids(self) -> List[str]:
         return list(self.videos.find().distinct("_id"))
@@ -326,7 +359,7 @@ if __name__ == "__main__":
 
     # Preview database contents
     stats = db.get_database_stats()
-    # preview = db.peek_database(limit=5)
+    preview = db.peek_database(limit=10000)
     # breakpoint()
     # print("\nVideo samples:")
     # for video in preview["videos"]:

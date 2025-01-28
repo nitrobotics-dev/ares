@@ -5,7 +5,8 @@ We construct a training artifact in order to derisk loading errors and avoid mas
 
 See ares/train/README.md for more details and ares/train/train.py for how to use the preprocessed artifact.
 
-Preprocess assums a list of IDs have been selected via curation on the ARES platform.
+Preprocess assumes a list of IDs have been selected via curation on the ARES platform.
+Extra info cols could be "grounding_string", "detections", "embodied_cot", etc.
 
 Example usage:
     python preprocess.py --ids_df_path path/to/ids.csv --extra_info_cols col1 --extra_info_cols col2 --output_path output.parquet

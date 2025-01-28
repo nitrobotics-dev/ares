@@ -199,7 +199,10 @@ def main() -> None:
     with filter_error_context(section_video_grid), timer_context(section_video_grid):
         # show video cards of first 5 rows in a horizontal layout
         st.header("Rollout Examples")
-        display_video_grid(filtered_df, lazy_load=True)
+        n_videos = 5
+        rows = {k: v.head(1) for k, v in filtered_df.groupby("dataset_name")}
+        display_df = pd.concat(rows.values())
+        display_video_grid(display_df, lazy_load=True)
     st.divider()
 
     section_plot_hero = "plot hero display"
