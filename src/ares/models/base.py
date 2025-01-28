@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import os
 import time
 import typing as t
@@ -129,10 +130,6 @@ class VLM:
                 raise NotImplementedError("Video path not implemented for this VLM")
             messages = self._construct_messages(
                 info, prompt_filename, images, double_prompt
-            )
-            print(
-                f"submitting async request to {self.name}"
-                + (f" with {len(images)} images" if images else "")
             )
             return messages, await self._make_api_call(messages, model_kwargs)
 
@@ -284,3 +281,11 @@ class SentenceTransformerEmbedder(Embedder):
             raise ValueError("Input must be a string for SentenceTransformerEmbedder")
         prefix = "clustering: "
         return np.array(self.model.encode(prefix + inp))
+
+
+def parse_response(choice: dict, load_json: bool = False) -> dict:
+    content = choice.message.content
+    if load_json:
+        content = content.strip().removeprefix("```json").removesuffix("```").strip()
+        content = json.loads(content) if isinstance(content, str) else content
+    return content

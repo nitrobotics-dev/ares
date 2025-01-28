@@ -1,3 +1,5 @@
+from typing import Callable
+
 from ares.models.base import VLM, Embedder, SentenceTransformerEmbedder
 
 
@@ -59,7 +61,7 @@ name_to_vlm_fn_mapping = {
 }
 
 
-def get_all_vlm_fns() -> dict[str, VLM]:
+def get_all_vlm_fns() -> dict[str, Callable[[], VLM]]:
     return name_to_vlm_fn_mapping
 
 

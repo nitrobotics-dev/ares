@@ -171,6 +171,9 @@ def execute_heal(time_dir: str):
         ann_db_path=ANNOTATION_DB_PATH,
         annotating_fn=GroundingModalAnnotatingFn(),
         ids_path=update_grounding_ids_path,
+        failures_path=os.path.join(
+            ARES_DATA_DIR, "annotating_failures", f"heal_failures_{time_dir}.pkl"
+        ),
     )
 
     print(f"Finished healing")

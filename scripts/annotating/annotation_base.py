@@ -14,25 +14,13 @@ from ares.constants import (
     DATASET_NAMES,
     get_dataset_info_by_key,
 )
-from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
+from ares.databases.annotation_database import AnnotationDatabase
 from ares.databases.structured_database import (
-    ROBOT_DB_PATH,
     RolloutSQLModel,
     get_rollouts_by_ids,
     setup_database,
     setup_rollouts,
 )
-from ares.models.base import VLM
-from ares.models.grounding import ANNOTATION_GROUNDING_FPS
-from ares.models.grounding_utils import get_grounding_nouns_async
-from ares.models.refusal import check_refusal
-from ares.models.shortcuts import get_gpt_4o
-from ares.utils.image_utils import load_video_frames
-
-from .annotation_base import ErrorResult, ResultTracker, setup_rollouts
-from .modal_grounding import GroundingModalWrapper
-
-FAILURES_PATH = os.path.join(ARES_DATA_DIR, "failures.pkl")
 
 
 @dataclass
@@ -69,14 +57,24 @@ class ResultTracker:
         )
 
 
-def setup_rollouts(
+def setup_rollouts_from_sources(
     engine: Engine,
-    rollout_ids: List[str],
-    ids_path: str,
-    dataset_filename: str,
-    split: str,
+    rollout_ids: List[str] | None = None,
+    ids_path: str | None = None,
+    dataset_filename: str | None = None,
+    split: str | None = None,
 ) -> List[Rollout]:
+    """
+    Helper function to setup rollouts from a variety of sources.
+    """
+    assert (
+        ids_path or rollout_ids or dataset_filename
+    ), f"Must provide either ids_path, rollout_ids, or dataset_filename. Received: ids_path={ids_path}, rollout_ids={rollout_ids}, dataset_filename={dataset_filename}"
+
     if ids_path:
+        # load rollouts from a file path
+        # - a pickle implies a list of failed rollout dictionaries
+        # - a txt implies a list of rollout IDs directly
         if ids_path.endswith(".pkl"):
             with open(ids_path, "rb") as f:
                 failures = pickle.load(f)
@@ -89,20 +87,26 @@ def setup_rollouts(
         else:
             raise ValueError(f"Unknown file type: {ids_path}")
     elif rollout_ids:
+        # load rollouts from a list of IDs
         return get_rollouts_by_ids(engine, rollout_ids)
     else:
+        # load rollouts from a dataset filename
         dataset_info = get_dataset_info_by_key("dataset_filename", dataset_filename)
         if not dataset_info:
-            print(f"Dataset filename {dataset_filename} not found.")
-            return
+            raise ValueError(f"Dataset filename {dataset_filename} not found.")
         dataset_formalname = dataset_info["dataset_formalname"]
-        rollouts = setup_rollouts(engine, dataset_formalname)
+        rollouts = setup_rollouts(engine, dataset_formalname=dataset_formalname)
         if split:
             rollouts = [r for r in rollouts if r.split == split]
     return rollouts
 
 
 class AnnotatingFn(Protocol):
+    """
+    Compute primitive to annotate rollouts. AnnotatingFns should conduct their annotation in batches,
+    whether via API, Modal, local, etc.
+    """
+
     def __call__(
         self,
         rollouts: List[Rollout],
@@ -122,7 +126,8 @@ def orchestrate_annotating(
     outer_batch_size: int = ANNOTATION_OUTER_BATCH_SIZE,  # RAM limits number of concurrent rollouts formatted into requests
     ids_path: str = None,  # Path to ids to load; may be failed IDs from previous run
     annotating_kwargs: dict | None = None,
-) -> None:
+    failures_path: str | None = None,
+) -> tuple[ResultTracker, List[ErrorResult]]:
     """
     Main function to run grounding annotation using Modal.
 
@@ -145,7 +150,9 @@ def orchestrate_annotating(
     # Initialize databases
     ann_db = AnnotationDatabase(connection_string=ann_db_path)
     engine = setup_database(RolloutSQLModel, path=engine_path)
-    rollouts = setup_rollouts(engine, rollout_ids, ids_path, dataset_filename, split)
+    rollouts = setup_rollouts_from_sources(
+        engine, rollout_ids, ids_path, dataset_filename, split
+    )
     print(f"\n\nFound {len(rollouts)} total rollouts\n\n")
     if not rollouts:
         print(
@@ -160,10 +167,14 @@ def orchestrate_annotating(
     print(f"\n\nFailures: {overall_failures}\n\n")
 
     # Write failures to file to retry
-    with open(FAILURES_PATH, "wb") as f:
-        pickle.dump(overall_failures, f)
+    if failures_path and len(overall_failures) > 0:
+        os.makedirs(os.path.dirname(failures_path), exist_ok=True)
+        print(f"Writing failures to {failures_path}")
+        with open(failures_path, "wb") as f:
+            pickle.dump(overall_failures, f)
 
     print("Time taken:", time.time() - tic)
     print(f"\n\n")
     overall_tracker.print_stats()
     print(f"\nNumber of failures: {len(overall_failures)}")
+    return overall_tracker, overall_failures

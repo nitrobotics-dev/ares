@@ -11,7 +11,7 @@ import numpy as np
 from tqdm import tqdm
 
 from ares.configs.base import Rollout
-from ares.constants import ANNOTATION_OUTER_BATCH_SIZE
+from ares.constants import ANNOTATION_OUTER_BATCH_SIZE, ARES_DATA_DIR
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 from ares.databases.structured_database import ROBOT_DB_PATH
 from ares.models.base import VLM
@@ -162,7 +162,7 @@ async def setup_query(
         return ErrorResult(
             rollout_id=rollout.id,
             error_pattern="grounding_request_failure",
-            error=f"Refusal phrase triggered: '{label_str}' with refusal phrases {refusal_phrases}",
+            error=f"Refusal phrase triggered: '{label_str}'",
         )
     return rollout.id, frames, frame_indices, label_str
 
@@ -210,7 +210,7 @@ class GroundingModalAnnotatingFn(AnnotatingFn):
         rollouts: List[Rollout],
         ann_db: AnnotationDatabase,
         outer_batch_size: int,
-        annotation_fps: int,
+        annotation_fps: int = ANNOTATION_GROUNDING_FPS,
     ):
         """
         Main function to run grounding annotation using Modal.
@@ -229,6 +229,7 @@ class GroundingModalAnnotatingFn(AnnotatingFn):
                 print(
                     f"Processing batch {i // outer_batch_size + 1} of {len(rollouts) // outer_batch_size}"
                 )
+                # create VLM outside async as semaphore gets "bound" to async context
                 vlm = get_gpt_4o()
                 rollouts_batch = rollouts[i : i + outer_batch_size]
                 tracker, failures = asyncio.run(
@@ -260,5 +261,8 @@ if __name__ == "__main__":
         outer_batch_size=ANNOTATION_OUTER_BATCH_SIZE,
         annotating_kwargs=dict(
             annotation_fps=ANNOTATION_GROUNDING_FPS,
+        ),
+        failures_path=os.path.join(
+            ARES_DATA_DIR, "annotating_failures", f"grounding_failures.pkl"
         ),
     )

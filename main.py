@@ -1,10 +1,8 @@
 import asyncio
-import pickle
-
-import tensorflow_datasets as tfds
+import os
 
 from ares.configs.open_x_embodiment_configs import get_dataset_information
-from ares.constants import ARES_OXE_DIR, DATASET_NAMES
+from ares.constants import ARES_DATA_DIR, ARES_OXE_DIR, DATASET_NAMES
 from ares.databases.annotation_database import ANNOTATION_DB_PATH
 from ares.databases.embedding_database import EMBEDDING_DB_PATH
 from ares.databases.structured_database import (
@@ -13,8 +11,7 @@ from ares.databases.structured_database import (
     setup_database,
     setup_rollouts,
 )
-from ares.models.extractor import VLMInformationExtractor
-from ares.models.shortcuts import get_gpt_4o_mini, get_nomic_embedder
+from ares.models.shortcuts import get_nomic_embedder
 from scripts.annotating.annotation_base import orchestrate_annotating
 from scripts.annotating.run_grounding import GroundingModalAnnotatingFn
 from scripts.run_structured_ingestion import (
@@ -79,4 +76,9 @@ if __name__ == "__main__":
                 ann_db_path=ANNOTATION_DB_PATH,
                 annotating_fn=GroundingModalAnnotatingFn(),
                 rollout_ids=[r.id for r in rollouts],
+                failures_path=os.path.join(
+                    ARES_DATA_DIR,
+                    "annotating_failures",
+                    f"grounding_{dataset_filename}_{split}.pkl",
+                ),
             )
