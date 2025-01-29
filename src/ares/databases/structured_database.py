@@ -278,6 +278,9 @@ if __name__ == "__main__":
     scores = {k: (len(v), v.path.nunique()) for k, v in df.groupby("dataset_name")}
     failed_unique = {k: v for k, v in scores.items() if v[0] != v[1]}
     print(f"failed unique! {failed_unique}")
+
+    first_id = df.iloc[0].id
+    first_rollout = get_rollouts_by_ids(engine, [first_id])[0]
     breakpoint()
 
     # breakpoint()

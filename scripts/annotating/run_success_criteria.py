@@ -6,12 +6,16 @@ from typing import List, Tuple
 
 from tqdm import tqdm
 
+from ares.annotating.annotating_base import ErrorResult, ResultTracker
+from ares.annotating.annotating_fn import APIAnnotatingFn
+from ares.annotating.orchestration import orchestrate_annotating
 from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
 from ares.constants import (
     ANNOTATION_GROUNDING_FPS,
     ANNOTATION_OUTER_BATCH_SIZE,
     ARES_DATA_DIR,
+    DATASET_NAMES,
 )
 from ares.databases.annotation_database import (
     ANNOTATION_DB_PATH,
@@ -22,14 +26,6 @@ from ares.databases.structured_database import ROBOT_DB_PATH, RolloutSQLModel
 from ares.models.base import VLM, parse_response
 from ares.models.shortcuts import get_vlm
 from ares.utils.image_utils import load_video_frames
-
-from .annotating_base import (
-    AnnotatingFn,
-    APIAnnotatingFn,
-    ErrorResult,
-    ResultTracker,
-    orchestrate_annotating,
-)
 
 
 class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
@@ -74,8 +70,6 @@ class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
 
 
 if __name__ == "__main__":
-    from ares.constants import DATASET_NAMES
-
     overall_tracker = ResultTracker()
     overall_failures = []
 

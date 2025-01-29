@@ -5,34 +5,23 @@ See original code https://github.com/MichalZawalski/embodied-CoT/blob/main/scrip
 We utilize the `grounding_string`, `detections`, and `success_criteria` annotations (see other annotating scripts!) + rollout fields to generate a pseudo-ECoT in a similar fashion.
 """
 
-import asyncio
 import os
 import traceback
-from pathlib import Path
-from typing import List, Tuple
 
-from tqdm import tqdm
-
+from ares.annotating.annotating_base import ErrorResult, ResultTracker
+from ares.annotating.annotating_fn import APIAnnotatingFn
+from ares.annotating.orchestration import orchestrate_annotating
 from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
-from ares.constants import ANNOTATION_OUTER_BATCH_SIZE, ARES_DATA_DIR
+from ares.constants import ANNOTATION_OUTER_BATCH_SIZE, ARES_DATA_DIR, DATASET_NAMES
 from ares.databases.annotation_database import (
     ANNOTATION_DB_PATH,
     AnnotationDatabase,
     get_video_id,
 )
-from ares.databases.structured_database import ROBOT_DB_PATH, RolloutSQLModel
+from ares.databases.structured_database import ROBOT_DB_PATH
 from ares.models.base import VLM, parse_response
-from ares.models.shortcuts import get_vlm
 from ares.utils.image_utils import load_video_frames
-
-from .annotating_base import (
-    AnnotatingFn,
-    APIAnnotatingFn,
-    ErrorResult,
-    ResultTracker,
-    orchestrate_annotating,
-)
 
 
 def construct_pseudo_ecot_info(rollout: Rollout, ann_db: AnnotationDatabase):
@@ -107,8 +96,6 @@ class PseudoECoTAnnotatingFn(APIAnnotatingFn):
 
 
 if __name__ == "__main__":
-    from ares.constants import DATASET_NAMES
-
     overall_tracker = ResultTracker()
     overall_failures = []
 

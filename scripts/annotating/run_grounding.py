@@ -10,6 +10,10 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 from tqdm import tqdm
 
+from ares.annotating.annotating_base import ErrorResult, ResultTracker
+from ares.annotating.annotating_fn import AnnotatingFn
+from ares.annotating.modal_grounding import GroundingModalWrapper
+from ares.annotating.orchestration import orchestrate_annotating
 from ares.configs.base import Rollout
 from ares.constants import (
     ANNOTATION_GROUNDING_FPS,
@@ -23,14 +27,6 @@ from ares.models.grounding_utils import get_grounding_nouns_async
 from ares.models.refusal import check_refusal
 from ares.models.shortcuts import get_gpt_4o
 from ares.utils.image_utils import load_video_frames
-
-from .annotating_base import (
-    AnnotatingFn,
-    ErrorResult,
-    ResultTracker,
-    orchestrate_annotating,
-)
-from .modal_grounding import GroundingModalWrapper
 
 
 async def run_annotate_and_ingest(

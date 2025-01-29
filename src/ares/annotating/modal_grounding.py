@@ -6,8 +6,8 @@ from typing import List, Tuple
 
 from modal import enter, method
 
+from ares.annotating.modal_base import BaseModalWrapper, BaseWorker
 from ares.models.grounding import GroundingAnnotator
-from scripts.annotating.modal_base import BaseModalWrapper, BaseWorker
 
 
 class GroundingWorker(BaseWorker):

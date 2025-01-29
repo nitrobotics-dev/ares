@@ -26,7 +26,11 @@ from ares.app.plot_primitives import (
 )
 from ares.configs.annotations import Annotation
 from ares.databases.annotation_database import AnnotationDatabase
-from ares.databases.embedding_database import IndexManager, rollout_to_index_name
+from ares.databases.embedding_database import (
+    TRAJECTORY_INDEX_NAMES,
+    IndexManager,
+    rollout_to_index_name,
+)
 from ares.utils.image_utils import (
     choose_and_preprocess_frames,
     get_video_frames,
@@ -382,14 +386,13 @@ def show_hero_display(
     # Row 3: n tabs covering most similar based on state, action, text
     st.write(f"**Similarity Search**")
     st.write(f"Most similar examples to {row['id']}, based on:")
-
+    # TODO: ALSO DESCRIPTION
     text_distance_fn = "Levenshtein"
     text_data_key = "task_language_instruction"
     tab_names = [
-        f"Text - {text_distance_fn}",
-        f"Text - Embedding",
-        "State",
-        "Action",
+        f"Task - {text_distance_fn}",
+        f"Task - Embedding",
+        *TRAJECTORY_INDEX_NAMES,
     ]
 
     # some robotics datasets have lots of overlap, e.g. the same task instruction.
@@ -408,20 +411,16 @@ def show_hero_display(
         st.session_state[zero_distance_filter_key] = False
 
     # Get the similarity data
-    state_viz_data = create_embedding_similarity_visualization(
-        row,
-        name=rollout_to_index_name(row, "states"),
-        index_manager=index_manager,
-        n_most_similar=retrieve_n_most_similar,
-        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-    )
-    action_viz_data = create_embedding_similarity_visualization(
-        row,
-        name=rollout_to_index_name(row, "actions"),
-        index_manager=index_manager,
-        n_most_similar=retrieve_n_most_similar,
-        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-    )
+    trajectory_viz_data = [
+        create_embedding_similarity_visualization(
+            row,
+            name=rollout_to_index_name(row, k),
+            index_manager=index_manager,
+            n_most_similar=retrieve_n_most_similar,
+            filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
+        )
+        for k in TRAJECTORY_INDEX_NAMES
+    ]
     text_embedding_viz_data = create_embedding_similarity_visualization(
         row,
         name=text_data_key,
@@ -442,8 +441,7 @@ def show_hero_display(
     similarity_viz = [
         text_viz_data,
         text_embedding_viz_data,
-        state_viz_data,
-        action_viz_data,
+        *trajectory_viz_data,
     ]
 
     # Create the tabs with the data
@@ -470,7 +468,7 @@ def generate_robot_array_plot_visualizations(
         raise ValueError(
             f"Cannot provide both highlight_row and scores. Received highlight_row: {highlight_row}, scores: {scores}"
         )
-    keys = keys or ["states", "actions"]
+    keys = keys or TRAJECTORY_INDEX_NAMES
     figs = []
     for key in keys:
         name_key = row.dataset_name + "-" + row.robot_embodiment + "-" + key

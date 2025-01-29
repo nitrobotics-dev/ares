@@ -13,11 +13,13 @@ from pathlib import Path
 import click
 import pandas as pd
 
+from ares.annotating.orchestration import orchestrate_annotating
 from ares.constants import ARES_DATA_DIR
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 from ares.databases.embedding_database import (
     EMBEDDING_DB_PATH,
     META_INDEX_NAMES,
+    TRAJECTORY_INDEX_NAMES,
     FaissIndex,
     IndexManager,
     rollout_to_index_name,
@@ -30,7 +32,6 @@ from ares.databases.structured_database import (
     setup_database,
 )
 
-from .annotating.annotating_base import orchestrate_annotating
 from .annotating.run_grounding import GroundingModalAnnotatingFn
 from .run_trajectory_embedding_ingestion import (
     main as run_trajectory_embedding_ingestion,
@@ -72,7 +73,7 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
         )
         potential_index_names = [
             rollout_to_index_name(example_rollout, suffix)
-            for suffix in ["states", "actions"]
+            for suffix in TRAJECTORY_INDEX_NAMES
         ] + META_INDEX_NAMES  # description, task
         for index_name in potential_index_names:
             if index_name in HEALING_EXCEPTIONS.get(dataset_formalname, []):

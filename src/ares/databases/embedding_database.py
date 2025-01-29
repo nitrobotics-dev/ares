@@ -21,6 +21,7 @@ TEST_EMBEDDING_DB_PATH_2 = os.path.join(ARES_DATA_DIR, "tmp/test_embedding_data_
 
 TEST_TIME_STEPS = 100
 META_INDEX_NAMES = ["description_estimate", "task_language_instruction"]
+TRAJECTORY_INDEX_NAMES = ["states", "actions"]
 
 
 def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
@@ -29,23 +30,12 @@ def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
     return f"{rollout.dataset_formalname}-{rollout.robot.embodiment}-{suffix}"
 
 
-def rollout_to_embedding_pack(
-    rollout: Rollout | pd.Series,
-) -> Dict[str, np.ndarray | None]:
-    states = (
-        rollout.trajectory.states_array
-        if isinstance(rollout, Rollout)
-        else rollout["trajectory_states_array"]
-    )
-    actions = (
-        rollout.trajectory.actions_array
-        if isinstance(rollout, Rollout)
-        else rollout["trajectory_actions_array"]
-    )
-    return {
-        rollout_to_index_name(rollout, suffix="states"): states,
-        rollout_to_index_name(rollout, suffix="actions"): actions,
-    }
+def rollout_to_embedding_pack(rollout: Rollout) -> Dict[str, np.ndarray | None]:
+    pack = dict()
+    for key in TRAJECTORY_INDEX_NAMES:
+        val = getattr(rollout.trajectory, f"{key}_array", None)
+        pack[rollout_to_index_name(rollout, suffix=key)] = val
+    return pack
 
 
 class NormalizationTracker:
@@ -564,6 +554,7 @@ class IndexManager:
             raise ValueError(f"Index {name} does not exist")
 
         index = self.indices[name]
+        entry_id = str(entry_id)
         vector = index.get_vector_by_id(entry_id)
 
         if vector is None:
