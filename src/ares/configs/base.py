@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from pydantic import BaseModel, Field, model_validator
 
 PATTERN_EXTRA_CHOICES = "|other|unknown"
@@ -179,7 +180,12 @@ class Task(BaseConfig):
 
     @model_validator(mode="after")
     def check_success(self) -> "Task":
-        if self.success is not None and not 0 <= self.success <= 1:
+        if (
+            self.success is not None
+            and not np.isnan(self.success)
+            and not pd.isna(self.success)
+            and not 0 <= self.success <= 1
+        ):
             raise ValueError("Success must be between 0 and 1, inclusive")
         return self
 

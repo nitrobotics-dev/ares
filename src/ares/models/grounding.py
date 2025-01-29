@@ -10,8 +10,6 @@ from transformers import (
     AutoProcessor,
 )
 
-ANNOTATION_GROUNDING_FPS = 5
-
 
 class GroundingAnnotator:
     def __init__(

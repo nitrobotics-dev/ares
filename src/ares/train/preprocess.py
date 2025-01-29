@@ -15,52 +15,96 @@ Example usage:
     python preprocess.py --ids_df_path path/to/ids.csv -extra_info_cols col1 -extra_info_cols col2 --output_path output.parquet
 """
 
+import json
+import os
+from collections import defaultdict
+from pathlib import Path
+
 import click
+import pandas as pd
 from tqdm import tqdm
 
-from ares.databases.annotation_database import ANNOTATION_DB_PATH
+from ares.databases.annotation_database import (
+    ANNOTATION_DB_PATH,
+    AnnotationDatabase,
+    get_video_id,
+)
 from ares.databases.structured_database import (
     ROBOT_DB_PATH,
     RolloutSQLModel,
+    get_partial_df,
     get_rollouts_by_ids,
     setup_database,
 )
 
 
 @click.command()
-@click.option("--ids_df_path", type=str, help="Path to CSV file containing rollout IDs")
+@click.option("--output-path", type=str, help="Path to save the preprocessed artifact")
 @click.option(
-    "--extra_info_cols",
+    "--ids-df-path",
+    type=str,
+    help="Path to CSV file containing rollout IDs",
+    required=False,
+    default=None,
+)
+@click.option(
+    "--extra-info-cols",
     type=str,
     multiple=True,
-    help="Extra info columns to collect annotations for. Can be specified multiple times",
+    help="Extra info columns to collect annotations for. Can be specified multiple times for different columns",
+    required=False,
+    default=None,
 )
-@click.option("--output_path", type=str, help="Path to save the preprocessed artifact")
-def preprocess(ids_df_path: str, extra_info_cols: list[str], output_path: str):
-    ids_df = pd.read_csv(ids_df_path)
+def preprocess(
+    output_path: str, ids_df_path: str | None, extra_info_cols: list[str] | None
+):
+    engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
+
+    if ids_df_path:
+        ids_df = pd.read_csv(ids_df_path)
+    else:
+        ids_df = get_partial_df(engine, ["id"])
+
+    if extra_info_cols is None:
+        extra_info_cols = []
 
     # collect rollouts
-    engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     rollout_df = get_rollouts_by_ids(engine, ids_df.id.tolist(), return_df=True)
 
     # collect annotations from annotation database via extra_info_cols
-    ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
-    extra_info_cols_to_anns = defaultdict(list)
-    for col in extra_info_cols:
-        print(f"Collecting annotations for extra info col{col}")
-        for i, row in tqdm(
-            rollout_df.iterrows(), desc=f"Collecting annotations for {col}"
-        ):
-            video_path = str(Path(row["filename"]).with_suffix(".mp4"))
-            video_id = f"{row['dataset_filename']}/{video_path}"
-            anns = ann_db.get_annotations(video_id, annotation_type=col)
-            extra_info_cols_to_anns[col].append(json.dumps(anns))
+    if extra_info_cols:
+        ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
+        extra_info_cols_to_anns = defaultdict(list)
+        for col in extra_info_cols:
+            for _, row in tqdm(
+                rollout_df.iterrows(), desc=f"Collecting annotations for {col}"
+            ):
+
+                video_id = get_video_id(row["dataset_filename"], row["filename"])
+                anns = ann_db.get_annotations(video_id, annotation_type=col)
+                if col in anns:
+                    raw_anns = json.dumps(
+                        anns[col],
+                        default=lambda x: x.__json__() if hasattr(x, "__json__") else x,
+                    )
+                else:
+                    raw_anns = None
+                extra_info_cols_to_anns[col].append(raw_anns)
 
     # construct train df
-    train_df = pd.DataFrame(rollout_df)
+    train_df = rollout_df.copy()
+    # parquet doesnt like uuids, so we convert to str
+    train_df.id = train_df.id.astype(str)
     for col in extra_info_cols:
         train_df[col] = extra_info_cols_to_anns[col]
 
+    breakpoint()
+
     # save to parquet
     print(f"Saving to {output_path}")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     train_df.to_parquet(output_path)
+
+
+if __name__ == "__main__":
+    preprocess()

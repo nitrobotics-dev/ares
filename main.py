@@ -12,7 +12,7 @@ from ares.databases.structured_database import (
     setup_rollouts,
 )
 from ares.models.shortcuts import get_nomic_embedder
-from scripts.annotating.annotation_base import orchestrate_annotating
+from scripts.annotating.annotating_base import orchestrate_annotating
 from scripts.annotating.run_grounding import GroundingModalAnnotatingFn
 from scripts.run_structured_ingestion import (
     build_dataset,

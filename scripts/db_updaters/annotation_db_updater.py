@@ -4,8 +4,7 @@ from ares.configs.annotations import Annotation
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 
 
-def migrate_nouns_to_annotation_objects():
-    """Migrate 'nouns' annotations from plain strings to Annotation objects."""
+def migrate():
     db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
 
     # Get all videos
@@ -14,14 +13,14 @@ def migrate_nouns_to_annotation_objects():
 
     for video_id in tqdm(video_ids):
         # Get annotations for this video
-        annotations = db.get_annotations(video_id, annotation_type="grounding_string")
-        if not annotations or "grounding_string" not in annotations:
-            print(f"Skipping {video_id} - no grounding_string annotations found")
+        annotations = db.get_annotations(video_id, annotation_type="success_criteria")
+        if not annotations or "success_criteria" not in annotations:
+            print(f"Skipping {video_id} - no success_criteria annotations found")
             continue
 
         # Get the original string from the list of annotations
         string_value = None
-        for ann in annotations["grounding_string"]:
+        for ann in annotations["success_criteria"]:
             if isinstance(ann, str):
                 string_value = ann
                 break
@@ -32,18 +31,18 @@ def migrate_nouns_to_annotation_objects():
 
         # Create new Annotation object with the original string
         annotation_obj = Annotation(
-            description=string_value, annotation_type="grounding_string"
+            description=string_value, annotation_type="success_criteria"
         )
 
-        # Delete all existing grounding_string annotations for this video
-        db.delete_annotations(video_id, annotation_type="grounding_string")
+        # Delete all existing success_criteria annotations for this video
+        db.delete_annotations(video_id, annotation_type="success_criteria")
 
         # Add the new annotation
         db.add_annotation(
             video_id=video_id,
-            key="nouns",
+            key="string",
             value=annotation_obj.to_dict(),
-            annotation_type="grounding_string",
+            annotation_type="success_criteria",
             frame=None,
         )
 
@@ -53,4 +52,4 @@ def migrate_nouns_to_annotation_objects():
 
 
 if __name__ == "__main__":
-    migrate_nouns_to_annotation_objects()
+    migrate()

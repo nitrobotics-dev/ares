@@ -12,6 +12,12 @@ from ares.configs.annotations import Annotation
 ANNOTATION_DB_PATH = "mongodb://localhost:27017"
 
 
+def get_video_id(dataset_filename: str, video_path: str) -> str:
+    return (
+        f"{dataset_filename}/{Path(video_path.removeprefix('/')).with_suffix('.mp4')}"
+    )
+
+
 class AnnotationDatabase:
     def __init__(self, connection_string: str) -> None:
         self.client: MongoClient = MongoClient(connection_string)
@@ -97,7 +103,8 @@ class AnnotationDatabase:
             query["frame"] = frame
         anns = list(self.annotations.find(query))
         output = dict()
-        # outputs tiered by type and then frame
+
+        # outputs tiered by type and then frame if exists
         for ann in anns:
             ann_dict = ann["value"]
             if "annotation_type" not in ann_dict:
@@ -257,8 +264,7 @@ class AnnotationDatabase:
             video_id: Unique identifier for the video
         """
         # Create video metadata
-        video_path = str(Path(video_path).with_suffix(".mp4"))
-        video_id = f"{dataset_filename}/{video_path}"
+        video_id = get_video_id(dataset_filename, video_path)
         metadata = {
             "dataset_filename": dataset_filename,
             "video_path": video_path,
@@ -273,7 +279,7 @@ class AnnotationDatabase:
         self.add_annotation(
             video_id=video_id,
             key="nouns",
-            value=label_str,
+            value=Annotation(description=label_str, annotation_type="grounding_string"),
             annotation_type="grounding_string",
             frame=None,
         )

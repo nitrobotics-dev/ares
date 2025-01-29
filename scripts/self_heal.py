@@ -30,7 +30,7 @@ from ares.databases.structured_database import (
     setup_database,
 )
 
-from .annotating.annotation_base import orchestrate_annotating
+from .annotating.annotating_base import orchestrate_annotating
 from .annotating.run_grounding import GroundingModalAnnotatingFn
 from .run_trajectory_embedding_ingestion import (
     main as run_trajectory_embedding_ingestion,

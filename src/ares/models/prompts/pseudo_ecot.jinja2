@@ -1,0 +1,11 @@
+Your goal is to create a plan for a robot to complete a task given an image and information about the task.
+
+Information about the task:
+- The overarching task is: {{ task }}, which is a {{ complexity_category_estimate }} task.
+- The environment contains the following objects that relate to the task: {{ grounding_string }}
+{% if detections %}- These objects have the following positions in the environment: {{ detections }}{% endif %}
+- The success criteria for the task are: {{ success_criteria }}
+
+Following the image below, output a plan for the robot to complete the task. 
+Think carefully and look carefully at the image and the information above.
+Your response should be a well-reasoned and detailed plan for the robot to complete the task.

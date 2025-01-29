@@ -28,7 +28,7 @@ class Annotation(BaseModel):
 
     # Core detection attributes
     description: str | None = None
-    bbox: list[float] | None = None  # [x1, y1, x2, y2] / LTRBformat
+    bbox: list[float] | None = None  # [x1, y1, x2, y2] / LTRB format
     category_id: int | None = None
     category_name: str | None = None
     # denotes confidence of the detection if float else None if ground truth
@@ -44,8 +44,14 @@ class Annotation(BaseModel):
     attributes: Dict[str, Any] = Field(default_factory=dict)
     annotation_type: str | None = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {
+            np.ndarray: lambda x: x.tolist(),
+            np.integer: lambda x: int(x),
+            np.floating: lambda x: float(x),
+        },
+    }
 
     @model_validator(mode="after")
     def sanity_check(self) -> "Annotation":
@@ -221,3 +227,10 @@ class Annotation(BaseModel):
         with open(filepath, "r") as f:
             data = json.load(f)
         return cls.from_dict(data)
+
+    def __json__(self):
+        """
+        Helper method for JSON serialization
+        Used as `json.dumps(..., default=lambda x: x.__json__() if hasattr(x, "__json__") else x)`
+        """
+        return self.model_dump()

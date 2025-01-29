@@ -11,17 +11,20 @@ import numpy as np
 from tqdm import tqdm
 
 from ares.configs.base import Rollout
-from ares.constants import ANNOTATION_OUTER_BATCH_SIZE, ARES_DATA_DIR
+from ares.constants import (
+    ANNOTATION_GROUNDING_FPS,
+    ANNOTATION_OUTER_BATCH_SIZE,
+    ARES_DATA_DIR,
+)
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
 from ares.databases.structured_database import ROBOT_DB_PATH
 from ares.models.base import VLM
-from ares.models.grounding import ANNOTATION_GROUNDING_FPS
 from ares.models.grounding_utils import get_grounding_nouns_async
 from ares.models.refusal import check_refusal
 from ares.models.shortcuts import get_gpt_4o
 from ares.utils.image_utils import load_video_frames
 
-from .annotation_base import (
+from .annotating_base import (
     AnnotatingFn,
     ErrorResult,
     ResultTracker,

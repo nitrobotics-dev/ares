@@ -1,3 +1,10 @@
+"""
+Orchestration script to run a simpler version of the 'Embodied Chain of Thought' paper. 
+See original code https://github.com/MichalZawalski/embodied-CoT/blob/main/scripts/generate_embodied_data/full_reasonings.py
+
+We utilize the `grounding_string`, `detections`, and `success_criteria` annotations + rollout fields to generate a pseudo-ECoT in a similar fashion.
+"""
+
 import asyncio
 import os
 import traceback
@@ -8,11 +15,7 @@ from tqdm import tqdm
 
 from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
-from ares.constants import (
-    ANNOTATION_GROUNDING_FPS,
-    ANNOTATION_OUTER_BATCH_SIZE,
-    ARES_DATA_DIR,
-)
+from ares.constants import ANNOTATION_OUTER_BATCH_SIZE, ARES_DATA_DIR
 from ares.databases.annotation_database import (
     ANNOTATION_DB_PATH,
     AnnotationDatabase,
@@ -31,8 +34,37 @@ from .annotating_base import (
 )
 
 
-class SuccessCriteriaAnnotatingFn(AnnotatingFn):
-    async def run_query(self, vlm: VLM, rollout: Rollout):
+def construct_pseudo_ecot_info(rollout: Rollout, ann_db: AnnotationDatabase):
+    # we want the grounding string, detections, and success criteria
+    video_id = get_video_id(rollout.dataset_filename, rollout.filename)
+    anns = ann_db.get_annotations(video_id)
+
+    # get the annotations from the database
+    grounding_string = anns.get("grounding_string")[0].description
+    grounding_string = ", ".join(grounding_string.split(".")[:-1]) + "."
+    success_criteria = anns.get("success_criteria")[0].description
+    detections = anns.get("detection")
+
+    # separate and parse the detections into a string
+    frame_0_detections: list[Annotation] = detections[0] if detections else []
+    if frame_0_detections:
+        text_detections = ", ".join(
+            f"{d.category_name} at {[round(r, 2) for r in d.bbox]} (LTRB format)"
+            for d in frame_0_detections
+        )
+    else:
+        text_detections = None
+    return dict(
+        task=rollout.task.language_instruction,
+        complexity_category_estimate=rollout.task.complexity_category_estimate,
+        grounding_string=grounding_string,
+        detections=text_detections,
+        success_criteria=success_criteria,
+    )
+
+
+class PseudoECoTAnnotatingFn(AnnotatingFn):
+    async def run_query(self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase):
         try:
             frames, frame_indices = load_video_frames(
                 rollout.dataset_filename,
@@ -46,27 +78,29 @@ class SuccessCriteriaAnnotatingFn(AnnotatingFn):
                 error=traceback.format_exc(),
             )
         try:
+            info = construct_pseudo_ecot_info(rollout, ann_db)
             messages, res = await vlm.ask_async(
-                info=dict(task=rollout.task.language_instruction),
-                prompt_filename="success_constraint_generation.jinja2",
+                info=info,
+                prompt_filename="pseudo_ecot.jinja2",
                 images=[frames[0]],
             )
         except Exception as e:
             return ErrorResult(
                 rollout_id=rollout.id,
-                error_pattern="success_constraint_generation_failure",
+                error_pattern="pseudo_ecot_failure",
                 error=traceback.format_exc(),
             )
         try:
             # just a string, so use the default
-            success_criteria = parse_response(res.choices[0], load_json=False)
+            breakpoint()
+            pseudo_ecot_str = parse_response(res.choices[0], load_json=False)
         except Exception as e:
             return ErrorResult(
                 rollout_id=rollout.id,
-                error_pattern="success_constraint_generation_failure",
+                error_pattern="pseudo_ecot_parsing_failure",
                 error=traceback.format_exc(),
             )
-        return success_criteria
+        return pseudo_ecot_str
 
     async def run_batch(
         self, vlm: VLM, rollouts_batch: List[Rollout], ann_db: AnnotationDatabase
@@ -74,7 +108,7 @@ class SuccessCriteriaAnnotatingFn(AnnotatingFn):
         # Create futures with their corresponding rollouts
         futures = []
         for rollout in rollouts_batch:
-            future = asyncio.create_task(self.run_query(vlm, rollout))
+            future = asyncio.create_task(self.run_query(vlm, rollout, ann_db))
             futures.append((future, rollout))
 
         tracker = ResultTracker()
@@ -92,9 +126,9 @@ class SuccessCriteriaAnnotatingFn(AnnotatingFn):
                         video_id=video_id,
                         key="string",
                         value=Annotation(
-                            description=result, annotation_type="success_criteria"
+                            description=result, annotation_type="pseudo_ecot"
                         ).to_dict(),
-                        annotation_type="success_criteria",
+                        annotation_type="pseudo_ecot",
                         frame=None,
                     )
                     tracker.update_via_batch(
@@ -120,6 +154,9 @@ class SuccessCriteriaAnnotatingFn(AnnotatingFn):
     ) -> Tuple[ResultTracker, List[ErrorResult]]:
         overall_tracker = ResultTracker()
         overall_failures = []
+
+        # HACK FIXME
+        rollouts = rollouts[:2]
 
         for i in tqdm(
             range(0, len(rollouts), outer_batch_size),
@@ -157,13 +194,13 @@ if __name__ == "__main__":
         tracker, failures = orchestrate_annotating(
             engine_path=ROBOT_DB_PATH,
             ann_db_path=ANNOTATION_DB_PATH,
-            annotating_fn=SuccessCriteriaAnnotatingFn(),
+            annotating_fn=PseudoECoTAnnotatingFn(),
             dataset_filename=dataset_filename,
             outer_batch_size=ANNOTATION_OUTER_BATCH_SIZE,
             failures_path=os.path.join(
                 ARES_DATA_DIR,
                 "annotating_failures",
-                f"success_criteria_failures_{dataset_filename}.pkl",
+                f"pseudo_ecot_failures_{dataset_filename}.pkl",
             ),
         )
         overall_tracker.update_tracker(tracker)
