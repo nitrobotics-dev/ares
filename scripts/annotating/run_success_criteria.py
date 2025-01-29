@@ -25,13 +25,17 @@ from ares.utils.image_utils import load_video_frames
 
 from .annotating_base import (
     AnnotatingFn,
+    APIAnnotatingFn,
     ErrorResult,
     ResultTracker,
     orchestrate_annotating,
 )
 
 
-class SuccessCriteriaAnnotatingFn(AnnotatingFn):
+class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
+    def __init__(self):
+        super().__init__(annotation_key="string", annotation_type="success_criteria")
+
     async def run_query(self, vlm: VLM, rollout: Rollout):
         try:
             frames, frame_indices = load_video_frames(
@@ -67,82 +71,6 @@ class SuccessCriteriaAnnotatingFn(AnnotatingFn):
                 error=traceback.format_exc(),
             )
         return success_criteria
-
-    async def run_batch(
-        self, vlm: VLM, rollouts_batch: List[Rollout], ann_db: AnnotationDatabase
-    ) -> Tuple[ResultTracker, List[ErrorResult]]:
-        # Create futures with their corresponding rollouts
-        futures = []
-        for rollout in rollouts_batch:
-            future = asyncio.create_task(self.run_query(vlm, rollout))
-            futures.append((future, rollout))
-
-        tracker = ResultTracker()
-        failures = []
-
-        for future, rollout in futures:
-            try:
-                result = await future
-                if isinstance(result, ErrorResult):
-                    failures.append(result)
-                else:
-                    video_id = get_video_id(rollout.dataset_filename, rollout.filename)
-                    # Add success criteria annotation to database
-                    ann_db.add_annotation(
-                        video_id=video_id,
-                        key="string",
-                        value=Annotation(
-                            description=result, annotation_type="success_criteria"
-                        ),
-                        annotation_type="success_criteria",
-                        frame=None,
-                    )
-                    tracker.update_via_batch(
-                        n_videos=1, n_frames=1, n_annotations=1, video_ids=[video_id]
-                    )
-            except Exception as e:
-                failures.append(
-                    ErrorResult(
-                        rollout_id=rollout.id,
-                        error_pattern="batch_processing_failure",
-                        error=traceback.format_exc(),
-                    )
-                )
-
-        return tracker, failures
-
-    def __call__(
-        self,
-        rollouts: List[Rollout],
-        ann_db: AnnotationDatabase,
-        outer_batch_size: int,
-        vlm_name: str = "gpt-4o-mini",
-    ) -> Tuple[ResultTracker, List[ErrorResult]]:
-        overall_tracker = ResultTracker()
-        overall_failures = []
-
-        for i in tqdm(
-            range(0, len(rollouts), outer_batch_size),
-            desc="Processing outer batches",
-        ):
-            print(
-                f"Processing batch {i // outer_batch_size + 1} of {max(1, len(rollouts) // outer_batch_size)}"
-            )
-            # create VLM outside async as the semaphore gets "bound" to async context
-            vlm = get_vlm(vlm_name)
-
-            # get batch results
-            rollouts_batch = rollouts[i : i + outer_batch_size]
-            tracker, failures = asyncio.run(
-                self.run_batch(vlm=vlm, rollouts_batch=rollouts_batch, ann_db=ann_db)
-            )
-
-            print(
-                f"Completed batch {i // outer_batch_size + 1} of {max(1, len(rollouts) // outer_batch_size)}"
-            )
-            overall_tracker.update_tracker(tracker)
-            overall_failures.extend(failures)
-        return overall_tracker, overall_failures
 
 
 if __name__ == "__main__":
