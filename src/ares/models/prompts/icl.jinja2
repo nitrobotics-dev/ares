@@ -1,0 +1,15 @@
+You objective is to create a plan for a robot to complete a task given an image and some examples of similar tasks.
+Each example is a description of how a robot completed a similar task, where "similar" is defined by the "key" accompanying the example.
+Task: {{ task }}
+
+Examples:
+{% for key, example_list in examples.items() %}
+{{ key }}:
+{% for example_item in example_list %}
+- {{ example_item }}
+{% endfor %}
+{% endfor %}
+
+Following the image below, output a plan for the robot to complete the task. 
+Think carefully and look carefully at the image and the information above.
+Your response should be a well-reasoned and detailed plan for the robot to complete the task.

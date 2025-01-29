@@ -7,7 +7,7 @@ from tqdm import tqdm
 from ares.annotating.annotating_base import ErrorResult, ResultTracker
 from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
-from ares.databases.annotation_database import AnnotationDatabase
+from ares.databases.annotation_database import AnnotationDatabase, get_video_id
 from ares.models.base import VLM
 from ares.models.shortcuts import get_vlm
 

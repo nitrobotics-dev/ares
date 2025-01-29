@@ -77,19 +77,11 @@ class PseudoECoTAnnotatingFn(APIAnnotatingFn):
                 prompt_filename="pseudo_ecot.jinja2",
                 images=[frames[0]],
             )
-        except Exception as e:
-            return ErrorResult(
-                rollout_id=rollout.id,
-                error_pattern="pseudo_ecot_failure",
-                error=traceback.format_exc(),
-            )
-        try:
-            # just a string, so use the default
             pseudo_ecot_str = parse_response(res.choices[0], load_json=False)
         except Exception as e:
             return ErrorResult(
                 rollout_id=rollout.id,
-                error_pattern="pseudo_ecot_parsing_failure",
+                error_pattern="pseudo_ecot_failure",
                 error=traceback.format_exc(),
             )
         return pseudo_ecot_str

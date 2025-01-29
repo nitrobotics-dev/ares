@@ -23,6 +23,7 @@ from ares.databases.embedding_database import (
     TRAJECTORY_INDEX_NAMES,
     FaissIndex,
     IndexManager,
+    rollout_to_index_name,
 )
 from ares.databases.structured_database import (
     ROBOT_DB_PATH,
@@ -31,7 +32,8 @@ from ares.databases.structured_database import (
     get_rollouts_by_ids,
     setup_database,
 )
-from ares.models.base import VLM
+from ares.models.base import VLM, parse_response
+from ares.models.shortcuts import get_vlm
 from ares.utils.image_utils import load_video_frames
 
 
@@ -58,6 +60,28 @@ class ICLAnnotatingFn(APIAnnotatingFn):
         self.n_examples_per_key = n_examples_per_key
         self.example_field = example_field
 
+    def construct_example_values(self, rollout: Rollout) -> dict[str, list[str]]:
+        output_vals = dict()
+        for key in self.keys:
+            if key not in META_INDEX_NAMES:
+                index_name = rollout_to_index_name(rollout, suffix=key)
+            else:
+                index_name = key
+            value = index_manager.get_matrix_by_id(index_name, str(rollout.id))
+            dists, ids, _ = index_manager.search_matrix(
+                index_name, value, k=self.n_examples_per_key + 1
+            )
+            ids = [_id for _id in ids if _id != str(rollout.id)][
+                : self.n_examples_per_key
+            ]
+            example_rollouts = get_rollouts_by_ids(self.engine, ids)
+            example_vals = [
+                rollout.get_nested_attr(self.example_field)
+                for rollout in example_rollouts
+            ]
+            output_vals[key] = example_vals
+        return output_vals
+
     async def run_query(self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase):
         try:
             frames, frame_indices = load_video_frames(
@@ -71,25 +95,25 @@ class ICLAnnotatingFn(APIAnnotatingFn):
                 error_pattern="loading_video_failure",
                 error=traceback.format_exc(),
             )
-
-        output_vals = dict()
-        for key in self.keys:
-            value = index_manager.get_matrix_by_id(key, str(rollout.id))
-            breakpoint()
-            dists, ids, _ = index_manager.search_matrix(
-                key, value, k=self.n_examples_per_key + 1
+        try:
+            example_values = self.construct_example_values(rollout)
+            info = {
+                "task": rollout.get_nested_attr("task_language_instruction"),
+                "examples": example_values,
+            }
+            messages, res = await vlm.ask_async(
+                info=info,
+                prompt_filename="icl.jinja2",
+                images=[frames[0]],
             )
-            breakpoint()
-            ids = [_id for _id in ids if _id != str(rollout.id)][
-                : self.n_examples_per_key
-            ]
-            example_rollouts = get_rollouts_by_ids(self.engine, ids)
-            example_vals = [
-                rollout.get_nested_attr(self.example_field)
-                for rollout in example_rollouts
-            ]
-            output_vals[key] = example_vals
-        breakpoint()
+            icl_str = parse_response(res.choices[0], load_json=False)
+        except Exception as e:
+            return ErrorResult(
+                rollout_id=rollout.id,
+                error_pattern="icl_parsing_failure",
+                error=traceback.format_exc(),
+            )
+        return icl_str
 
 
 if __name__ == "__main__":
@@ -98,7 +122,9 @@ if __name__ == "__main__":
     index_manager = IndexManager(EMBEDDING_DB_PATH, FaissIndex)
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
 
-    keys = ["task_language_instruction"]
+    # dont use description estimate
+    keys = META_INDEX_NAMES + TRAJECTORY_INDEX_NAMES
+    keys = [key for key in keys if key != "description_estimate"]
     n_examples_per_key = 5
     overall_tracker = ResultTracker()
     overall_failures = []
@@ -107,6 +133,7 @@ if __name__ == "__main__":
     first_rollout_id = df.iloc[-1].id
     first_rollout = get_rollouts_by_ids(engine, [first_rollout_id])[0]
 
+    vlm = get_vlm("gpt-4o-mini")
     icl_annotating_fn = ICLAnnotatingFn(
         index_manager=index_manager,
         engine=engine,
@@ -115,7 +142,7 @@ if __name__ == "__main__":
         example_field="description_estimate",
     )
     out = asyncio.run(
-        icl_annotating_fn.run_query(vlm=None, rollout=first_rollout, ann_db=None)
+        icl_annotating_fn.run_query(vlm=vlm, rollout=first_rollout, ann_db=None)
     )
 
     # for dataset_info in DATASET_NAMES:
