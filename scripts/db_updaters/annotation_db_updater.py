@@ -41,7 +41,7 @@ def migrate():
         db.add_annotation(
             video_id=video_id,
             key="string",
-            value=annotation_obj.to_dict(),
+            value=annotation_obj,
             annotation_type="success_criteria",
             frame=None,
         )

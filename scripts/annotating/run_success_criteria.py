@@ -93,7 +93,7 @@ class SuccessCriteriaAnnotatingFn(AnnotatingFn):
                         key="string",
                         value=Annotation(
                             description=result, annotation_type="success_criteria"
-                        ).to_dict(),
+                        ),
                         annotation_type="success_criteria",
                         frame=None,
                     )

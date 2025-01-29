@@ -2,7 +2,7 @@
 Orchestration script to run a simpler version of the 'Embodied Chain of Thought' paper. 
 See original code https://github.com/MichalZawalski/embodied-CoT/blob/main/scripts/generate_embodied_data/full_reasonings.py
 
-We utilize the `grounding_string`, `detections`, and `success_criteria` annotations + rollout fields to generate a pseudo-ECoT in a similar fashion.
+We utilize the `grounding_string`, `detections`, and `success_criteria` annotations (see other annotating scripts!) + rollout fields to generate a pseudo-ECoT in a similar fashion.
 """
 
 import asyncio
@@ -92,7 +92,6 @@ class PseudoECoTAnnotatingFn(AnnotatingFn):
             )
         try:
             # just a string, so use the default
-            breakpoint()
             pseudo_ecot_str = parse_response(res.choices[0], load_json=False)
         except Exception as e:
             return ErrorResult(
@@ -127,7 +126,7 @@ class PseudoECoTAnnotatingFn(AnnotatingFn):
                         key="string",
                         value=Annotation(
                             description=result, annotation_type="pseudo_ecot"
-                        ).to_dict(),
+                        ),
                         annotation_type="pseudo_ecot",
                         frame=None,
                     )
@@ -154,9 +153,6 @@ class PseudoECoTAnnotatingFn(AnnotatingFn):
     ) -> Tuple[ResultTracker, List[ErrorResult]]:
         overall_tracker = ResultTracker()
         overall_failures = []
-
-        # HACK FIXME
-        rollouts = rollouts[:2]
 
         for i in tqdm(
             range(0, len(rollouts), outer_batch_size),

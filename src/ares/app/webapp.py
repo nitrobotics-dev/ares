@@ -200,9 +200,16 @@ def main() -> None:
         # show video cards of first 5 rows in a horizontal layout
         st.header("Rollout Examples")
         n_videos = 5
-        rows = {k: v.head(1) for k, v in filtered_df.groupby("dataset_name")}
-        display_df = pd.concat(rows.values())
-        display_video_grid(display_df, lazy_load=True)
+        display_rows = pd.concat(
+            {k: v.head(1) for k, v in filtered_df.groupby("dataset_name")}
+        )
+        if len(display_rows) < n_videos:
+            # get enough videos to fill n_videos that arent already in display_rows
+            extra_rows = filtered_df.head(n_videos)
+            # remove rows that are already in display_rows
+            extra_rows = extra_rows[~extra_rows.id.isin(display_rows.id)]
+            display_rows = pd.concat([display_rows, extra_rows])
+        display_video_grid(display_rows, lazy_load=True)
     st.divider()
 
     section_plot_hero = "plot hero display"

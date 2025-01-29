@@ -54,7 +54,7 @@ class AnnotationDatabase:
         self,
         video_id: str,
         key: str,
-        value: Any,
+        value: Annotation,
         annotation_type: str,
         frame: Optional[Union[int, List[int]]] = None,
     ) -> str:
@@ -68,10 +68,12 @@ class AnnotationDatabase:
             annotation_type: Type of annotation (e.g., "bbox", "label", "mask")
             frame: Optional frame number or list of frames this applies to
         """
+        assert isinstance(value, Annotation)
+        value_dict = value.to_dict()
         annotation = {
             "video_id": video_id,
             "key": key,
-            "value": value,
+            "value": value_dict,
             "type": annotation_type,
             "frame": frame,
             "created_at": datetime.now(),
@@ -120,17 +122,15 @@ class AnnotationDatabase:
         return output
 
     def add_frame_annotations(
-        self, video_id: str, frame: int, annotations: List[Annotation | dict]
+        self, video_id: str, frame: int, annotations: List[Annotation]
     ) -> List[str]:
         """Add multiple annotations for a specific frame."""
         annotation_ids = []
         for ann in annotations:
-            # Convert the Annotation object to a dict suitable for MongoDB
-            ann_dict = ann.to_dict() if isinstance(ann, Annotation) else ann
             ann_id = self.add_annotation(
                 video_id=video_id,
                 key=f"frame_{frame}_annotation",
-                value=ann_dict,
+                value=ann,
                 annotation_type="detection",
                 frame=frame,
             )
@@ -336,42 +336,9 @@ class AnnotationDatabase:
 
 if __name__ == "__main__":
     db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
-    # db.add_video("test_video", {"test": "test"})
-    # db.add_annotation("test_video", "test_annotation", "test_value", "test_type", 1)
-    # anns = db.get_annotations("test_video", "test_type", 1)
-    # add more test samples to the database
-    # for i in range(100):
-    #     db.add_annotation(
-    #         "test_video", f"test_annotation_{i}", f"test_value_{i}", "test_type", i
-    #     )
-    # # also add video laevel anns and frame level anns
-    # db.add_annotation("test_video", "test_annotation", "test_value", "test_type", None)
-    # db.add_annotation(
-    #     "test_video", "test_annotation", "test_value", "test_type", [1, 2, 3]
-    # )
-    # stats = db.get_database_stats()
-    # print(stats)
-
-    # # Delete all annotations for "test_video"
-    # deleted_count = db.delete_annotations("test_video")
-    # print(f"Deleted {deleted_count} annotations")
-
-    # # Delete the test video and its annotations
-    # db.delete_video("test_video")
-
-    # stats = db.get_database_stats()
-    # print(stats)
-    # breakpoint()
 
     # Preview database contents
     stats = db.get_database_stats()
     preview = db.peek_database(limit=10000)
-    # breakpoint()
-    # print("\nVideo samples:")
-    # for video in preview["videos"]:
-    #     print(f"- {video['_id']}: {video['metadata']}")
 
-    # print("\nAnnotation samples:")
-    # for ann in preview["annotations"]:
-    #     print(f"- Video: {ann['video_id']}, Type: {ann['type']}, Frame: {ann['frame']}")
     breakpoint()
