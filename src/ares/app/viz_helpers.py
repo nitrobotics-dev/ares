@@ -200,6 +200,8 @@ def create_embedding_similarity_visualization(
                 n_most_similar + 1,  # to avoid self match
             )
 
+        if np.any(np.isnan(distances)):
+            breakpoint()
         # check index of id_str to see if it matches row.id then remove that index
         idx = np.where(ids == str(row.id))
         if len(idx[0]) != 0:
@@ -234,6 +236,8 @@ def create_similarity_tabs(
             for i, (dist, id_str) in enumerate(
                 zip(viz_data["distances"], viz_data["ids"])
             ):
+                if np.isnan(dist):
+                    breakpoint()
                 with similar_cols[i % max_cols_in_tab]:
                     st.write(f"Distance: {dist:.3f}")
                     # Convert id_str to UUID only if it's not already a UUID
@@ -392,7 +396,7 @@ def show_hero_display(
     tab_names = [
         f"Task - {text_distance_fn}",
         f"Task - Embedding",
-        *TRAJECTORY_INDEX_NAMES,
+        *[t.title() for t in TRAJECTORY_INDEX_NAMES],
     ]
 
     # some robotics datasets have lots of overlap, e.g. the same task instruction.

@@ -222,17 +222,20 @@ class FaissIndex(Index):
         distances, internal_indices = self.index.search(query_vector.reshape(1, -1), k)
         # -1 is the default value for faiss.IndexFlatL2 for no matches
         string_ids = [self.id_map[int(idx)] for idx in internal_indices[0] if idx != -1]
-        vectors = [
-            self.index.reconstruct(int(idx)) for idx in internal_indices[0] if idx != -1
-        ]
-        if len(vectors) == 0:
+        if len(string_ids) == 0:
             # no matches found, use brute force search
             if self.index.ntotal <= 100:
                 return self.brute_force_search(query_vector, k)
             else:
                 return np.array([]), [], np.array([])
-        vectors = np.vstack(vectors)
-        return distances, string_ids, vectors
+        else:
+            vectors = [
+                self.index.reconstruct(int(idx))
+                for idx in internal_indices[0]
+                if idx != -1
+            ]
+            vectors = np.vstack(vectors)
+            return distances, string_ids, vectors
 
     def get_all_ids(self) -> np.ndarray:
         """Get all string IDs in the index, in the same order as get_all_vectors()"""
@@ -319,12 +322,16 @@ class FaissIndex(Index):
 
         # Get all vectors and normalize them
         all_vectors = self.get_all_vectors()
-        all_vectors = all_vectors / np.linalg.norm(all_vectors, axis=1, keepdims=True)
+        all_vectors = np.nan_to_num(all_vectors, nan=0.0)
+        all_normed_vectors = all_vectors / np.linalg.norm(
+            all_vectors, axis=1, keepdims=True
+        )
         query_vector = query_vector.reshape(1, -1)
+        query_vector = np.nan_to_num(query_vector, nan=0.0)
         query_vector = query_vector / np.linalg.norm(query_vector)
 
         # Calculate cosine similarities
-        similarities = np.dot(all_vectors, query_vector.T).flatten()
+        similarities = np.dot(all_normed_vectors, query_vector.T).flatten()
 
         # Get top k indices
         k = min(k, len(similarities))
@@ -334,7 +341,6 @@ class FaissIndex(Index):
         distances = 1 - similarities[top_indices]  # Convert to distances
         string_ids = [self.id_map[i] for i in range(len(top_indices))]
         vectors = all_vectors[top_indices]
-
         return distances.reshape(1, -1), string_ids, vectors
 
 

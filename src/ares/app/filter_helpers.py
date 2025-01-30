@@ -42,6 +42,7 @@ def create_structured_data_filters(
 
     for idx, col in enumerate(df.columns):
         viz_info = infer_visualization_type(col, df)
+
         if viz_info["viz_type"] is None or col.lower() in ignore_cols:
             skipped_cols.append(col)
             continue
@@ -53,7 +54,15 @@ def create_structured_data_filters(
                     and len(df[col].dropna()) > 0
                     and pd.to_numeric(df[col].dropna(), errors="coerce").notna().all()
                 )
-            ) and viz_info["nunique"] > max_options:
+            ) and (
+                viz_info["nunique"] > max_options
+                or (
+                    pd.api.types.is_float_dtype(df[col])
+                    and df[col].min() >= 0
+                    and df[col].max() <= 1
+                    and df[col].min() != df[col].max()
+                )
+            ):
                 # Convert to numeric if object type
                 numeric_col = pd.to_numeric(df[col], errors="coerce")
                 min_val = float(numeric_col.dropna().min())
@@ -130,7 +139,6 @@ def create_structured_data_filters(
                         print(
                             f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
                         )
-
             elif viz_info["viz_type"] == "bar":
                 # Convert None to "(None)" for display, but keep other values as is
                 options = [
