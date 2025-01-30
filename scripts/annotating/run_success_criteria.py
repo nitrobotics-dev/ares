@@ -32,7 +32,7 @@ class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
     def __init__(self):
         super().__init__(annotation_key="string", annotation_type="success_criteria")
 
-    async def run_query(self, vlm: VLM, rollout: Rollout):
+    async def run_query(self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase):
         try:
             frames, frame_indices = load_video_frames(
                 rollout.dataset_filename,

@@ -14,7 +14,7 @@ from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
 from ares.constants import get_dataset_info_by_key
 from ares.databases.annotation_database import AnnotationDatabase
-from ares.databases.structured_database import get_rollouts_by_ids
+from ares.databases.structured_database import get_rollouts_by_ids, setup_rollouts
 
 
 @dataclass

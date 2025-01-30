@@ -45,7 +45,7 @@ class APIAnnotatingFn(AnnotatingFn):
         # Create futures with their corresponding rollouts
         futures = []
         for rollout in rollouts_batch:
-            future = asyncio.create_task(self.run_query(vlm, rollout))
+            future = asyncio.create_task(self.run_query(vlm, rollout, ann_db))
             futures.append((future, rollout))
 
         tracker = ResultTracker()

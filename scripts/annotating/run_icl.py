@@ -50,7 +50,7 @@ class ICLAnnotatingFn(APIAnnotatingFn):
         index_manager: IndexManager,
         engine: Engine,
         keys: list[str],
-        n_examples_per_key: int = 1,
+        n_examples_per_key: int = 5,
         example_field: str = "description_estimate",
     ):
         super().__init__(annotation_key="string", annotation_type="icl")
@@ -62,24 +62,37 @@ class ICLAnnotatingFn(APIAnnotatingFn):
 
     def construct_example_values(self, rollout: Rollout) -> dict[str, list[str]]:
         output_vals = dict()
+        # Initialize set of used IDs with the current rollout ID
+        already_used_ids = {str(rollout.id)}
+
         for key in self.keys:
             if key not in META_INDEX_NAMES:
                 index_name = rollout_to_index_name(rollout, suffix=key)
             else:
                 index_name = key
-            value = index_manager.get_matrix_by_id(index_name, str(rollout.id))
-            dists, ids, _ = index_manager.search_matrix(
-                index_name, value, k=self.n_examples_per_key + 1
-            )
-            ids = [_id for _id in ids if _id != str(rollout.id)][
-                : self.n_examples_per_key
-            ]
-            example_rollouts = get_rollouts_by_ids(self.engine, ids)
+
+            value = self.index_manager.get_matrix_by_id(index_name, str(rollout.id))
+            # Request more IDs to account for potential duplicates
+            k = self.n_examples_per_key + len(already_used_ids)
+            dists, ids, _ = self.index_manager.search_matrix(index_name, value, k=k)
+
+            # Filter out already used IDs
+            new_ids = []
+            for id_ in ids:
+                if (
+                    id_ not in already_used_ids
+                    and len(new_ids) < self.n_examples_per_key
+                ):
+                    new_ids.append(id_)
+                    already_used_ids.add(id_)
+
+            example_rollouts = get_rollouts_by_ids(self.engine, new_ids)
             example_vals = [
                 rollout.get_nested_attr(self.example_field)
                 for rollout in example_rollouts
             ]
-            output_vals[key] = example_vals
+            display_key = key.replace("_", " ").title()
+            output_vals[display_key] = example_vals
         return output_vals
 
     async def run_query(self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase):
@@ -129,41 +142,30 @@ if __name__ == "__main__":
     overall_tracker = ResultTracker()
     overall_failures = []
 
-    df = db_to_df(engine)
-    first_rollout_id = df.iloc[-1].id
-    first_rollout = get_rollouts_by_ids(engine, [first_rollout_id])[0]
+    for dataset_info in DATASET_NAMES:
+        print(f"Processing {dataset_info['dataset_formalname']}")
+        dataset_filename = dataset_info["dataset_filename"]
+        tracker, failures = orchestrate_annotating(
+            engine_path=ROBOT_DB_PATH,
+            ann_db_path=ANNOTATION_DB_PATH,
+            annotating_fn=ICLAnnotatingFn(
+                index_manager=index_manager,
+                engine=engine,
+                keys=keys,
+                n_examples_per_key=n_examples_per_key,
+            ),
+            dataset_filename=dataset_filename,
+            outer_batch_size=ANNOTATION_OUTER_BATCH_SIZE,
+            failures_path=os.path.join(
+                ARES_DATA_DIR,
+                "annotating_failures",
+                f"icl_failures_{dataset_filename}.pkl",
+            ),
+        )
+        overall_tracker.update_tracker(tracker)
+        overall_failures.extend(failures)
 
-    vlm = get_vlm("gpt-4o-mini")
-    icl_annotating_fn = ICLAnnotatingFn(
-        index_manager=index_manager,
-        engine=engine,
-        keys=keys,
-        n_examples_per_key=n_examples_per_key,
-        example_field="description_estimate",
-    )
-    out = asyncio.run(
-        icl_annotating_fn.run_query(vlm=vlm, rollout=first_rollout, ann_db=None)
-    )
-
-    # for dataset_info in DATASET_NAMES:
-    #     print(f"Processing {dataset_info['dataset_formalname']}")
-    #     dataset_filename = dataset_info["dataset_filename"]
-    #     tracker, failures = orchestrate_annotating(
-    #         engine_path=ROBOT_DB_PATH,
-    #         ann_db_path=ANNOTATION_DB_PATH,
-    #         annotating_fn=ICLAnnotatingFn(index_manager=index_manager, keys=keys, n_examples_per_key=n_examples_per_key),
-    #         dataset_filename=dataset_filename,
-    #         outer_batch_size=ANNOTATION_OUTER_BATCH_SIZE,
-    #         failures_path=os.path.join(
-    #             ARES_DATA_DIR,
-    #             "annotating_failures",
-    #             f"icl_failures_{dataset_filename}.pkl",
-    #         ),
-    #     )
-    #     overall_tracker.update_tracker(tracker)
-    #     overall_failures.extend(failures)
-
-    # print(f"OVERALL STATS")
-    # overall_tracker.print_stats()
-    # print(f"Number of failures: {len(overall_failures)}")
-    # breakpoint()
+    print(f"OVERALL STATS")
+    overall_tracker.print_stats()
+    print(f"Number of failures: {len(overall_failures)}")
+    breakpoint()

@@ -220,14 +220,18 @@ class FaissIndex(Index):
         self, query_vector: np.ndarray, k: int
     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
         distances, internal_indices = self.index.search(query_vector.reshape(1, -1), k)
+        # -1 is the default value for faiss.IndexFlatL2 for no matches
         string_ids = [self.id_map[int(idx)] for idx in internal_indices[0] if idx != -1]
-        vectors = np.vstack(
-            [
-                self.index.reconstruct(int(idx))
-                for idx in internal_indices[0]
-                if idx != -1
-            ]
-        )
+        vectors = [
+            self.index.reconstruct(int(idx)) for idx in internal_indices[0] if idx != -1
+        ]
+        if len(vectors) == 0:
+            # no matches found, use brute force search
+            if self.index.ntotal <= 100:
+                return self.brute_force_search(query_vector, k)
+            else:
+                return np.array([]), [], np.array([])
+        vectors = np.vstack(vectors)
         return distances, string_ids, vectors
 
     def get_all_ids(self) -> np.ndarray:
@@ -303,6 +307,35 @@ class FaissIndex(Index):
             meta_path = path.parent / f"{path.stem}_meta.json"
             if meta_path.exists():
                 meta_path.unlink()  # Delete the metadata file
+
+    def brute_force_search(
+        self, query_vector: np.ndarray, k: int, max_brute_force: int = 100
+    ) -> Tuple[np.ndarray, List[str], np.ndarray]:
+        """Search using brute force comparison when index is small enough.
+        More reliable than FAISS for small datasets."""
+        assert (
+            self.index.ntotal <= max_brute_force
+        ), f"Index size {self.index.ntotal} is greater than max_brute_force {max_brute_force}"
+
+        # Get all vectors and normalize them
+        all_vectors = self.get_all_vectors()
+        all_vectors = all_vectors / np.linalg.norm(all_vectors, axis=1, keepdims=True)
+        query_vector = query_vector.reshape(1, -1)
+        query_vector = query_vector / np.linalg.norm(query_vector)
+
+        # Calculate cosine similarities
+        similarities = np.dot(all_vectors, query_vector.T).flatten()
+
+        # Get top k indices
+        k = min(k, len(similarities))
+        top_indices = np.argsort(similarities)[-k:][::-1]
+
+        # Get corresponding distances, ids, and vectors
+        distances = 1 - similarities[top_indices]  # Convert to distances
+        string_ids = [self.id_map[i] for i in range(len(top_indices))]
+        vectors = all_vectors[top_indices]
+
+        return distances.reshape(1, -1), string_ids, vectors
 
 
 class IndexManager:
