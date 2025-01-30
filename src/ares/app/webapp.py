@@ -34,8 +34,6 @@ from ares.app.viz_helpers import (
 from ares.constants import ARES_DATA_DIR
 from ares.databases.structured_database import RolloutSQLModel
 
-print(f"finished imports")
-
 # top level variables
 title = "ARES Dashboard"
 tmp_dump_dir = os.path.join(ARES_DATA_DIR, "tmp2")
@@ -100,8 +98,8 @@ def main() -> None:
         st.write(
             f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
         )
+        # HACK
         filtered_df = None
-
         if len(kept_ids) == 0:
             breakpoint()
 
@@ -147,6 +145,7 @@ def main() -> None:
 
     if filtered_df is None:
         filtered_df = value_filtered_df
+        cluster_fig = None
 
     # Add a button to refresh the sample
     st.button(

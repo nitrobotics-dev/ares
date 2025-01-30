@@ -143,27 +143,34 @@ def create_structured_data_filters(
                     skipped_cols.append(col)
                     continue
 
-                # Initialize with current active values or defaults
                 select_key = f"{col}_select"
-                if select_key not in st.session_state.temp_filter_values:
-                    st.session_state.temp_filter_values[select_key] = (
-                        st.session_state.active_filter_values.get(select_key, options)
-                    )
-
-                # Unique key for the multiselect
                 multiselect_key = f"multiselect_{col}"
 
-                # Create multiselect widget with unique key
+                # Initialize temp_filter_values based on active_filter_values or default to all options
+                if select_key not in st.session_state.temp_filter_values:
+                    active_selected = st.session_state.active_filter_values.get(
+                        select_key
+                    )
+                    if active_selected is not None:
+                        st.session_state.temp_filter_values[select_key] = (
+                            active_selected
+                        )
+                    else:
+                        st.session_state.temp_filter_values[select_key] = options.copy()
+
+                # Create multiselect widget
                 selected = st.multiselect(
                     f"Filter {col}",
                     options=options,
                     default=st.session_state.temp_filter_values[select_key],
                     key=multiselect_key,
                 )
+
+                # Update temp_filter_values immediately with the widget's current selection
                 st.session_state.temp_filter_values[select_key] = selected
 
                 # Debug prints for categorical filters
-                if debug:
+                if debug and col == "dataset_name":
                     print(f"\nCategory filter for {col}:")
                     print(
                         f"Temp value: {st.session_state.temp_filter_values.get(select_key)}"
@@ -172,7 +179,7 @@ def create_structured_data_filters(
                         f"Active value: {st.session_state.active_filter_values.get(select_key)}"
                     )
 
-                # Only apply active filters
+                # Apply active filters if they exist
                 active_selected = st.session_state.active_filter_values.get(select_key)
                 if active_selected:
                     old_shape = filtered_df.shape[0]
@@ -205,6 +212,7 @@ def create_structured_data_filters(
                             f"Types of active values: {[type(x) for x in active_values]}"
                         )
 
+                    # Apply the filter to the DataFrame
                     filtered_df = filtered_df[filtered_df[col].isin(active_values)]
                     if debug:
                         print(

@@ -28,6 +28,13 @@
                 "[python]": {
                     "editor.defaultFormatter": "ms-python.black-formatter",
                     "editor.formatOnSave": true
+                },
+                "files.watcherExclude": {
+                    "**/data/**": true,
+                    "**/cache/**": true,
+                    "**/tmp/**": true,
+                    "**/.git/objects/**": true,
+                    "**/.git/subtree-cache/**": true
                 }
             }
         }

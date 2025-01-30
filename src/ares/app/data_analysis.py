@@ -34,7 +34,12 @@ def infer_visualization_type(
         and len(data[column_name].dropna()) > 0
         and pd.to_numeric(data[column_name].dropna(), errors="coerce").notna().all()
     ):
-        if nunique > 20:
+        # check if lots of unique values or if it's a float between 0 and 1
+        if nunique > 20 or (
+            pd.api.types.is_float_dtype(data[column_name])
+            and data[column_name].min() >= 0
+            and data[column_name].max() <= 1
+        ):
             result["viz_type"] = "histogram"
         else:
             result["viz_type"] = "bar"
