@@ -237,7 +237,8 @@ def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -
                     st.video(get_video_mp4(dataset_filename, fname))
 
             st.write(f"**{row['id']}**")
-            st.write(f"Task: {row['task_language_instruction']}")
+            task = row["task_language_instruction"]
+            st.write(f"Task: {task if task else '(No task recorded)' }")
             st.write(f"Dataset: {row['dataset_formalname']}")
         except Exception as e:
             st.warning(f"Error loading video for {row['id']}: {e}")
@@ -263,6 +264,11 @@ def show_dataframe(
         raise ValueError("Cannot specify both show_columns and hide_columns")
 
     st.subheader(title)
+
+    # Add a button to refresh the sample
+    st.button(
+        "Get New Random Sample"
+    )  # Button press triggers streamlit rerun, triggers new random sample
 
     # Create copy and filter columns
     display_df = df.copy()

@@ -20,7 +20,7 @@ TEST_EMBEDDING_DB_PATH = os.path.join(ARES_DATA_DIR, "tmp/test_embedding_data")
 TEST_EMBEDDING_DB_PATH_2 = os.path.join(ARES_DATA_DIR, "tmp/test_embedding_data_2")
 
 TEST_TIME_STEPS = 100
-META_INDEX_NAMES = ["description_estimate", "task_language_instruction"]
+META_INDEX_NAMES = ["task_language_instruction", "description_estimate"]
 TRAJECTORY_INDEX_NAMES = ["states", "actions"]
 
 

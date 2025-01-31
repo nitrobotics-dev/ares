@@ -187,7 +187,9 @@ def display_state_info() -> None:
         st.subheader("Index Manager")
         if "INDEX_MANAGER" in st.session_state:
             index_manager = st.session_state.INDEX_MANAGER
-            st.write("Available ind " + ", ".join(list(index_manager.indices.keys())))
+            st.write(
+                "Available indices: " + ", ".join(list(index_manager.indices.keys()))
+            )
             with st.popover("Index Details"):
                 for name, index in index_manager.indices.items():
                     st.write(f"\n**{name} Index:**")

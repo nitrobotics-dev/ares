@@ -7,7 +7,7 @@ ARES_VIDEO_DIR = os.path.join(ARES_DATA_DIR, "videos")
 
 # using oxe-downloader
 # oxe-download --dataset "name" --path $ARES_OXE_DIR
-DATASET_NAMES = [
+DATASET_NAMES: list[dict[str, str]] = [
     # {
     #     "dataset_filename": "nyu_rot_dataset_converted_externally_to_rlds",
     #     "dataset_formalname": "NYU ROT",
@@ -72,14 +72,14 @@ DATASET_NAMES = [
 #     "dataset_formalname": "Saytap",
 # },
 
-DATASET_KEY_TO_DATASET_INFO = defaultdict(dict)
+DATASET_KEY_TO_DATASET_INFO: dict[str, dict[str, str]] = defaultdict(dict)
 keys = ["dataset_filename", "dataset_formalname"]
 for dataset_info in DATASET_NAMES:
     for key in keys:
         DATASET_KEY_TO_DATASET_INFO[key][dataset_info[key]] = dataset_info
 
 
-def get_dataset_info_by_key(key_type: str, key: str) -> dict:
+def get_dataset_info_by_key(key_type: str, key: str) -> dict[str, str]:
     if key_type not in DATASET_KEY_TO_DATASET_INFO:
         raise ValueError(f"Invalid key type: {key_type}")
     if key not in DATASET_KEY_TO_DATASET_INFO[key_type]:

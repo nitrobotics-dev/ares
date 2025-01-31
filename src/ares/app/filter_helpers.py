@@ -1,3 +1,4 @@
+import traceback
 from collections import defaultdict
 from typing import Callable
 
@@ -28,15 +29,10 @@ def create_structured_data_filters(
         # Debug prints for initial state
         print("Initial df shape:", df.shape)
         print("Initial temp filters:", st.session_state.get("temp_filter_values", {}))
-        print(
-            "Initial active filters:", st.session_state.get("active_filter_values", {})
-        )
 
     # Initialize temporary filter values if not exists
     if "temp_filter_values" not in st.session_state:
         st.session_state.temp_filter_values = {}
-    if "active_filter_values" not in st.session_state:
-        st.session_state.active_filter_values = {}
 
     filter_cols = st.columns(n_cols)
 
@@ -63,17 +59,15 @@ def create_structured_data_filters(
                     and df[col].min() != df[col].max()
                 )
             ):
-                # Convert to numeric if object type
+                # Numeric filter logic remains unchanged
                 numeric_col = pd.to_numeric(df[col], errors="coerce")
                 min_val = float(numeric_col.dropna().min())
                 max_val = float(numeric_col.dropna().max())
 
-                # Add checkbox for including None values
+                # Checkbox for including None values
                 checkbox_key = f"{col}_include_none"
                 if checkbox_key not in st.session_state.temp_filter_values:
-                    st.session_state.temp_filter_values[checkbox_key] = (
-                        st.session_state.active_filter_values.get(checkbox_key, True)
-                    )
+                    st.session_state.temp_filter_values[checkbox_key] = True
 
                 include_none = st.checkbox(
                     f"Include None values for {col}",
@@ -82,19 +76,13 @@ def create_structured_data_filters(
                 )
                 st.session_state.temp_filter_values[checkbox_key] = include_none
 
-                # Initialize with current active values or defaults
+                # Slider for numeric range
                 range_key = f"{col}_range"
                 if range_key not in st.session_state.temp_filter_values:
-                    st.session_state.temp_filter_values[range_key] = (
-                        st.session_state.active_filter_values.get(
-                            range_key, (min_val, max_val)
-                        )
-                    )
+                    st.session_state.temp_filter_values[range_key] = (min_val, max_val)
 
-                # Unique key for the slider
                 slider_key = f"slider_{col}"
 
-                # Create slider widget with unique key
                 values = st.slider(
                     f"Filter {col}",
                     min_value=min_val,
@@ -111,42 +99,40 @@ def create_structured_data_filters(
                         f"Temp value: {st.session_state.temp_filter_values.get(range_key)}"
                     )
                     print(
-                        f"Active value: {st.session_state.active_filter_values.get(range_key)}"
-                    )
-                    print(
                         f"Include None - Temp: {st.session_state.temp_filter_values.get(checkbox_key)}"
                     )
-                    print(
-                        f"Include None - Active: {st.session_state.active_filter_values.get(checkbox_key)}"
-                    )
 
-                # Only apply active filters
-                active_values = st.session_state.active_filter_values.get(range_key)
-                active_include_none = st.session_state.active_filter_values.get(
+                # Apply temp filters
+                active_values = st.session_state.temp_filter_values.get(range_key)
+                active_include_none = st.session_state.temp_filter_values.get(
                     checkbox_key
                 )
 
                 if active_values:
                     old_shape = filtered_df.shape[0]
-                    # Convert column to numeric before comparison
                     numeric_col = pd.to_numeric(filtered_df[col], errors="coerce")
-                    mask = (
-                        (numeric_col >= active_values[0])
-                        & (numeric_col <= active_values[1])
-                    ) | (filtered_df[col].isna() if active_include_none else False)
+                    mask = (numeric_col >= active_values[0]) & (
+                        numeric_col <= active_values[1]
+                    )
+                    if active_include_none:
+                        mask |= filtered_df[col].isna()
                     filtered_df = filtered_df[mask]
                     if debug:
                         print(
                             f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
                         )
             elif viz_info["viz_type"] == "bar":
-                # Convert None to "(None)" for display, but keep other values as is
-                options = [
-                    str(x) if x is not None else "(None)" for x in df[col].unique()
-                ]
-                options = sorted(options)
+                # Categorical filter logic
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    options = sorted(df[col].unique())
+                else:
+                    options = sorted(
+                        [
+                            str(x) if x is not None else "(None)"
+                            for x in df[col].unique()
+                        ]
+                    )
 
-                # bad ux for > 9 options
                 if len(options) > max_options:
                     skipped_cols.append(col)
                     continue
@@ -154,19 +140,9 @@ def create_structured_data_filters(
                 select_key = f"{col}_select"
                 multiselect_key = f"multiselect_{col}"
 
-                # Initialize temp_filter_values based on active_filter_values or default to all options
                 if select_key not in st.session_state.temp_filter_values:
-                    active_selected = st.session_state.active_filter_values.get(
-                        select_key
-                    )
-                    if active_selected is not None:
-                        st.session_state.temp_filter_values[select_key] = (
-                            active_selected
-                        )
-                    else:
-                        st.session_state.temp_filter_values[select_key] = options.copy()
+                    st.session_state.temp_filter_values[select_key] = options.copy()
 
-                # Create multiselect widget
                 selected = st.multiselect(
                     f"Filter {col}",
                     options=options,
@@ -174,64 +150,57 @@ def create_structured_data_filters(
                     key=multiselect_key,
                 )
 
-                # Update temp_filter_values immediately with the widget's current selection
                 st.session_state.temp_filter_values[select_key] = selected
 
                 # Debug prints for categorical filters
-                if debug and col == "dataset_name":
+                if debug and col == "robot_rgb_cams":
                     print(f"\nCategory filter for {col}:")
                     print(
                         f"Temp value: {st.session_state.temp_filter_values.get(select_key)}"
                     )
-                    print(
-                        f"Active value: {st.session_state.active_filter_values.get(select_key)}"
-                    )
 
-                # Apply active filters if they exist
-                active_selected = st.session_state.active_filter_values.get(select_key)
+                active_selected = st.session_state.temp_filter_values.get(select_key)
                 if active_selected:
                     old_shape = filtered_df.shape[0]
-                    # Convert values based on column type
-                    if pd.api.types.is_bool_dtype(df[col]):
-                        active_values = [
-                            x == "True" if x != "(None)" else None
-                            for x in active_selected
-                        ]
-                    elif pd.api.types.is_numeric_dtype(df[col]):
-                        active_values = [
-                            float(x) if x != "(None)" else None for x in active_selected
-                        ]
-                        # Convert to int if the original column was integer
-                        if pd.api.types.is_integer_dtype(df[col]):
-                            active_values = [
-                                int(x) if x is not None else None for x in active_values
+                    # Convert selected options back to original data type if numeric
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        # Ensure all selections are numeric
+                        try:
+                            active_selected_converted = [
+                                (
+                                    float(x)
+                                    if isinstance(x, float) or "." in str(x)
+                                    else int(x)
+                                )
+                                for x in active_selected
                             ]
+                        except ValueError as ve:
+                            if debug:
+                                print(
+                                    f"ValueError converting selections for {col}: {ve}"
+                                )
+                            active_selected_converted = []
                     else:
-                        active_values = [
-                            (None if x == "(None)" else x) for x in active_selected
+                        # Handle None selection
+                        active_selected_converted = [
+                            None if x == "(None)" else x for x in active_selected
                         ]
 
-                    # Debug prints for problematic filters
-                    if debug:
-                        print(f"\nFiltering {col}:")
-                        print(f"Column dtype: {df[col].dtype}")
-                        print(f"Active values: {active_values}")
-                        print(
-                            f"Types of active values: {[type(x) for x in active_values]}"
-                        )
-
-                    # Apply the filter to the DataFrame
-                    filtered_df = filtered_df[filtered_df[col].isin(active_values)]
-                    if debug:
-                        print(
-                            f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
-                        )
+                    # Apply the filter only if conversion was successful
+                    if active_selected_converted:
+                        filtered_df = filtered_df[
+                            filtered_df[col].isin(active_selected_converted)
+                        ]
+                        if debug:
+                            print(
+                                f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
+                            )
             else:
                 skipped_cols.append(col)
 
     if debug:
         print("\nFinal df shape:", filtered_df.shape)
-    # check if len(filtered_df) == 0! something wrong
+    # Check if len(filtered_df) == 0! something wrong
     if len(filtered_df) == 0:
         breakpoint()
     return filtered_df, skipped_cols
@@ -243,24 +212,33 @@ def structured_data_filters_display(
     col1, col2, col3, _ = st.columns([5, 1, 1, 3])
     with col1:
         st.subheader("Structured Data Filters")
+
+    # Reset Button outside the form to allow resetting anytime
     with col2:
         if st.button("Reset Filters", type="primary"):
             # Clear all filter states
             st.session_state.temp_filter_values = {}
             st.session_state.active_filter_values = {}
             st.rerun()
+
+    # Apply Button is now part of the form
     with col3:
-        if st.button("Apply Filters", type="primary"):
-            # Copy temporary values to active values
-            st.session_state.active_filter_values = (
-                st.session_state.temp_filter_values.copy()
-            )
-            st.rerun()
+        pass  # Placeholder for alignment
 
     with st.expander("Filter Data", expanded=False):
-        value_filtered_df, skipped_cols = create_structured_data_filters(
-            df, debug=debug
-        )
+        with st.form(key="filter_form"):
+            value_filtered_df, skipped_cols = create_structured_data_filters(
+                df, debug=debug
+            )
+            submit = st.form_submit_button("Apply Filters")
+
+            if submit:
+                # Copy temporary values to active values
+                st.session_state.active_filter_values = (
+                    st.session_state.temp_filter_values.copy()
+                )
+                st.rerun()
+
         if skipped_cols:
             st.warning(
                 f"Skipped columns: {skipped_cols} due to high cardinality or lack of unique values"
@@ -358,11 +336,11 @@ def handle_selection(
     fig: go.Figure,
     custom_data_keys: list[str],
 ) -> tuple[bool, list[int], dict]:
-    # determine if selection was made OR if just no points selected
+    # Determine if selection was made OR if just no points selected
     if selection_flag := any(
         len(selection.get(k, [])) > 0 for k in ["box", "lasso", "points"]
     ):
-        # selection made!
+        # Selection made!
         selected_ids = []
         valid_traces = [
             v for k, v in cluster_to_trace.items() if "centroid" not in k.lower()
@@ -376,7 +354,7 @@ def handle_selection(
                 selected_ids.append(original_idx)
 
     else:
-        # no selection made, use all filtered points
+        # No selection made, use all filtered points
         selected_ids = value_filtered_df.id.tolist()
     return selection_flag, selected_ids, selection
 
@@ -386,17 +364,18 @@ def create_embedding_data_filters(
     fig: go.Figure,
     cluster_to_trace: dict[str, int],
     custom_data_keys: list[str],
+    name: str,
 ) -> tuple[bool, list[int], dict]:
     # Display the plot and capture selected points from the event data
     event = st.plotly_chart(
         fig,
         use_container_width=True,
-        key="cluster_plot",
+        key=f"cluster_plot_{name}",
         selection_mode=["points", "box", "lasso"],
         on_select="rerun",
     )
     selection = getattr(event, "selection", dict())
-    # handle finding the indices of the selected points
+    # Handle finding the indices of the selected points
     selection_flag, selected_ids, selection = handle_selection(
         value_filtered_df, selection, cluster_to_trace, fig, custom_data_keys
     )
@@ -411,11 +390,10 @@ def embedding_data_filters_display(
     id_key: str = "id",
     keep_mask: list[str] | None = None,
 ) -> tuple[pd.DataFrame, go.Figure, dict, bool]:
-    st.subheader(f"Embedding Filters")
     custom_data_keys = ["raw_data", "id"]
     if keep_mask is None:
         keep_mask = df[id_key].apply(str).tolist()
-    with st.expander("Embedding Selection", expanded=False):
+    with st.expander(f"Embedding Selection ({raw_data_key})", expanded=False):
         cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
             reduced,
             labels,
@@ -425,19 +403,21 @@ def embedding_data_filters_display(
             keep_mask=keep_mask,
         )
         selection_flag, selected_ids, selection = create_embedding_data_filters(
-            df, cluster_fig, cluster_to_trace, custom_data_keys
+            df, cluster_fig, cluster_to_trace, custom_data_keys, name=raw_data_key
         )
 
-        # need to only include IDs in selection that are in KEPT
+        # Need to only include IDs in selection that are in KEPT
         selected_ids = [x for x in selected_ids if str(x) in keep_mask]
 
         st.write("**Selection Controls**")
         st.write("Double click to clear selection")
-        if st.button("Summarize Selection"):
+        if st.button("Summarize Selection", key=f"summarize_selection_{raw_data_key}"):
             raw_data_idx = custom_data_keys.index("raw_data")
             cluster_to_data = defaultdict(list)
             for p in selection["points"]:
                 if p["curve_number"] not in cluster_to_trace.get("centroids", []):
+                    if "customdata" not in p:
+                        continue
                     cluster_to_data[p["curve_number"]].append(
                         p["customdata"][raw_data_idx]
                     )
@@ -447,15 +427,15 @@ def embedding_data_filters_display(
             for k, v in cluster_to_data.items():
                 v_sample = np.random.choice(v, min(10, len(v)), replace=False)
                 st.write(f"**Cluster {k}**")
-                st.write(f"Ex: {'; '.join(v_sample[:5])}")
                 st.write(
-                    f"Summary: {summarize(st.session_state['models']['summarizer'], v_sample, description='a cluster of points describing robot tasks.')}"
+                    f"**Summary**: {summarize(st.session_state['models']['summarizer'], v_sample, description='a subset of a cluster of points describing robot tasks.')}"
                 )
+                st.write(f"**Examples**: " + "\n- ".join(v_sample[:5]))
 
     filtered_df = df[df.id.astype(str).isin(map(str, selected_ids))]
 
     st.write(
-        f"Selection found! Using '{'box' if selection['box'] else 'lasso' if selection['lasso'] else 'points'}' as bounds"
+        f"Selection found! Using '{'box' if selection.get('box') else 'lasso' if selection.get('lasso') else 'points'}' as bounds"
         if selection_flag
         else "No selection found, using all points"
     )
@@ -463,3 +443,36 @@ def embedding_data_filters_display(
         f"Selected {len(filtered_df)} rows out of {len(keep_mask)} available via embedding filters"
     )
     return filtered_df, cluster_fig, selection, selection_flag
+
+
+def create_embedding_data_filter_display(
+    df: pd.DataFrame,
+    id_key: str,
+    raw_data_key: str,
+    kept_ids: list[str],
+) -> tuple[pd.DataFrame, go.Figure]:
+    reduced_embeddings = st.session_state[f"{raw_data_key}_reduced"]
+    labels = st.session_state[f"{raw_data_key}_labels"]
+    state_ids = st.session_state[f"{raw_data_key}_ids"]
+    try:
+        desired_ids = df[id_key].apply(str)
+        id_to_idx_state = {_id: idx for idx, _id in enumerate(state_ids)}
+        desired_state_indices = [id_to_idx_state[_id] for _id in desired_ids]
+        reduced_embeddings = reduced_embeddings[desired_state_indices]
+        labels = labels[desired_state_indices]
+
+        filtered_df, cluster_fig, selection, selection_flag = (
+            embedding_data_filters_display(
+                df=df,
+                reduced=reduced_embeddings,
+                labels=labels,
+                raw_data_key=raw_data_key,
+                id_key=id_key,
+                keep_mask=kept_ids,
+            )
+        )
+    except Exception as e:
+        print(e)
+        print(traceback.format_exc())
+        breakpoint()
+    return filtered_df, cluster_fig

@@ -1,38 +1,27 @@
-import json
 import os
 import time
 import traceback
 from collections import defaultdict
 from contextlib import contextmanager
-from datetime import datetime
 from typing import Any
 
-import numpy as np
-import pandas as pd
 import streamlit as st
-from sqlalchemy import select
 
-from ares.app.data_analysis import generate_automatic_visualizations
-from ares.app.export_data import export_options
-from ares.app.filter_helpers import (
-    embedding_data_filters_display,
-    select_row_from_df_user,
-    structured_data_filters_display,
-)
-from ares.app.init_data import display_state_info, initialize_data
 from ares.app.plot_primitives import show_dataframe
-from ares.app.viz_helpers import (
-    annotation_statistics,
-    create_tabbed_visualizations,
-    display_video_grid,
-    generate_robot_array_plot_visualizations,
-    generate_success_rate_visualizations,
-    generate_time_series_visualizations,
-    show_hero_display,
-    total_statistics,
+from ares.app.webapp_sections import (
+    data_distributions_section,
+    embedding_data_filters_section,
+    export_options,
+    loading_data_section,
+    plot_hero_section,
+    robot_array_section,
+    state_info_section,
+    structured_data_filters_section,
+    success_rate_analytics_section,
+    time_series_analytics_section,
+    video_grid_section,
 )
 from ares.constants import ARES_DATA_DIR
-from ares.databases.structured_database import RolloutSQLModel
 
 # top level variables
 title = "ARES Dashboard"
@@ -63,205 +52,122 @@ def timer_context(section_name: str) -> Any:
         section_times[section_name] += elapsed_time
 
 
-def load_data() -> pd.DataFrame:
-    """Load data from session state or initialize if needed."""
-    initialize_data(tmp_dump_dir)
-    return st.session_state.df
-
-
-# Streamlit app
+# Main function defining the order of the streamlit subsections
 def main() -> None:
+    """
+    Load data and setup state info
+    """
     # Define section names
     section_loading = "loading data"
-    print(section_loading)
     with filter_error_context(section_loading), timer_context(section_loading):
-        print("\n" + "=" * 100 + "\n")
-        st.set_page_config(page_title=title, page_icon="📊", layout="wide")
-        st.title(title)
-        df = load_data()
+        df = loading_data_section(title, tmp_dump_dir)
 
     section_state_info = "state info"
-    print(section_state_info)
     with filter_error_context(section_state_info), timer_context(section_state_info):
-        display_state_info()
-        total_statistics(df)
-        annotation_statistics(st.session_state.annotations_db)
-        st.divider()
+        state_info_section(df)
+    st.divider()
 
+    """
+    Filter data using structured (selected via buttons, dropdowns, etc.) and embedding (selected via pointer, boxes) filters
+    """
     section_filters = "structured data filters"
-    print(section_filters)
     with filter_error_context(section_filters), timer_context(section_filters):
-        # Structured data filters
-        st.header(f"Data Filters")
-        value_filtered_df = structured_data_filters_display(df, debug=True)
-        kept_ids = value_filtered_df["id"].apply(str).tolist()
-        st.write(
-            f"Selected {len(value_filtered_df)} rows out of {len(df)} total via structured data filters"
+        structured_filtered_df = structured_data_filters_section(df)
+
+    section_embedding_filters = "embedding data filters"
+    with (
+        filter_error_context(section_embedding_filters),
+        timer_context(section_embedding_filters),
+    ):
+        filtered_df, embedding_figs = embedding_data_filters_section(
+            df, structured_filtered_df
         )
-        # HACK
-        filtered_df = None
-        if len(kept_ids) == 0:
-            breakpoint()
+        if filtered_df.empty:
+            st.warning(
+                "No data available for the selected points! Try adjusting your selection to receive analytics."
+            )
+            return
+    st.divider()
 
-    # section_embedding_filters = "embedding data filters"
-    # print(section_embedding_filters)
-    # with filter_error_context(section_embedding_filters), timer_context(section_embedding_filters):
-    #     # Embedding data filters
-    #     id_key = "id"
-    #     state_key = "task_language_instruction"
-    #     raw_data_key = "task_language_instruction"
-
-    #     # TODO: present description, task language instruction filter options
-    #     reduced_embeddings = st.session_state[f"{state_key}_reduced"]
-    #     labels = st.session_state[f"{state_key}_labels"]
-    #     state_ids = st.session_state[f"{state_key}_ids"]
-    #     try:
-    #         desired_ids = df[id_key].apply(str)
-    #         id_to_idx_state = {_id: idx for idx, _id in enumerate(state_ids)}
-    #         desired_state_indices = [id_to_idx_state[_id] for _id in desired_ids]
-    #         reduced_embeddings = reduced_embeddings[desired_state_indices]
-    #         labels = labels[desired_state_indices]
-
-    #         filtered_df, cluster_fig, selection, selection_flag = (
-    #             embedding_data_filters_display(
-    #                 df=df,
-    #                 reduced=reduced_embeddings,
-    #                 labels=labels,
-    #                 raw_data_key=raw_data_key,
-    #                 id_key=id_key,
-    #                 keep_mask=kept_ids,
-    #             )
-    #         )
-    #     except Exception as e:
-    #         print(e)
-    #         print(traceback.format_exc())
-    #         breakpoint()
-
-    #     if filtered_df.empty:
-    #         st.warning(
-    #             "No data available for the selected points! Try adjusting your selection to receive analytics."
-    #         )
-    #         return
-
-    if filtered_df is None:
-        filtered_df = value_filtered_df
-        cluster_fig = None
-
-    # Add a button to refresh the sample
-    st.button(
-        "Get New Random Sample"
-    )  # Button press triggers streamlit rerun, triggers new random sample
-    show_dataframe(filtered_df.sample(min(5, len(filtered_df))), title="Data Sample")
-    # st.divider()
+    """
+    Display a section of the data and the distributions of the data, covering:
+    - general data distribution
+    - success rate
+    - time series trends
+    - video grid of examples
+    """
+    section_data_sample = "data sample"
+    with filter_error_context(section_data_sample), timer_context(section_data_sample):
+        show_dataframe(
+            filtered_df.sample(min(5, len(filtered_df))), title="Data Sample"
+        )
+    st.divider()
 
     section_display = "data distributions"
     with filter_error_context(section_display), timer_context(section_display):
-        max_x_bar_options = 100
-        # Create overview of all data
-        st.header("Distribution Analytics")
-        general_visualizations = generate_automatic_visualizations(
-            filtered_df,
-            time_column="ingestion_time",
-            max_x_bar_options=max_x_bar_options,
-        )
-        general_visualizations = sorted(
-            general_visualizations, key=lambda x: x["title"]
-        )
-        create_tabbed_visualizations(
-            general_visualizations, [viz["title"] for viz in general_visualizations]
-        )
+        data_distributation_visualizations = data_distributions_section(filtered_df)
 
     section_success_rate = "success estimate analytics"
     with (
         filter_error_context(section_success_rate),
         timer_context(section_success_rate),
     ):
-        st.header("Success Estimate Analytics")
-        success_visualizations = generate_success_rate_visualizations(filtered_df)
-        create_tabbed_visualizations(
-            success_visualizations, [viz["title"] for viz in success_visualizations]
-        )
+        success_rate_visualizations = success_rate_analytics_section(filtered_df)
     st.divider()
 
     section_time_series = "time series trends"
     with filter_error_context(section_time_series), timer_context(section_time_series):
-        st.header("Time Series Trends")
-        time_series_visualizations = generate_time_series_visualizations(
-            filtered_df, time_column="ingestion_time"
-        )
-        create_tabbed_visualizations(
-            time_series_visualizations,
-            [viz["title"] for viz in time_series_visualizations],
-        )
+        time_series_visualizations = time_series_analytics_section(filtered_df)
+    st.divider()
 
     section_video_grid = "video grid"
     with filter_error_context(section_video_grid), timer_context(section_video_grid):
-        # show video cards of first 5 rows in a horizontal layout
-        st.header("Rollout Examples")
-        n_videos = 5
-        display_rows = pd.concat(
-            {k: v.head(1) for k, v in filtered_df.groupby("dataset_name")}
-        )
-        if len(display_rows) < n_videos:
-            # get enough videos to fill n_videos that arent already in display_rows
-            extra_rows = filtered_df.head(n_videos)
-            # remove rows that are already in display_rows
-            extra_rows = extra_rows[~extra_rows.id.isin(display_rows.id)]
-            display_rows = pd.concat([display_rows, extra_rows])
-        display_video_grid(display_rows, lazy_load=True)
+        video_grid_section(filtered_df)
     st.divider()
 
+    """
+    Create a centralized focus on a single row of data with a 'hero' display
+    - Show the video, annotations, and other relevant data
+    - Create a tabbed interface for different views of the data
+    - Retrieve similar examples based on different metrics
+    """
     section_plot_hero = "plot hero display"
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
-        st.header("Rollout Display")
-        # initialize or persist selected row in state
-        select_row_from_df_user(filtered_df)
-        selected_row = st.session_state.get("selected_row")
-
-        if selected_row is not None:
-            show_dataframe(pd.DataFrame([selected_row]), title="Selected Row")
-            st.write(f"Selected row ID: {selected_row.id}")
-            hero_visualizations = show_hero_display(
-                df,  # compare selected row from filtered_df to all rows in df
-                selected_row,
-                st.session_state.all_vecs,
-                index_manager=st.session_state.INDEX_MANAGER,
-                lazy_load=False,
-                retrieve_n_most_similar=10,
-            )
-        else:
-            st.info("Please select a row to display details")
+        hero_visualizations, selected_row = plot_hero_section(df, filtered_df)
     st.divider()
 
+    """
+    Plot robot arrays showing the distribution of robot actions and states relative to the rest
+    of the dataset. Useful for finding outliers and other interesting patterns.
+    """
     section_plot_robots = "plot robot arrays"
     with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
-        if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
-            st.header("Robot Array Display")
-            # Number of trajectories to display in plots
-            robot_array_visualizations = generate_robot_array_plot_visualizations(
-                selected_row,  # need row to select dataset/robot embodiment of trajectories
-                st.session_state.all_vecs,
-                show_n=1000,
-            )
-        else:
-            st.write("No robot array plots generated")
-            robot_array_visualizations = []
+        robot_array_visualizations = robot_array_section(filtered_df, selected_row)
     st.divider()
 
+    """
+    Export the data and all visualizations to a file or training format.
+    """
     section_export = "exporting data"
     with filter_error_context(section_export), timer_context(section_export):
-        # Export controls
-        # Collect all visualizations
         # TODO: add structured data filters to export
         all_visualizations = [
-            *general_visualizations,
-            *success_visualizations,
+            *data_distributation_visualizations,
+            *success_rate_visualizations,
             *time_series_visualizations,
+            *hero_visualizations,
             *robot_array_visualizations,
-            *hero_visualizations,  # Add hero visualizations to export
         ]
-        export_options(filtered_df, all_visualizations, title, cluster_fig=cluster_fig)
+        export_options(
+            filtered_df,
+            all_visualizations,
+            title,
+            cluster_fig=embedding_figs.get(next(iter(embedding_figs))),
+        )
 
+    """
+    Display the timing report found by the context managers
+    """
     # Print timing report at the end
     print("\n=== Timing Report ===")
     print(f"Total time: {sum(section_times.values()):.2f} seconds")

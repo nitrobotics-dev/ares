@@ -175,7 +175,7 @@ def create_embedding_similarity_visualization(
                 )
 
                 # Filter out exact matches (using small epsilon to handle floating point)
-                non_zero_mask = distances > 1e-10
+                non_zero_mask = distances > 1e-6
                 filtered_distances = distances[non_zero_mask]
                 filtered_ids = ids[non_zero_mask]
                 filtered_matrices = (
@@ -236,8 +236,6 @@ def create_similarity_tabs(
             for i, (dist, id_str) in enumerate(
                 zip(viz_data["distances"], viz_data["ids"])
             ):
-                if np.isnan(dist):
-                    breakpoint()
                 with similar_cols[i % max_cols_in_tab]:
                     st.write(f"Distance: {dist:.3f}")
                     # Convert id_str to UUID only if it's not already a UUID
@@ -275,6 +273,21 @@ def get_video_annotation_data(video_id: str) -> dict | None:
         )
     )
     return {"video_data": video_data, "annotations": annotations}
+
+
+def setup_zero_distance_checkbox_with_state() -> str:
+    zero_distance_filter_key = "filter_zero_distance_matches"
+    if zero_distance_filter_key not in st.session_state:
+        st.session_state[zero_distance_filter_key] = False
+
+    if st.checkbox(
+        "Filter out zero-distance matches",
+        value=st.session_state[zero_distance_filter_key],
+    ):
+        st.session_state[zero_distance_filter_key] = True
+    else:
+        st.session_state[zero_distance_filter_key] = False
+    return zero_distance_filter_key
 
 
 def show_hero_display(
@@ -388,31 +401,42 @@ def show_hero_display(
             breakpoint()
 
     # Row 3: n tabs covering most similar based on state, action, text
-    st.write(f"**Similarity Search**")
+    st.write(f"**Similar Examples**")
     st.write(f"Most similar examples to {row['id']}, based on:")
-    # TODO: ALSO DESCRIPTION
-    text_distance_fn = "Levenshtein"
-    text_data_key = "task_language_instruction"
-    tab_names = [
-        f"Task - {text_distance_fn}",
-        f"Task - Embedding",
-        *[t.title() for t in TRAJECTORY_INDEX_NAMES],
-    ]
 
     # some robotics datasets have lots of overlap, e.g. the same task instruction.
     # we may want to filter out zero-distance matches, even if they aren't the same ID
     # and will need to persist selection in state
-    zero_distance_filter_key = "filter_zero_distance_matches"
-    if zero_distance_filter_key not in st.session_state:
-        st.session_state[zero_distance_filter_key] = False
 
-    if st.checkbox(
-        "Filter out zero-distance matches",
-        value=st.session_state[zero_distance_filter_key],
-    ):
-        st.session_state[zero_distance_filter_key] = True
-    else:
-        st.session_state[zero_distance_filter_key] = False
+    zero_distance_filter_key = setup_zero_distance_checkbox_with_state()
+
+    text_distance_fn = "Levenshtein"
+    text_data_key = "task_language_instruction"
+
+    text_viz_data = create_text_similarity_visualization(
+        row,
+        df,
+        retrieve_n_most_similar,
+        text_data_key,
+        distance_fn_name=text_distance_fn.lower(),
+        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
+    )
+
+    text_embedding_viz_data = create_embedding_similarity_visualization(
+        row,
+        name=text_data_key,
+        index_manager=index_manager,
+        n_most_similar=retrieve_n_most_similar,
+        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
+    )
+
+    description_viz_data = create_embedding_similarity_visualization(
+        row,
+        name="description_estimate",
+        index_manager=index_manager,
+        n_most_similar=retrieve_n_most_similar,
+        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
+    )
 
     # Get the similarity data
     trajectory_viz_data = [
@@ -425,26 +449,18 @@ def show_hero_display(
         )
         for k in TRAJECTORY_INDEX_NAMES
     ]
-    text_embedding_viz_data = create_embedding_similarity_visualization(
-        row,
-        name=text_data_key,
-        index_manager=index_manager,
-        n_most_similar=retrieve_n_most_similar,
-        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-    )
 
-    text_viz_data = create_text_similarity_visualization(
-        row,
-        df,
-        retrieve_n_most_similar,
-        text_data_key,
-        distance_fn_name=text_distance_fn.lower(),
-        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-    )
+    tab_names = [
+        f"Task - {text_distance_fn}",
+        f"Task - Embedding",
+        f"Description - Embedding",
+        *[t.title() for t in TRAJECTORY_INDEX_NAMES],
+    ]
 
     similarity_viz = [
         text_viz_data,
         text_embedding_viz_data,
+        description_viz_data,
         *trajectory_viz_data,
     ]
 
@@ -574,5 +590,5 @@ def annotation_statistics(ann_db: AnnotationDatabase) -> None:
         st.write(f"{stats['total_annotations']:,}")
     with col4:
         st.subheader(f"Annotations by type:")
-        for k, v in stats["annotations_by_type"].items():
+        for k, v in sorted(stats["annotations_by_type"].items(), key=lambda x: x[1]):
             st.write(f"{k}: {v:,}")
