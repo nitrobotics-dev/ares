@@ -1,9 +1,9 @@
 import os
 import time
 import traceback
+import typing as t
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import Any
 
 import streamlit as st
 
@@ -30,7 +30,7 @@ section_times: dict[str, float] = defaultdict(float)
 
 
 @contextmanager
-def filter_error_context(section_name: str) -> Any:
+def filter_error_context(section_name: str) -> t.Any:
     """Context manager for handling filter operation errors."""
     try:
         yield
@@ -42,7 +42,7 @@ def filter_error_context(section_name: str) -> Any:
 
 
 @contextmanager
-def timer_context(section_name: str) -> Any:
+def timer_context(section_name: str) -> t.Any:
     """Context manager for timing sections."""
     start_time = time.time()
     try:

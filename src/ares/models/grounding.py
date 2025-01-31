@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 import numpy as np
 import torch
@@ -39,7 +38,7 @@ class GroundingAnnotator:
 
     def setup_detector(
         self, model_id: str
-    ) -> Tuple[AutoProcessor, AutoModelForZeroShotObjectDetection]:
+    ) -> tuple[AutoProcessor, AutoModelForZeroShotObjectDetection]:
         processor = AutoProcessor.from_pretrained(model_id)
         print(f"Downloading model {model_id}...")
         model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id).to(
@@ -49,7 +48,7 @@ class GroundingAnnotator:
 
     def setup_segmenter(
         self, model_id: str | None
-    ) -> Tuple[AutoProcessor, AutoModelForMaskGeneration]:
+    ) -> tuple[AutoProcessor, AutoModelForMaskGeneration]:
         if model_id is None:
             return None, None
         processor = AutoProcessor.from_pretrained(model_id)

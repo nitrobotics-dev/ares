@@ -25,7 +25,9 @@ from ares.utils.clustering import cluster_embeddings
 def load_cached_embeddings(
     tmp_dump_dir: str, index_name: str, stored_embeddings: np.ndarray
 ) -> tuple | None:
-    """Try to load cached embeddings and clusters for given index"""
+    """
+    Settig up embedding visualizations can be expensive, so we locally cache some of the generated arrays.
+    """
     embeddings_path = os.path.join(tmp_dump_dir, f"{index_name}_embeddings.npy")
     clusters_path = os.path.join(tmp_dump_dir, f"{index_name}_clusters.npz")
     ids_path = os.path.join(tmp_dump_dir, f"{index_name}_ids.npy")  # New path for IDs
@@ -64,7 +66,9 @@ def save_embeddings(
     labels: np.ndarray,
     ids: np.ndarray,  # Add IDs parameter
 ) -> None:
-    """Save embeddings, clusters, and IDs to disk"""
+    """
+    Save reduced embeddings, clusters, and IDs to disk
+    """
     embeddings_path = os.path.join(tmp_dump_dir, f"{index_name}_embeddings.npy")
     clusters_path = os.path.join(tmp_dump_dir, f"{index_name}_clusters.npz")
     ids_path = os.path.join(tmp_dump_dir, f"{index_name}_ids.npy")  # New path for IDs
@@ -81,7 +85,9 @@ def store_in_session(
     labels: np.ndarray,
     stored_ids: np.ndarray,
 ) -> None:
-    """Store embeddings and clusters in session state"""
+    """
+    Store embeddings, clusters, other info in session state
+    """
     st.session_state[f"{index_name}_embeddings"] = embeddings
     st.session_state[f"{index_name}_reduced"] = reduced
     st.session_state[f"{index_name}_labels"] = labels
@@ -89,7 +95,9 @@ def store_in_session(
 
 
 def initialize_data(tmp_dump_dir: str) -> None:
-    """Initialize database connection, load data and create embeddings with caching."""
+    """
+    Initialize database connection, load data and create embeddings with caching.
+    """
     # Skip if already initialized
     if all(
         key in st.session_state for key in ["ENGINE", "SESSION", "df", "INDEX_MANAGER"]
@@ -164,7 +172,9 @@ def initialize_data(tmp_dump_dir: str) -> None:
 
 
 def display_state_info() -> None:
-    # all in a dropdown
+    """
+    Helpful debugging state info displayed as the first rendered item in the streamlit object
+    """
     with st.expander("Session State Data Overview"):
         """Display information about data stored in streamlit session state."""
         st.header("Session State Data Overview")

@@ -1,11 +1,10 @@
 import json
 import os
 import traceback
+import typing as t
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type
 
 import faiss
 import numpy as np
@@ -30,7 +29,7 @@ def rollout_to_index_name(rollout: Rollout | pd.Series, suffix: str) -> str:
     return f"{rollout.dataset_formalname}-{rollout.robot.embodiment}-{suffix}"
 
 
-def rollout_to_embedding_pack(rollout: Rollout) -> Dict[str, np.ndarray | None]:
+def rollout_to_embedding_pack(rollout: Rollout) -> dict[str, np.ndarray | None]:
     pack = dict()
     for key in TRAJECTORY_INDEX_NAMES:
         val = getattr(rollout.trajectory, f"{key}_array", None)
@@ -44,8 +43,8 @@ class NormalizationTracker:
     def __init__(
         self,
         feature_dim: int,
-        initial_means: Optional[np.ndarray] = None,
-        initial_stds: Optional[np.ndarray] = None,
+        initial_means: t.Optional[np.ndarray] = None,
+        initial_stds: t.Optional[np.ndarray] = None,
     ):
         self.feature_dim = feature_dim
         # For online updates
@@ -73,7 +72,7 @@ class NormalizationTracker:
             delta2 = x - self.mean
             self.M2 += delta * delta2
 
-    def get_current_stats(self) -> Tuple[np.ndarray, np.ndarray]:
+    def get_current_stats(self) -> tuple[np.ndarray, np.ndarray]:
         """Get current mean and std estimates"""
         if self.count < 2:
             return self.mean, np.ones_like(self.mean)
@@ -85,8 +84,8 @@ class NormalizationTracker:
         return self.mean, std
 
     def compute_batch_stats(
-        self, matrices: List[np.ndarray]
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, matrices: list[np.ndarray]
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Compute statistics from a batch of matrices"""
         # Reshape all matrices to 2D arrays with features as columns
         all_data = np.vstack([m.reshape(-1, self.feature_dim) for m in matrices])
@@ -112,10 +111,10 @@ class Index(ABC):
         self.n_entries = 0
 
         # Initialize normalization constants to None
-        self.norm_means: Optional[np.ndarray] = None
-        self.norm_stds: Optional[np.ndarray] = None
+        self.norm_means: t.Optional[np.ndarray] = None
+        self.norm_stds: t.Optional[np.ndarray] = None
 
-        # Optional online normalization
+        # t.Optional online normalization
         self.online_norm = online_norm
         if online_norm:
             self.norm_tracker = NormalizationTracker(feature_dim)
@@ -128,7 +127,7 @@ class Index(ABC):
     @abstractmethod
     def search(
         self, query_vector: np.ndarray, k: int
-    ) -> Tuple[np.ndarray, List[str], np.ndarray]:
+    ) -> tuple[np.ndarray, list[str], np.ndarray]:
         """Search for similar vectors
         Returns:
             - distances: (n_queries, k) array of distances
@@ -158,7 +157,7 @@ class Index(ABC):
         pass
 
     @abstractmethod
-    def get_all_ids(self) -> List[str]:
+    def get_all_ids(self) -> list[str]:
         """Get all string IDs in the index, in the same order as get_all_vectors()"""
         pass
 
@@ -187,7 +186,7 @@ class Index(ABC):
         return (matrix * self.norm_stds) + self.norm_means
 
     @abstractmethod
-    def get_vector_by_id(self, entry_id: str) -> Optional[np.ndarray]:
+    def get_vector_by_id(self, entry_id: str) -> t.Optional[np.ndarray]:
         """Get a vector by its string ID
         Returns:
             - vector: The vector if found, None otherwise
@@ -206,7 +205,7 @@ class FaissIndex(Index):
         super().__init__(feature_dim, time_steps, online_norm)
         base_index = faiss.IndexFlatL2(self.total_dim)
         self.index = faiss.IndexIDMap2(base_index)
-        self.id_map: Dict[int, str] = {}
+        self.id_map: dict[int, str] = {}
         self.next_id: int = 0
 
     def add_vector(self, vector: np.ndarray, entry_id: str) -> None:
@@ -218,7 +217,7 @@ class FaissIndex(Index):
 
     def search(
         self, query_vector: np.ndarray, k: int
-    ) -> Tuple[np.ndarray, List[str], np.ndarray]:
+    ) -> tuple[np.ndarray, list[str], np.ndarray]:
         distances, internal_indices = self.index.search(query_vector.reshape(1, -1), k)
         # -1 is the default value for faiss.IndexFlatL2 for no matches
         string_ids = [self.id_map[int(idx)] for idx in internal_indices[0] if idx != -1]
@@ -280,7 +279,7 @@ class FaissIndex(Index):
     def get_all_vectors(self) -> np.ndarray:
         return np.vstack([self.index.reconstruct(i) for i in range(self.index.ntotal)])
 
-    def get_vector_by_id(self, entry_id: str) -> Optional[np.ndarray]:
+    def get_vector_by_id(self, entry_id: str) -> t.Optional[np.ndarray]:
         """Get a vector by its string ID"""
         # Find the internal ID corresponding to the string ID
         internal_id = None
@@ -313,7 +312,7 @@ class FaissIndex(Index):
 
     def brute_force_search(
         self, query_vector: np.ndarray, k: int, max_brute_force: int = 100
-    ) -> Tuple[np.ndarray, List[str], np.ndarray]:
+    ) -> tuple[np.ndarray, list[str], np.ndarray]:
         """Search using brute force comparison when index is small enough.
         More reliable than FAISS for small datasets."""
         assert (
@@ -348,7 +347,7 @@ class IndexManager:
     def __init__(
         self,
         base_dir: str,
-        index_class: Type[Index],
+        index_class: t.Type[Index],
         max_backups: int = 1,
         online_norm: bool = False,
     ):
@@ -356,8 +355,8 @@ class IndexManager:
         self.base_dir.mkdir(exist_ok=True, parents=True)
         self.index_class = index_class
         self.max_backups = max_backups
-        self.indices: Dict[str, Index] = {}
-        self.metadata: Dict[str, dict] = {}
+        self.indices: dict[str, Index] = {}
+        self.metadata: dict[str, dict] = {}
         self.online_norm = online_norm
 
         # Load existing indices if they exist
@@ -368,9 +367,9 @@ class IndexManager:
         name: str,
         feature_dim: int,
         time_steps: int,
-        norm_means: Optional[np.ndarray] = None,
-        norm_stds: Optional[np.ndarray] = None,
-        extra_metadata: Optional[dict] = None,
+        norm_means: t.Optional[np.ndarray] = None,
+        norm_stds: t.Optional[np.ndarray] = None,
+        extra_metadata: t.Optional[dict] = None,
     ) -> None:
         if name in self.indices:
             raise ValueError(f"Index {name} already exists")
@@ -495,7 +494,7 @@ class IndexManager:
         path = self.base_dir / f"{name}.index"
         self.indices[name].save(path)
 
-    def update_metadata(self, name: str, **kwargs: Any) -> None:
+    def update_metadata(self, name: str, **kwargs: t.Any) -> None:
         """Update metadata for an index"""
         if name not in self.metadata:
             self.metadata[name] = {"n_entries": 0}  # Initialize with n_entries
@@ -548,7 +547,7 @@ class IndexManager:
 
     def get_all_matrices(
         self, name: str | list[str] | None = None
-    ) -> Dict[str, Dict[str, np.ndarray | None]]:
+    ) -> dict[str, dict[str, np.ndarray | None]]:
         """Get all vectors and their IDs from the manager, reshaping vectors to matrices.
 
         Args:
@@ -579,7 +578,7 @@ class IndexManager:
             if n in name
         }
 
-    def get_matrix_by_id(self, name: str, entry_id: str) -> Optional[np.ndarray]:
+    def get_matrix_by_id(self, name: str, entry_id: str) -> t.Optional[np.ndarray]:
         """Get a matrix by its ID, handling denormalization
 
         Args:

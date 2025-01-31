@@ -2,7 +2,6 @@ import asyncio
 import os
 import traceback
 from pathlib import Path
-from typing import List, Tuple
 
 from tqdm import tqdm
 

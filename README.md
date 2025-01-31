@@ -5,3 +5,6 @@ ARES is a system for automatically evaluating robot data using machine learning 
 ## Overview
 ARES is composed to three main components: a single-rollout pseudolabeling system, a structured database for storing robot data, and a dataset-wide evaluation and visualization system. We ingest robot data, extract relevant information, store it in a database, and then present an easy-to-use interface for understanding weaknesses and strengths in the robot's performance.
 
+
+# HACK FIXME TODO --> treat pi_demo as a batch of robot data w analysis!
+    --> use as batch case for developing tools to analyze static batches of data

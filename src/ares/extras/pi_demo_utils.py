@@ -1,4 +1,9 @@
-PI_DEMO_PATH = "/workspaces/ares/data/videos/pi_demos"
+import os
+
+from ares.constants import ARES_VIDEO_DIR
+
+PI_DEMO_PATH = os.path.join(ARES_VIDEO_DIR, "pi_demos")
+
 PI_DEMO_TASKS = {
     "Eggs in carton": {
         "task": "The robot must place every egg into the carton and then close and secure the lid.",

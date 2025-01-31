@@ -4,8 +4,8 @@ See ares/train/README.md for more details and ares/train/preprocess.py for how t
 """
 
 import json
+import typing as t
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
 
 import click
 import numpy as np
@@ -47,7 +47,7 @@ class RolloutDataset(Dataset):
 
     def __getitem__(
         self, idx: int
-    ) -> Dict[str, Rollout | Dict[str, Any] | list[np.ndarray]]:
+    ) -> dict[str, Rollout | dict[str, t.Any] | list[np.ndarray]]:
         """Get a rollout and its annotations."""
         row = self.df.iloc[idx]
 
@@ -85,8 +85,8 @@ def get_dataloader(
     """Create DataLoader with custom collate function."""
 
     def collate_fn(
-        batch: list[Dict[str, Rollout | Dict[str, Any] | list[np.ndarray]]]
-    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        batch: list[dict[str, Rollout | dict[str, t.Any] | list[np.ndarray]]]
+    ) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         # construct your training data here! example below
         inputs = {
             "image_batch": torch.stack(

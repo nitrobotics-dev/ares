@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 import pandas as pd
-from sqlalchemy import Column, Engine, MetaData, inspect, select, text
+from sqlalchemy import Engine, MetaData, inspect, select, text
 from sqlmodel import Session, SQLModel, create_engine
 
 from ares.configs.base import Rollout
@@ -90,7 +90,7 @@ def add_rollout(engine: Engine, rollout: Rollout, RolloutSQLModel: SQLModel) -> 
         session.commit()
 
 
-def add_rollouts(engine: Engine, rollouts: t.List[Rollout]) -> None:
+def add_rollouts(engine: Engine, rollouts: t.list[Rollout]) -> None:
     # use add_all; potentially update to bulk_save_objects
     with Session(engine) as session:
         session.add_all([RolloutSQLModel(**t.flatten_fields("")) for t in rollouts])

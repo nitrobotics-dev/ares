@@ -2,18 +2,13 @@
 Base classes and functions for annotating rollouts, either by API, Modal, or local.
 """
 
-import os
 import pickle
-import time
 from dataclasses import dataclass, field
-from typing import List
 
 from sqlalchemy import Engine
 
-from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
 from ares.constants import get_dataset_info_by_key
-from ares.databases.annotation_database import AnnotationDatabase
 from ares.databases.structured_database import get_rollouts_by_ids, setup_rollouts
 
 
@@ -29,10 +24,10 @@ class ResultTracker:
     videos: int = 0
     frames: int = 0
     annotations: int = 0
-    video_ids: List[str] = field(default_factory=list)
+    video_ids: list[str] = field(default_factory=list)
 
     def update_via_batch(
-        self, n_videos: int, n_frames: int, n_annotations: int, video_ids: List[str]
+        self, n_videos: int, n_frames: int, n_annotations: int, video_ids: list[str]
     ):
         self.videos += n_videos
         self.frames += n_frames
@@ -53,11 +48,11 @@ class ResultTracker:
 
 def setup_rollouts_from_sources(
     engine: Engine,
-    rollout_ids: List[str] | None = None,
+    rollout_ids: list[str] | None = None,
     ids_path: str | None = None,
     dataset_filename: str | None = None,
     split: str | None = None,
-) -> List[Rollout]:
+) -> list[Rollout]:
     """
     Helper function to setup rollouts from a variety of sources.
     """

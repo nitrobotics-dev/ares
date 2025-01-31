@@ -1,8 +1,6 @@
 import asyncio
-from typing import List
 
 import numpy as np
-from PIL import Image
 
 from ares.configs.annotations import Annotation, binary_mask_to_rle
 from ares.models.base import VLM

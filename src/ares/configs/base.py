@@ -2,7 +2,6 @@ import json
 import typing as t
 import uuid
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -13,7 +12,7 @@ COLOR_PATTERN = f"^(white|black|gray|red|green|blue|yellow|purple|orange|brown|p
 
 
 class BaseConfig(BaseModel):
-    def flatten_fields(self, prefix: str = "") -> t.Dict[str, t.Any]:
+    def flatten_fields(self, prefix: str = "") -> dict[str, t.Any]:
         flattened = {}
         for field_name, field_value in self.model_dump().items():
             if isinstance(field_value, dict):
@@ -245,10 +244,11 @@ class Rollout(BaseConfig):
 
 def pydantic_to_field_instructions(
     model_cls: type[BaseModel],
-    exclude_fields: t.Dict = {},
+    exclude_fields: dict | None = None,
     prefix: str = "",
     required_only: bool = False,
 ) -> list[str]:
+    exclude_fields = exclude_fields or {}
     field_instructions = []
     skip_fields = {"id", "ingestion_time", "creation_time"}
 
@@ -298,8 +298,11 @@ def pydantic_to_field_instructions(
 
 
 def pydantic_to_example_dict(
-    model_cls: type[BaseModel], exclude_fields: t.Dict = {}, required_only: bool = False
+    model_cls: type[BaseModel],
+    exclude_fields: dict | None = None,
+    required_only: bool = False,
 ) -> dict:
+    exclude_fields = exclude_fields or {}
     # Get the field instructions first
     field_instructions = pydantic_to_field_instructions(
         model_cls, exclude_fields, required_only=required_only

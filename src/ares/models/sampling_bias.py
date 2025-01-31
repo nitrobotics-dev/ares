@@ -11,8 +11,6 @@ import typing as t
 
 import numpy as np
 
-# question: CLIP cluster sampling? only sample frames truly different from one another?
-
 
 # linear sampling bias
 def linear_sampling_bias(

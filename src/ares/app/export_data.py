@@ -1,3 +1,7 @@
+"""
+Simple methods for exporting ARES dashboards for a report to external users.
+"""
+
 import os
 import traceback
 from datetime import datetime

@@ -4,8 +4,8 @@ This enables us to perform efficient nearest neighbor search on the embeddings i
 """
 
 import time
+import typing as t
 from collections import defaultdict
-from typing import Union
 
 import click
 import numpy as np
@@ -151,14 +151,14 @@ def run_embedding_database_ingestion_per_dataset(
 )
 @click.option(
     "--dataset-formalname",
-    type=Union[str, None],
+    type=t.Union[str, None],
     required=False,
     help="Formal name of the dataset to process",
     default=None,
 )
 @click.option(
     "--from-id-file",
-    type=Union[str, None],
+    type=t.Union[str, None],
     required=False,
     help="File containing rollout ids to ingest",
     default=None,
@@ -172,10 +172,10 @@ def run_embedding_database_ingestion_per_dataset(
 )
 def main(
     engine_url: str,
-    dataset_formalname: Union[str, None],
-    from_id_file: Union[str, None],
+    dataset_formalname: t.Union[str, None],
+    from_id_file: t.Union[str, None],
     index_path: str,
-):
+) -> None:
     """Run embedding database ingestion for trajectory data."""
     assert (
         dataset_formalname is not None or from_id_file is not None

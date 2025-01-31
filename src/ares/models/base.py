@@ -2,7 +2,6 @@ import asyncio
 import base64
 import json
 import os
-import time
 import typing as t
 from asyncio import Semaphore
 from contextlib import nullcontext
@@ -122,7 +121,7 @@ class VLM:
         video_path: str | None = None,
         double_prompt: bool = False,
         model_kwargs: t.Dict | None = None,
-    ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
+    ) -> t.tuple[list[dict[str, t.Any]], ModelResponse]:
         """Rate-limited async version of ask method"""
         async with self.semaphore:
             model_kwargs = model_kwargs or dict()
@@ -141,7 +140,7 @@ class VLM:
         video_path: str | None = None,
         double_prompt: bool = False,
         model_kwargs: t.Dict | None = None,
-    ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
+    ) -> t.tuple[list[dict[str, t.Any]], ModelResponse]:
         return asyncio.run(
             self.ask_async(
                 info,
@@ -162,7 +161,7 @@ class VLM:
         ) = None,
         double_prompt: bool = False,
         model_kwargs: t.Dict | None = None,
-    ) -> list[t.Tuple[list[dict[str, t.Any]], ModelResponse]]:
+    ) -> list[t.tuple[list[dict[str, t.Any]], ModelResponse]]:
         """Process multiple requests with rate limiting"""
         if images_list is None:
             images_list = [None] * len(infos)
@@ -202,7 +201,7 @@ class GeminiVideoVLM(VLM):
         video_path: str | None = None,
         double_prompt: bool = False,
         model_kwargs: t.Dict | None = None,
-    ) -> t.Tuple[list[dict[str, t.Any]], ModelResponse]:
+    ) -> t.tuple[list[dict[str, t.Any]], ModelResponse]:
         model_kwargs = model_kwargs or dict()
         prompt = self._get_prompt(prompt_filename, info)
         if video_path:

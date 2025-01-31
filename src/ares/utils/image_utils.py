@@ -1,14 +1,12 @@
 import base64
 import io
 import os
-import random
 import tempfile
 import typing as t
 from pathlib import Path
 
 import cv2
 import numpy as np
-import pandas as pd
 import requests
 from moviepy.editor import ImageSequenceClip
 from PIL import Image
@@ -230,7 +228,7 @@ def load_video_frames(
     fname: str,
     target_fps: int | float = 1,
     include_last_frame: bool = False,
-) -> tuple[t.List[np.ndarray], t.List[int]]:
+) -> tuple[t.list[np.ndarray], t.list[int]]:
     """Load video frames at specified FPS."""
     video_path = get_video_from_path(dataset_filename, fname)
 

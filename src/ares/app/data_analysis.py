@@ -1,9 +1,8 @@
-from typing import Any
+import typing as t
 
-import numpy as np
 import pandas as pd
 
-from ares.app.plot_primitives import create_bar_plot, create_histogram, create_line_plot
+from ares.app.plot_primitives import create_bar_plot, create_histogram
 
 
 def infer_visualization_type(
@@ -11,7 +10,11 @@ def infer_visualization_type(
     data: pd.DataFrame,
     skip_columns: list | None = None,
     max_str_length: int = 500,
-) -> dict[str, Any]:
+) -> dict[str, t.Any]:
+    """
+    Heuristic solution for transforming a column of data into a visualization type,
+    focusing on numeric ranges or category counts.
+    """
     skip_columns = skip_columns or ["path", "id"]
 
     dtype = str(data[column_name].dtype)
@@ -58,6 +61,9 @@ def generate_automatic_visualizations(
     ignore_cols: list[str] | None = None,
     max_x_bar_options: int = 100,
 ) -> list[dict]:
+    """
+    After inferring the 'type' of a column, we can create automatic visualizations.
+    """
     ignore_cols = ignore_cols or ["dataset_filename", "dataset_formalname"]
     visualizations = []
 

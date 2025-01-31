@@ -1,8 +1,8 @@
 import time
+import typing as t
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from pymongo import MongoClient
@@ -41,7 +41,7 @@ class AnnotationDatabase:
         )
         self.annotations.create_index([("video_id", 1), ("key", 1)])
 
-    def add_video(self, video_id: str, metadata: Dict[str, Any]) -> str:
+    def add_video(self, video_id: str, metadata: dict[str, t.Any]) -> str:
         """Add or update video metadata."""
         self.videos.update_one(
             {"_id": video_id},
@@ -56,7 +56,7 @@ class AnnotationDatabase:
         key: str,
         value: Annotation,
         annotation_type: str,
-        frame: Optional[Union[int, List[int]]] = None,
+        frame: t.Optional[t.Union[int, list[int]]] = None,
     ) -> str:
         """
         Add a key-value annotation.
@@ -66,7 +66,7 @@ class AnnotationDatabase:
             key: Annotation key (e.g., "person_bbox", "scene_label")
             value: The annotation value
             annotation_type: Type of annotation (e.g., "bbox", "label", "mask")
-            frame: Optional frame number or list of frames this applies to
+            frame: t.Optional frame number or list of frames this applies to
         """
         assert isinstance(value, Annotation)
         value_dict = value.to_dict()
@@ -81,7 +81,7 @@ class AnnotationDatabase:
         result = self.annotations.insert_one(annotation)
         return str(result.inserted_id)
 
-    def get_video_metadata(self, video_id: str) -> Optional[Dict[str, Any]]:
+    def get_video_metadata(self, video_id: str) -> t.Optional[dict[str, t.Any]]:
         """Get video metadata."""
         video = self.videos.find_one({"_id": video_id})
         # Handle case where video exists but has no metadata
@@ -90,9 +90,9 @@ class AnnotationDatabase:
     def get_annotations(
         self,
         video_id: str,
-        annotation_type: Optional[str] = None,
-        frame: Optional[int] = None,
-    ) -> List[Dict[str, Any]] | None:
+        annotation_type: t.Optional[str] = None,
+        frame: t.Optional[int] = None,
+    ) -> list[dict[str, t.Any]] | None:
         """Get annotations for a video, optionally filtered by type and frame."""
         # First check if video exists
         if not self.videos.find_one({"_id": video_id}):
@@ -122,8 +122,8 @@ class AnnotationDatabase:
         return output
 
     def add_frame_annotations(
-        self, video_id: str, frame: int, annotations: List[Annotation]
-    ) -> List[str]:
+        self, video_id: str, frame: int, annotations: list[Annotation]
+    ) -> list[str]:
         """Add multiple annotations for a specific frame."""
         annotation_ids = []
         for ann in annotations:
@@ -137,7 +137,7 @@ class AnnotationDatabase:
             annotation_ids.append(ann_id)
         return annotation_ids
 
-    def get_database_stats(self) -> Dict[str, Any]:
+    def get_database_stats(self) -> dict[str, t.Any]:
         """Get statistics about the current state of the database.
 
         Returns:
@@ -162,7 +162,7 @@ class AnnotationDatabase:
         total_frames_result = list(self.annotations.aggregate(pipeline))
         total_frames = total_frames_result[0]["total"] if total_frames_result else 0
 
-        stats: dict[str, Any] = {
+        stats: dict[str, t.Any] = {
             "total_videos": self.videos.count_documents({}),
             "total_annotated_frames": total_frames,
             "total_annotations": self.annotations.count_documents({}),
@@ -212,7 +212,7 @@ class AnnotationDatabase:
         return stats
 
     def delete_annotations(
-        self, video_id: str, annotation_type: Optional[str] = None
+        self, video_id: str, annotation_type: t.Optional[str] = None
     ) -> int:
         """Delete annotations for a video, optionally filtered by type.
 
@@ -245,9 +245,9 @@ class AnnotationDatabase:
         self,
         dataset_filename: str,
         video_path: str,
-        frames: List[np.ndarray],
-        frame_indices: List[int],
-        annotations: List[List[Annotation]],
+        frames: list[np.ndarray],
+        frame_indices: list[int],
+        annotations: list[list[Annotation]],
         label_str: str,
     ) -> str:
         """Add a video and its frame annotations to the database.
@@ -299,7 +299,7 @@ class AnnotationDatabase:
         self.delete_video(video_id)
         self.delete_annotations(video_id)
 
-    def peek_database(self, limit: int = 5) -> Dict[str, Any]:
+    def peek_database(self, limit: int = 5) -> dict[str, t.Any]:
         """Preview entries from both videos and annotations collections.
 
         Args:
@@ -327,10 +327,10 @@ class AnnotationDatabase:
 
         return samples
 
-    def get_video_ids(self) -> List[str]:
+    def get_video_ids(self) -> list[str]:
         return list(self.videos.find().distinct("_id"))
 
-    def get_annotation_ids(self) -> List[str]:
+    def get_annotation_ids(self) -> list[str]:
         return list(self.annotations.find().distinct("video_id"))
 
 

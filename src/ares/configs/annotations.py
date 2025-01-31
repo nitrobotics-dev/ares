@@ -1,10 +1,8 @@
 import json
-import os
-from typing import Any, Dict, Optional, Union
+import typing as t
 
 import cv2
 import numpy as np
-from PIL import Image
 from pycocotools import mask as mask_utils
 from pydantic import BaseModel, Field, model_validator
 
@@ -35,13 +33,13 @@ class Annotation(BaseModel):
     score: float | None = None
 
     # Segmentation attributes
-    segmentation: Optional[Union[dict, list[list[float]]]] = (
+    segmentation: t.Optional[t.Union[dict, list[list[float]]]] = (
         None  # RLE or polygon format
     )
 
     # Tracking and metadata
-    track_id: Optional[int] = None
-    attributes: Dict[str, Any] = Field(default_factory=dict)
+    track_id: t.Optional[int] = None
+    attributes: dict[str, t.Any] = Field(default_factory=dict)
     annotation_type: str | None = None
 
     model_config = {
@@ -79,7 +77,7 @@ class Annotation(BaseModel):
         return x1, y1, x2 - x1, y2 - y1
 
     # Add this validation method
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: t.Any) -> None:
         """Validate bbox format after initialization."""
         if self.bbox is not None:
             x1, y1, x2, y2 = self.bbox
@@ -135,8 +133,8 @@ class Annotation(BaseModel):
             return self.compute_bbox_iou(other)
 
         intersection = np.logical_and(self.mask, other.mask).sum()
-        union = np.logical_or(self.mask, other.mask).sum()
-        return float(intersection) / float(union) if union > 0 else 0.0
+        t.Union = np.logical_or(self.mask, other.mask).sum()
+        return float(intersection) / float(t.Union) if t.Union > 0 else 0.0
 
     def compute_bbox_iou(self, other: "Annotation") -> float:
         """Compute IoU between bounding boxes."""
@@ -160,8 +158,8 @@ class Annotation(BaseModel):
         area2 = (x2_ - x1_) * (y2_ - y1_)
 
         # Compute IoU
-        union = area1 + area2 - intersection
-        return intersection / union if union > 0 else 0.0
+        t.Union = area1 + area2 - intersection
+        return intersection / t.Union if t.Union > 0 else 0.0
 
     def transform(
         self,

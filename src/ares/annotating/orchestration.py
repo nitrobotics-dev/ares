@@ -5,7 +5,6 @@ Base classes and functions for annotating rollouts, either by API, Modal, or loc
 import os
 import pickle
 import time
-from typing import List
 
 from ares.annotating.annotating_base import (
     ErrorResult,
@@ -24,12 +23,12 @@ def orchestrate_annotating(
     annotating_fn: AnnotatingFn,
     dataset_filename: str | None = None,
     split: str | None = None,
-    rollout_ids: List[str] | None = None,
+    rollout_ids: list[str] | None = None,
     outer_batch_size: int = ANNOTATION_OUTER_BATCH_SIZE,  # RAM limits number of concurrent rollouts formatted into requests
     ids_path: str = None,  # Path to ids to load; may be failed IDs from previous run
     annotating_kwargs: dict | None = None,
     failures_path: str | None = None,
-) -> tuple[ResultTracker, List[ErrorResult]]:
+) -> tuple[ResultTracker, list[ErrorResult]]:
     """
     Main function to run grounding annotation using Modal.
 
@@ -39,7 +38,7 @@ def orchestrate_annotating(
         annotating_fn (Callable): Function to run annotation.
         dataset_filename (str, optional): Dataset filename.
         split (str, optional): Data split.
-        rollout_ids (List[str], optional): Specific rollout IDs to process.
+        rollout_ids (list[str], optional): Specific rollout IDs to process.
         outer_batch_size (int, optional): Batch size for processing rollouts.
         ids_path (str, optional): Path to ids to load.
         annotating_kwargs (dict, optional): Additional keyword arguments for annotating_fn.

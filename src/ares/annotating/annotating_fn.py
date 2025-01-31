@@ -1,6 +1,5 @@
 import asyncio
 import traceback
-from typing import List
 
 from tqdm import tqdm
 
@@ -20,11 +19,11 @@ class AnnotatingFn:
 
     def __call__(
         self,
-        rollouts: List[Rollout],
+        rollouts: list[Rollout],
         ann_db: AnnotationDatabase,
         outer_batch_size: int,
         **kwargs,
-    ) -> tuple[ResultTracker, List[ErrorResult]]: ...
+    ) -> tuple[ResultTracker, list[ErrorResult]]: ...
 
 
 class APIAnnotatingFn(AnnotatingFn):
@@ -41,7 +40,7 @@ class APIAnnotatingFn(AnnotatingFn):
         vlm: VLM,
         rollouts_batch: list[Rollout],
         ann_db: AnnotationDatabase,
-    ) -> tuple[ResultTracker, List[ErrorResult]]:
+    ) -> tuple[ResultTracker, list[ErrorResult]]:
         # Create futures with their corresponding rollouts
         futures = []
         for rollout in rollouts_batch:

@@ -2,8 +2,6 @@
 Modal wrapper for interacting with GroundingWorker.
 """
 
-from typing import List, Tuple
-
 from modal import enter, method
 
 from ares.annotating.modal_base import BaseModalWrapper, BaseWorker
@@ -20,8 +18,8 @@ class GroundingWorker(BaseWorker):
 
     @method()
     async def process(
-        self, batch: List[Tuple[str, list, str]]
-    ) -> List[Tuple[str, list]]:
+        self, batch: list[tuple[str, list, str]]
+    ) -> list[tuple[str, list]]:
         """
         Process method to annotate multiple videos in a batch.
 
@@ -29,7 +27,7 @@ class GroundingWorker(BaseWorker):
             batch: List of tuples containing (rollout_id, frames, label_str)
 
         Returns:
-            List[Tuple[str, list]]: List of annotation results
+            list[tuple[str, list]]: List of annotation results
         """
         results = []
         for rollout_id, frames, label_str in batch:
@@ -52,15 +50,15 @@ class GroundingModalWrapper(BaseModalWrapper):
         super().__init__(app_name, worker_cls=GroundingWorker)
 
     async def annotate_videos(
-        self, tasks: List[Tuple[str, list, str]]
-    ) -> List[Tuple[str, list]]:
+        self, tasks: list[tuple[str, list, str]]
+    ) -> list[tuple[str, list]]:
         """
         Submit a batch of annotation tasks to the GroundingWorker.
 
         Args:
-            tasks (List[Tuple[str, list, str]]): List of tuples containing rollout_id, frames, and label_str.
+            tasks (list[tuple[str, list, str]]): List of tuples containing rollout_id, frames, and label_str.
 
         Returns:
-            List[Tuple[str, list]]: List of annotation results.
+            list[tuple[str, list]]: List of annotation results.
         """
         return await self.run_batch(tasks)

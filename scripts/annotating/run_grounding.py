@@ -5,7 +5,7 @@ Orchestration script to run grounding annotations using Modal.
 import asyncio
 import os
 import traceback
-from typing import Any, Dict, List, Tuple
+import typing as t
 
 import numpy as np
 from tqdm import tqdm
@@ -31,23 +31,23 @@ from ares.utils.image_utils import load_video_frames
 
 async def run_annotate_and_ingest(
     annotator: GroundingModalWrapper,
-    rollout_ids: List[str],
-    annotation_input_futures: List[Any],
+    rollout_ids: list[str],
+    annotation_input_futures: list[t.Any],
     db: AnnotationDatabase,
-    rollouts: List[Any],
-) -> Tuple[ResultTracker, List[ErrorResult]]:
+    rollouts: list[t.Any],
+) -> tuple[ResultTracker, list[ErrorResult]]:
     """
     Run annotation tasks in parallel using Modal.
 
     Args:
         annotator (GroundingModalWrapper): Modal wrapper for grounding tasks.
-        rollout_ids (List[str]): List of rollout IDs.
-        annotation_input_futures (List[Any]): List of asyncio Tasks for preparing annotation inputs.
+        rollout_ids (list[str]): List of rollout IDs.
+        annotation_input_futures (list[t.Any]): List of asyncio Tasks for preparing annotation inputs.
         db (AnnotationDatabase): Database instance for storing annotations.
-        rollouts (List[Any]): List of rollout objects.
+        rollouts (list[t.Any]): List of rollout objects.
 
     Returns:
-        Tuple[ResultTracker, List[ErrorResult]]: Tracker and list of failures.
+        tuple[ResultTracker, list[ErrorResult]]: Tracker and list of failures.
     """
     id_to_rollout = {r.id: r for r in rollouts}
     id_to_annotation_inputs = {}
@@ -116,20 +116,20 @@ async def run_annotate_and_ingest(
 
 
 async def setup_query(
-    rollout: Any,
+    rollout: t.Any,
     vlm: VLM,
     target_fps: int = 5,
-) -> Tuple[str, List[np.ndarray], List[int], str] | Dict[str, Any]:
+) -> tuple[str, list[np.ndarray], list[int], str] | dict[str, t.Any]:
     """
     Prepare annotation inputs for a rollout.
 
     Args:
-        rollout (Any): Rollout object.
+        rollout (t.Any): Rollout object.
         vlm (VLM): Vision-Language Model instance.
         target_fps (int, optional): Target FPS for frame extraction.
 
     Returns:
-        Tuple[str, List[np.ndarray], List[int], str] | Dict[str, Any]: Prepared data or error dict.
+        tuple[str, list[np.ndarray], list[int], str] | dict[str, t.Any]: Prepared data or error dict.
     """
     try:
         frames, frame_indices = load_video_frames(
@@ -167,23 +167,23 @@ async def setup_query(
 
 
 async def run_ground_and_annotate(
-    rollouts: List[Any],
+    rollouts: list[t.Any],
     vlm: VLM,
     ann_db: AnnotationDatabase,
     annotator: GroundingModalWrapper,
     target_fps: int = ANNOTATION_GROUNDING_FPS,
-) -> Tuple[ResultTracker, List[ErrorResult]]:
+) -> tuple[ResultTracker, list[ErrorResult]]:
     """
     Process, ground, and annotate list of rollouts.
 
     Args:
-        rollouts (List[Any]): List of rollout objects.
+        rollouts (list[t.Any]): List of rollout objects.
         vlm (VLM): Vision-Language Model instance.
         ann_db (AnnotationDatabase): Annotation database instance.
         target_fps (int, optional): Target FPS for annotation.
 
     Returns:
-        Tuple[Dict[str, int], List[Dict]]: Tracker and list of failures.
+        tuple[dict[str, int], list[dict]]: Tracker and list of failures.
     """
     rollout_ids = [r.id for r in rollouts]
 
@@ -206,7 +206,7 @@ async def run_ground_and_annotate(
 class GroundingModalAnnotatingFn(AnnotatingFn):
     def __call__(
         self,
-        rollouts: List[Rollout],
+        rollouts: list[Rollout],
         ann_db: AnnotationDatabase,
         outer_batch_size: int,
         annotation_fps: int = ANNOTATION_GROUNDING_FPS,

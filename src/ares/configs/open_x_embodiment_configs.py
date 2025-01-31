@@ -1,5 +1,5 @@
 import os
-from typing import Any
+import typing as t
 
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ class TensorConverterMixin(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def convert_tensors_to_python(cls, data: dict) -> dict:
-        def convert_value(value: Any) -> Any:
+        def convert_value(value: t.Any) -> t.Any:
             if isinstance(value, tf.Tensor):
                 # Convert to numpy first
                 value = value.numpy()

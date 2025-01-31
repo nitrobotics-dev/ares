@@ -9,7 +9,7 @@ from sqlmodel import Field, SQLModel
 def create_flattened_model(
     data_model: t.Type[BaseModel], non_nullable_fields: list[str] = ["id"]
 ) -> t.Type[SQLModel]:
-    fields: t.Dict[str, t.Any] = {
+    fields: dict[str, t.Any] = {
         "__annotations__": {},
         "__tablename__": "rollout",
     }

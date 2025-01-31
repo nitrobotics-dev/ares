@@ -1,10 +1,5 @@
-import io
-import json
-import os
-import random
 import traceback
 import uuid
-from typing import Any, Union
 
 import numpy as np
 import pandas as pd
@@ -14,10 +9,7 @@ import streamlit as st
 from Levenshtein import distance as levenshtein_distance
 
 from ares.app.annotation_helpers import draw_annotations
-from ares.app.data_analysis import (
-    generate_automatic_visualizations,
-    infer_visualization_type,
-)
+from ares.app.data_analysis import infer_visualization_type
 from ares.app.plot_primitives import (
     create_bar_plot,
     create_line_plot,

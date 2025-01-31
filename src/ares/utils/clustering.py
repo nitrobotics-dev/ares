@@ -2,9 +2,7 @@
 Cluster embeddings using UMAP for dimensionality reduction and HDBSCAN for clustering.
 """
 
-import json
-import os
-from typing import Optional, Tuple
+import typing as t
 
 import hdbscan
 import numpy as np
@@ -20,7 +18,7 @@ def cluster_embeddings(
     min_cluster_size: int = 50,
     min_samples: int = 5,
     random_state: int = 42,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Cluster embeddings using UMAP for dimensionality reduction and HDBSCAN for clustering.
 
@@ -55,10 +53,10 @@ def visualize_clusters(
     reduced_embeddings: np.ndarray,
     cluster_labels: np.ndarray,
     raw_data: list,
-    ids: Optional[list] = None,
-    custom_data_keys: Optional[list] = None,
-    keep_mask: Optional[list[str]] = None,
-) -> Tuple[go.Figure, pd.DataFrame, dict[str, int | list[int]]]:
+    ids: t.Optional[list] = None,
+    custom_data_keys: t.Optional[list] = None,
+    keep_mask: t.Optional[list[str]] = None,
+) -> tuple[go.Figure, pd.DataFrame, dict[str, int | list[int]]]:
     """
     Create an interactive 2D visualization of the clustered embeddings.
     Returns figure and dataframe for selection tracking.
@@ -67,8 +65,8 @@ def visualize_clusters(
         reduced_embeddings: UMAP-reduced embeddings (2D)
         cluster_labels: Cluster assignments for each embedding
         raw_data: Original text/data for each point
-        ids: Optional list of IDs for each point
-        keep_mask: Optional mask to gray out some points
+        ids: t.Optional list of IDs for each point
+        keep_mask: t.Optional mask to gray out some points
     """
     # Initialize trace counter and mapping at the start
     current_trace = 0
