@@ -7,11 +7,11 @@ from typing import Any
 
 import streamlit as st
 
+from ares.app.export_data import export_options
 from ares.app.plot_primitives import show_dataframe
 from ares.app.webapp_sections import (
     data_distributions_section,
     embedding_data_filters_section,
-    export_options,
     loading_data_section,
     plot_hero_section,
     robot_array_section,
@@ -53,10 +53,11 @@ def timer_context(section_name: str) -> Any:
 
 
 # Main function defining the order of the streamlit subsections
+# Note: streamlit displays standalone-strings like `"""..."""` as markdown! Use `#` for comments.
 def main() -> None:
-    """
-    Load data and setup state info
-    """
+    ######################################################################
+    # Load data and setup state info
+    ######################################################################
     # Define section names
     section_loading = "loading data"
     with filter_error_context(section_loading), timer_context(section_loading):
@@ -67,9 +68,9 @@ def main() -> None:
         state_info_section(df)
     st.divider()
 
-    """
-    Filter data using structured (selected via buttons, dropdowns, etc.) and embedding (selected via pointer, boxes) filters
-    """
+    ######################################################################
+    # Filter data using structured (selected via buttons, dropdowns, etc.) and embedding (selected via pointer, boxes) filters
+    ######################################################################
     section_filters = "structured data filters"
     with filter_error_context(section_filters), timer_context(section_filters):
         structured_filtered_df = structured_data_filters_section(df)
@@ -89,13 +90,13 @@ def main() -> None:
             return
     st.divider()
 
-    """
-    Display a section of the data and the distributions of the data, covering:
-    - general data distribution
-    - success rate
-    - time series trends
-    - video grid of examples
-    """
+    ######################################################################
+    # Display a section of the data and the distributions of the data, covering:
+    # - general data distribution
+    # - success rate
+    # - time series trends
+    # - video grid of examples
+    ######################################################################
     section_data_sample = "data sample"
     with filter_error_context(section_data_sample), timer_context(section_data_sample):
         show_dataframe(
@@ -125,29 +126,29 @@ def main() -> None:
         video_grid_section(filtered_df)
     st.divider()
 
-    """
-    Create a centralized focus on a single row of data with a 'hero' display
-    - Show the video, annotations, and other relevant data
-    - Create a tabbed interface for different views of the data
-    - Retrieve similar examples based on different metrics
-    """
+    ######################################################################
+    # Create a centralized focus on a single row of data with a 'hero' display
+    # - Show the video, annotations, and other relevant data
+    # - Create a tabbed interface for different views of the data
+    # - Retrieve similar examples based on different metrics
+    ######################################################################
     section_plot_hero = "plot hero display"
     with filter_error_context(section_plot_hero), timer_context(section_plot_hero):
         hero_visualizations, selected_row = plot_hero_section(df, filtered_df)
     st.divider()
 
-    """
-    Plot robot arrays showing the distribution of robot actions and states relative to the rest
-    of the dataset. Useful for finding outliers and other interesting patterns.
-    """
+    ######################################################################
+    # Plot robot arrays showing the distribution of robot actions and states relative to the rest
+    # of the dataset. Useful for finding outliers and other interesting patterns.
+    ######################################################################
     section_plot_robots = "plot robot arrays"
     with filter_error_context(section_plot_robots), timer_context(section_plot_robots):
         robot_array_visualizations = robot_array_section(filtered_df, selected_row)
     st.divider()
 
-    """
-    Export the data and all visualizations to a file or training format.
-    """
+    ######################################################################
+    # Export the data and all visualizations to a file or training format.
+    ######################################################################
     section_export = "exporting data"
     with filter_error_context(section_export), timer_context(section_export):
         # TODO: add structured data filters to export
@@ -165,10 +166,9 @@ def main() -> None:
             cluster_fig=embedding_figs.get(next(iter(embedding_figs))),
         )
 
-    """
-    Display the timing report found by the context managers
-    """
-    # Print timing report at the end
+    ######################################################################
+    # Display the timing report found by the context managers
+    ######################################################################
     print("\n=== Timing Report ===")
     print(f"Total time: {sum(section_times.values()):.2f} seconds")
     for section, elapsed_time in section_times.items():

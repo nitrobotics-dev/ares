@@ -43,7 +43,7 @@ def state_info_section(df: pd.DataFrame) -> None:
 def structured_data_filters_section(df: pd.DataFrame) -> pd.DataFrame:
     # Structured data filters
     st.header(f"Data Filters")
-    structured_filtered_df = structured_data_filters_display(df, debug=True)
+    structured_filtered_df = structured_data_filters_display(df, debug=False)
     st.write(
         f"Selected {len(structured_filtered_df)} rows out of {len(df)} total via structured data filters"
     )
