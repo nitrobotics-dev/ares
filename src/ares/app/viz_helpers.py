@@ -4,11 +4,9 @@ import uuid
 import numpy as np
 import pandas as pd
 import plotly
-import plotly.express as px
 import streamlit as st
 from Levenshtein import distance as levenshtein_distance
 
-from ares.app.annotation_helpers import draw_annotations
 from ares.app.data_analysis import infer_visualization_type
 from ares.app.plot_primitives import (
     create_bar_plot,
@@ -22,11 +20,6 @@ from ares.databases.embedding_database import (
     TRAJECTORY_INDEX_NAMES,
     IndexManager,
     rollout_to_index_name,
-)
-from ares.utils.image_utils import (
-    choose_and_preprocess_frames,
-    get_video_frames,
-    get_video_mp4,
 )
 
 
@@ -265,207 +258,6 @@ def get_video_annotation_data(video_id: str) -> dict | None:
         )
     )
     return {"video_data": video_data, "annotations": annotations}
-
-
-def setup_zero_distance_checkbox_with_state() -> str:
-    zero_distance_filter_key = "filter_zero_distance_matches"
-    if zero_distance_filter_key not in st.session_state:
-        st.session_state[zero_distance_filter_key] = False
-
-    if st.checkbox(
-        "Filter out zero-distance matches",
-        value=st.session_state[zero_distance_filter_key],
-    ):
-        st.session_state[zero_distance_filter_key] = True
-    else:
-        st.session_state[zero_distance_filter_key] = False
-    return zero_distance_filter_key
-
-
-def show_hero_display(
-    df: pd.DataFrame,
-    row: pd.Series,
-    all_vecs: dict,
-    index_manager: IndexManager,
-    traj_array_show_n: int = 100,
-    retrieve_n_most_similar: int = 5,
-    lazy_load: bool = False,
-    max_cols: int = 5,
-) -> list[dict]:
-    """
-    Row 1: text
-    Row 2: video col, detail + robot array plots
-    Row 3: n tabs covering most similar based on state, action, video, text (embedding), text (metric)
-
-    Returns:
-        List of visualization figures to be included in export
-    """
-
-    dataset, fname = (
-        row["dataset_filename"],
-        row["filename"],
-    )
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if lazy_load:
-            frame = get_video_frames(dataset, fname, n_frames=1)[0]
-            st.image(frame)
-            if st.button("Load Video"):
-                st.video(get_video_mp4(dataset, fname))
-        else:
-            st.video(get_video_mp4(dataset, fname))
-    with col2:
-        if row.task_language_instruction:
-            st.write(f"**Task:** {row.task_language_instruction}")
-        if not np.isnan(row.task_success) and row.task_success:
-            st.write(f"**Success:** {row.task_success:.2f}")
-        if isinstance(row.trajectory_reward_step, str):
-            if int(row.trajectory_reward_step) >= 0:
-                st.write(
-                    f"**Reward Step:** {row.trajectory_reward_step} ({100*int(row.trajectory_reward_step) / int(row.length):.2f}% through rollout)"
-                )
-            else:
-                st.write(f"Failure episode!")
-        with st.expander("Row Details", expanded=False):
-            json_repr = {
-                k: (v if len(str(v)) < 1000 else str(v)[:1000] + "...")
-                for k, v in sorted(row.to_dict().items(), key=lambda x: x[0])
-            }
-            st.json(json_repr, expanded=False)
-
-        if st.button("Generate Robot Array Plots", key="robot_array_plots_button_hero"):
-            array_figs = generate_robot_array_plot_visualizations(
-                row, all_vecs, traj_array_show_n, highlight_row=True
-            )
-        else:
-            array_figs = []
-
-    # Add annotation data retrieval button
-    if st.button("Retrieve Annotation Data"):
-        try:
-            dataset_filename = row["dataset_filename"]
-            video_id = f"{dataset_filename}/{row['filename']}" + ".mp4"
-            db_data = get_video_annotation_data(video_id)
-            if db_data is not None:
-                annotation_data = db_data.get("annotations")
-                if not annotation_data:
-                    st.warning(
-                        f"No annotation data found for this video for {video_id}"
-                    )
-                else:
-                    detection_data = annotation_data.get("detection")
-                    if detection_data:
-                        frame_inds = list(detection_data.keys())
-                        all_frame_paths = get_video_frames(
-                            dataset, fname, n_frames=None, just_path=True
-                        )
-                        selected_frames = choose_and_preprocess_frames(
-                            all_frame_paths,
-                            specified_frames=frame_inds,
-                        )
-                        annotated_frames = [
-                            draw_annotations(frame, anns)
-                            for frame, anns in zip(
-                                selected_frames, detection_data.values()
-                            )
-                        ]
-                        with st.expander("Annotated Frames", expanded=False):
-                            max_cols = 3
-                            cols = st.columns(max_cols)
-                            for i, (frame_ind, frame) in enumerate(
-                                zip(frame_inds, annotated_frames)
-                            ):
-                                with cols[i % max_cols]:
-                                    st.write(f"Frame {frame_ind}")
-                                    st.image(frame)
-
-                    with st.expander("Raw Annotation Data (as JSON)", expanded=False):
-                        st.write("Video Data:")
-                        st.json(db_data["video_data"], expanded=False)
-                        st.write("Annotations:")
-                        st.json(db_data["annotations"], expanded=False)
-            else:
-                st.warning(f"No video or annotation data found for {video_id}")
-        except Exception as e:
-            st.error(f"Error retrieving annotation data: {str(e)}")
-            st.error(traceback.format_exc())
-            breakpoint()
-
-    # Row 3: n tabs covering most similar based on state, action, text
-    st.write(f"**Similar Examples**")
-    st.write(f"Most similar examples to {row['id']}, based on:")
-
-    # some robotics datasets have lots of overlap, e.g. the same task instruction.
-    # we may want to filter out zero-distance matches, even if they aren't the same ID
-    # and will need to persist selection in state
-
-    zero_distance_filter_key = setup_zero_distance_checkbox_with_state()
-
-    text_distance_fn = "Levenshtein"
-    text_data_key = "task_language_instruction"
-
-    text_viz_data = create_text_similarity_visualization(
-        row,
-        df,
-        retrieve_n_most_similar,
-        text_data_key,
-        distance_fn_name=text_distance_fn.lower(),
-        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-    )
-
-    text_embedding_viz_data = create_embedding_similarity_visualization(
-        row,
-        name=text_data_key,
-        index_manager=index_manager,
-        n_most_similar=retrieve_n_most_similar,
-        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-    )
-
-    description_viz_data = create_embedding_similarity_visualization(
-        row,
-        name="description_estimate",
-        index_manager=index_manager,
-        n_most_similar=retrieve_n_most_similar,
-        filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-    )
-
-    # Get the similarity data
-    trajectory_viz_data = [
-        create_embedding_similarity_visualization(
-            row,
-            name=rollout_to_index_name(row, k),
-            index_manager=index_manager,
-            n_most_similar=retrieve_n_most_similar,
-            filter_zero_distance_matches=st.session_state[zero_distance_filter_key],
-        )
-        for k in TRAJECTORY_INDEX_NAMES
-    ]
-
-    tab_names = [
-        f"Task - {text_distance_fn}",
-        f"Task - Embedding",
-        f"Description - Embedding",
-        *[t.title() for t in TRAJECTORY_INDEX_NAMES],
-    ]
-
-    similarity_viz = [
-        text_viz_data,
-        text_embedding_viz_data,
-        description_viz_data,
-        *trajectory_viz_data,
-    ]
-
-    # Create the tabs with the data
-    create_similarity_tabs(
-        similarity_viz,
-        tab_names,
-        df,
-        max_cols_in_tab=max_cols,
-    )
-
-    # Return all visualizations for export
-    return array_figs + similarity_viz
 
 
 def generate_robot_array_plot_visualizations(

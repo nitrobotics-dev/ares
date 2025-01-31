@@ -1,5 +1,6 @@
 """
-Base classes and functions for annotating rollouts, either by API, Modal, or local.
+Helper function to orchestrate annotation over datasets in the structured database and send annotations into the annotation database.
+See `ares.annotating.annotating_fn.py` for the AnnotatingFn object that gets fulfilled for different annotation methods.
 """
 
 import os
@@ -30,7 +31,7 @@ def orchestrate_annotating(
     failures_path: str | None = None,
 ) -> tuple[ResultTracker, list[ErrorResult]]:
     """
-    Main function to run grounding annotation using Modal.
+    Main function to run annotations, whether local, API-driven, or on Modal.
 
     Args:
         engine_path (str): Path to the database engine.

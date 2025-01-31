@@ -1,4 +1,6 @@
-"""Base Modal infrastructure for running serverless compute tasks."""
+"""
+Base Modal infrastructure for running serverless compute tasks.
+"""
 
 import asyncio
 

@@ -7,6 +7,7 @@ from ares.app.filter_helpers import (
     select_row_from_df_user,
     structured_data_filters_display,
 )
+from ares.app.hero_display import show_hero_display
 from ares.app.init_data import display_state_info, initialize_data
 from ares.app.plot_primitives import show_dataframe
 from ares.app.viz_helpers import (
@@ -16,7 +17,6 @@ from ares.app.viz_helpers import (
     generate_robot_array_plot_visualizations,
     generate_success_rate_visualizations,
     generate_time_series_visualizations,
-    show_hero_display,
     total_statistics,
 )
 from ares.databases.embedding_database import META_INDEX_NAMES
