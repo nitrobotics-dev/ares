@@ -267,7 +267,7 @@ def show_dataframe(
 
     # Add a button to refresh the sample
     st.button(
-        "Get New Random Sample"
+        "Get New Random Sample", key=f"refresh_sample_{title}"
     )  # Button press triggers streamlit rerun, triggers new random sample
 
     # Create copy and filter columns
