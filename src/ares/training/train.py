@@ -67,7 +67,7 @@ class RolloutDataset(Dataset):
 
         # construct extra information like grounding annotations, chain of thought, etc.
         extra_info = {
-            k: json.loads(v)
+            k: (json.loads(v) if isinstance(v, str) else v)
             for k, v in row.items()
             if k in self.train_config.extra_info_cols
         }
@@ -168,15 +168,30 @@ def collate_fn(
     image_tensors = [torch.tensor(item["images"][:max_frames]) for item in batch]
     padded_images, image_mask, _ = pad_sequence(image_tensors, max_frames)
 
-    # Convert and pad trajectory data
+    # Convert and pad trajectory data with None handling
     states_tensors = [
-        torch.tensor(item["rollout"].trajectory.states_array) for item in batch
+        (
+            torch.tensor(item["rollout"].trajectory.states_array)
+            if item["rollout"].trajectory.states_array is not None
+            else torch.zeros((0,))
+        )
+        for item in batch
     ]
     actions_tensors = [
-        torch.tensor(item["rollout"].trajectory.actions_array) for item in batch
+        (
+            torch.tensor(item["rollout"].trajectory.actions_array)
+            if item["rollout"].trajectory.actions_array is not None
+            else torch.zeros((0,))
+        )
+        for item in batch
     ]
     rewards_tensors = [
-        torch.tensor(item["rollout"].trajectory.rewards_array) for item in batch
+        (
+            torch.tensor(item["rollout"].trajectory.rewards_array)
+            if item["rollout"].trajectory.rewards_array is not None
+            else torch.zeros((0,))
+        )
+        for item in batch
     ]
 
     padded_states, states_seq_mask, states_feat_mask = pad_sequence(
@@ -252,13 +267,17 @@ def main(preprocessed_path: str, extra_info_cols: list[str]) -> None:
         shuffle=True,
     )
 
-    # one example loop
-    for inputs, outputs in dataloader:
-        print(inputs.keys())
-        print(outputs.keys())
+    # example loop
+    for i, (inputs, outputs) in enumerate(dataloader):
+        if i == 0:
+            print(inputs.keys())
+            print(outputs.keys())
+
         breakpoint()
         preds = MOCK_MODEL(inputs)
-        break
+
+        if i > 10:
+            break
 
 
 if __name__ == "__main__":

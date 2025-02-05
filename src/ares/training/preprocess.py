@@ -41,11 +41,11 @@ from ares.databases.structured_database import (
 def setup_extra_info_col(
     df: pd.DataFrame, col: str, ann_db: AnnotationDatabase
 ) -> list[str | None]:
-    raw_anns = []
+    raw_anns: list[str | None] = []
     for _, row in tqdm(df.iterrows(), desc=f"Collecting annotations for {col}"):
         video_id = get_video_id(row["dataset_filename"], row["filename"])
         anns = ann_db.get_annotations(video_id, annotation_type=col)
-        if col in anns:
+        if anns and col in anns:
             raw_anns.append(
                 json.dumps(
                     anns[col],

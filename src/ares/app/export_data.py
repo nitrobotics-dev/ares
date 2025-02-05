@@ -15,35 +15,23 @@ import streamlit as st
 from ares.constants import ARES_DATA_DIR
 
 
-def export_dataframe(df: pd.DataFrame, base_path: str) -> str:
-    """Export dataframe to CSV file with timestamp.
-
-    Args:
-        df: DataFrame containing all data
-        base_path: Base directory path where file should be saved
-
-    Returns:
-        Path where file was saved
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    export_dir = os.path.join(base_path, "exports")
-
-    # Create exports directory if it doesn't exist
-    os.makedirs(export_dir, exist_ok=True)
-
-    # Save dataframe
-    export_path = os.path.join(export_dir, f"video_analytics_{timestamp}.csv")
-    df.to_csv(export_path, index=False)
-
-    return export_path
-
-
 def pdf_from_html(all_html_content: str, full_path: str) -> None:
-    html_path = f"/tmp/export.html"
-    with open(html_path, "w") as f:
+    # Use absolute path for temporary HTML file
+    html_path = os.path.abspath("/tmp/export.html")
+
+    # Write the HTML content with proper encoding
+    with open(html_path, "w", encoding="utf-8") as f:
         f.write(all_html_content)
-    pdfkit.from_file(html_path, full_path)
-    os.remove(html_path)  # Clean up temp file
+
+    # Configure pdfkit options
+    options = {"enable-local-file-access": None, "quiet": None}
+
+    try:
+        pdfkit.from_file(html_path, full_path, options=options)
+    finally:
+        # Clean up temp file even if conversion fails
+        if os.path.exists(html_path):
+            os.remove(html_path)
 
 
 def data_only_export(df: pd.DataFrame, export_path: str, format: str) -> str:
@@ -52,6 +40,10 @@ def data_only_export(df: pd.DataFrame, export_path: str, format: str) -> str:
     print(f"Exporting data-only format to {full_path}")
     if format == "csv":
         df.to_csv(full_path, index=False)
+    elif format == "parquet":
+        # parquet doesn't like uuid
+        df.id = df.id.astype(str)
+        df.to_parquet(full_path, index=False)
     else:
         df.to_excel(full_path, index=False)
     return full_path
@@ -110,7 +102,7 @@ def pretty_dashboard_export(
             html_content.extend(
                 [
                     f"<h2>{name} Analysis</h2>",
-                    f'<img src="{im_path}" style="max-width:100%">',
+                    f'<img src="file:///{os.path.abspath(im_path)}" style="max-width:100%">',
                 ]
             )
 
@@ -118,12 +110,14 @@ def pretty_dashboard_export(
     html_content.append("<h2>Visualizations</h2>")
     for i, viz in enumerate(visualizations):
         img_path = os.path.join(img_dir, f"plot_{i}.png")
+        if "figure" not in viz:
+            breakpoint()
         viz["figure"].write_image(img_path)
         html_content.extend(
             [
                 f"<div class='plot-container'>",
                 f"<h3>{viz['title']}</h3>",
-                f'<img src="{os.path.basename(img_dir)}/plot_{i}.png" style="max-width:100%">',
+                f'<img src="file:///{os.path.abspath(img_path)}" style="max-width:100%">',
                 "</div>",
             ]
         )
@@ -205,7 +199,7 @@ def export_dashboard(
     base_filename = f"dashboard_export_{timestamp}"
     export_path = os.path.join(export_dir, base_filename)
 
-    if format in ["csv", "xlsx"]:
+    if format in ["csv", "xlsx", "parquet"]:
         return data_only_export(df, export_path, format)
     else:
         return pretty_dashboard_export(
@@ -246,7 +240,7 @@ def export_options(
     with export_col2:
         export_format = st.selectbox(
             "Export Format",
-            options=["html", "pdf", "csv", "xlsx"],
+            options=["html", "pdf", "csv", "xlsx", "parquet"],
             help="Choose the format for your export. HTML/PDF include visualizations. CSV/XLSX include filtered data only.",
         )
 

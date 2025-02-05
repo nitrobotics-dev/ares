@@ -150,9 +150,7 @@ def video_grid_section(filtered_df: pd.DataFrame) -> None:
     display_video_grid(display_rows, lazy_load=True)
 
 
-def plot_hero_section(
-    df: pd.DataFrame, filtered_df: pd.DataFrame
-) -> tuple[list[dict], pd.Series]:
+def plot_hero_section(df: pd.DataFrame, filtered_df: pd.DataFrame) -> pd.Series:
     st.header("Rollout Display")
     # initialize or persist selected row in state
     select_row_from_df_user(filtered_df)
@@ -163,7 +161,7 @@ def plot_hero_section(
             pd.DataFrame([selected_row]), title="Selected Row", add_refresh_button=False
         )
         st.write(f"Selected row ID: {selected_row.id}")
-        hero_visualizations = show_hero_display(
+        show_hero_display(
             df,  # compare selected row from filtered_df to all rows in df
             selected_row,
             st.session_state.all_vecs,
@@ -173,7 +171,7 @@ def plot_hero_section(
         )
     else:
         st.info("Please select a row to display details")
-    return hero_visualizations, selected_row
+    return selected_row
 
 
 def robot_array_section(selected_row: pd.Series) -> list[dict]:

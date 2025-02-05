@@ -38,6 +38,7 @@ hdbscan
 kaleido
 pdfkit
 matplotlib
+openpyxl
 
 # database
 faiss-cpu # replace with faiss-gpu if available 

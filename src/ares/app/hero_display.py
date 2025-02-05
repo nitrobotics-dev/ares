@@ -156,7 +156,7 @@ def show_hero_display(
     retrieve_n_most_similar: int = 5,
     lazy_load: bool = False,
     max_cols: int = 5,
-) -> list[dict]:
+) -> None:
     """
     Row 1: text
     Row 2: video col, detail + robot array plots
@@ -236,6 +236,3 @@ def show_hero_display(
         df,
         max_cols_in_tab=max_cols,
     )
-
-    # Return all visualizations for export
-    return array_figs + similarity_viz

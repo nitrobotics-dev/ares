@@ -151,7 +151,7 @@ def main() -> None:
     ######################################################################
     section_plot_hero = "plot hero display"
     with error_context(section_plot_hero), timer_context(section_plot_hero):
-        hero_visualizations, selected_row = plot_hero_section(df, filtered_df)
+        selected_row = plot_hero_section(df, filtered_df)
     st.divider()
 
     ######################################################################
@@ -173,7 +173,6 @@ def main() -> None:
             *data_distributation_visualizations,
             *success_rate_visualizations,
             *time_series_visualizations,
-            *hero_visualizations,
             *robot_array_visualizations,
         ]
         export_options(
