@@ -40,7 +40,7 @@ from ares.databases.structured_database import (
 
 def setup_extra_info_col(
     df: pd.DataFrame, col: str, ann_db: AnnotationDatabase
-) -> list[str]:
+) -> list[str | None]:
     raw_anns = []
     for _, row in tqdm(df.iterrows(), desc=f"Collecting annotations for {col}"):
         video_id = get_video_id(row["dataset_filename"], row["filename"])

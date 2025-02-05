@@ -92,9 +92,11 @@ class AnnotationDatabase:
         video_id: str,
         annotation_type: t.Optional[str] = None,
         frame: t.Optional[int] = None,
-    ) -> list[dict[str, t.Any]] | None:
-        """Get annotations for a video, optionally filtered by type and frame."""
-        # First check if video exists
+    ) -> dict[str, t.Any] | None:
+        """
+        Get annotations for a video, optionally filtered by type and frame.
+        """
+        # First check if video exists; video collection much smaller than annotations
         if not self.videos.find_one({"_id": video_id}):
             return None
 
@@ -104,9 +106,9 @@ class AnnotationDatabase:
         if frame is not None:
             query["frame"] = frame
         anns = list(self.annotations.find(query))
-        output = dict()
 
         # outputs tiered by type and then frame if exists
+        output: dict[str, t.Any] = dict()
         for ann in anns:
             ann_dict = ann["value"]
             if "annotation_type" not in ann_dict:
@@ -340,5 +342,4 @@ if __name__ == "__main__":
     # Preview database contents
     stats = db.get_database_stats()
     preview = db.peek_database(limit=10000)
-
     breakpoint()
