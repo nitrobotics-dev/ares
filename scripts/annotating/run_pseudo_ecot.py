@@ -7,6 +7,7 @@ We utilize the `grounding_string`, `detections`, and `success_criteria` annotati
 
 import os
 import traceback
+import typing as t
 
 from ares.annotating.annotating_base import ErrorResult, ResultTracker
 from ares.annotating.annotating_fn import APIAnnotatingFn
@@ -24,7 +25,9 @@ from ares.models.base import VLM, parse_response
 from ares.utils.image_utils import load_video_frames
 
 
-def construct_pseudo_ecot_info(rollout: Rollout, ann_db: AnnotationDatabase):
+def construct_pseudo_ecot_info(
+    rollout: Rollout, ann_db: AnnotationDatabase
+) -> dict[str, t.Any]:
     # we want the grounding string, detections, and success criteria
     video_id = get_video_id(rollout.dataset_filename, rollout.filename)
     anns = ann_db.get_annotations(video_id)
@@ -57,9 +60,11 @@ class PseudoECoTAnnotatingFn(APIAnnotatingFn):
     def __init__(self):
         super().__init__(annotation_key="string", annotation_type="pseudo_ecot")
 
-    async def run_query(self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase):
+    async def run_query(
+        self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase
+    ) -> str | ErrorResult:
         try:
-            frames, frame_indices = load_video_frames(
+            frames, _ = load_video_frames(
                 rollout.dataset_filename,
                 rollout.filename,
                 target_fps=0,
@@ -69,6 +74,7 @@ class PseudoECoTAnnotatingFn(APIAnnotatingFn):
                 rollout_id=rollout.id,
                 error_pattern="loading_video_failure",
                 error=traceback.format_exc(),
+                exception=str(e),
             )
         try:
             info = construct_pseudo_ecot_info(rollout, ann_db)
@@ -83,6 +89,7 @@ class PseudoECoTAnnotatingFn(APIAnnotatingFn):
                 rollout_id=rollout.id,
                 error_pattern="pseudo_ecot_failure",
                 error=traceback.format_exc(),
+                exception=str(e),
             )
         return pseudo_ecot_str
 

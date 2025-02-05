@@ -1,29 +1,14 @@
-import asyncio
 import os
 import traceback
-from pathlib import Path
-
-from tqdm import tqdm
 
 from ares.annotating.annotating_base import ErrorResult, ResultTracker
 from ares.annotating.annotating_fn import APIAnnotatingFn
 from ares.annotating.orchestration import orchestrate_annotating
-from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
-from ares.constants import (
-    ANNOTATION_GROUNDING_FPS,
-    ANNOTATION_OUTER_BATCH_SIZE,
-    ARES_DATA_DIR,
-    DATASET_NAMES,
-)
-from ares.databases.annotation_database import (
-    ANNOTATION_DB_PATH,
-    AnnotationDatabase,
-    get_video_id,
-)
-from ares.databases.structured_database import ROBOT_DB_PATH, RolloutSQLModel
+from ares.constants import ANNOTATION_OUTER_BATCH_SIZE, ARES_DATA_DIR, DATASET_NAMES
+from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
+from ares.databases.structured_database import ROBOT_DB_PATH
 from ares.models.base import VLM, parse_response
-from ares.models.shortcuts import get_vlm
 from ares.utils.image_utils import load_video_frames
 
 
@@ -31,9 +16,11 @@ class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
     def __init__(self):
         super().__init__(annotation_key="string", annotation_type="success_criteria")
 
-    async def run_query(self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase):
+    async def run_query(
+        self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase
+    ) -> str | ErrorResult:
         try:
-            frames, frame_indices = load_video_frames(
+            frames, _ = load_video_frames(
                 rollout.dataset_filename,
                 rollout.filename,
                 target_fps=0,
@@ -43,9 +30,10 @@ class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
                 rollout_id=rollout.id,
                 error_pattern="loading_video_failure",
                 error=traceback.format_exc(),
+                exception=str(e),
             )
         try:
-            messages, res = await vlm.ask_async(
+            _, res = await vlm.ask_async(
                 info=dict(task=rollout.task.language_instruction),
                 prompt_filename="success_constraint_generation.jinja2",
                 images=[frames[0]],
@@ -56,6 +44,7 @@ class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
                 rollout_id=rollout.id,
                 error_pattern="success_constraint_generation_failure",
                 error=traceback.format_exc(),
+                exception=str(e),
             )
         return success_criteria
 

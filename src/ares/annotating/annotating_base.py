@@ -17,6 +17,7 @@ class ErrorResult:
     rollout_id: str
     error_pattern: str
     error: str
+    exception: str | None = None
 
 
 @dataclass
@@ -28,19 +29,19 @@ class ResultTracker:
 
     def update_via_batch(
         self, n_videos: int, n_frames: int, n_annotations: int, video_ids: list[str]
-    ):
+    ) -> None:
         self.videos += n_videos
         self.frames += n_frames
         self.annotations += n_annotations
         self.video_ids.extend(video_ids)
 
-    def update_tracker(self, tracker: "ResultTracker"):
+    def update_tracker(self, tracker: "ResultTracker") -> None:
         self.videos += tracker.videos
         self.frames += tracker.frames
         self.annotations += tracker.annotations
         self.video_ids.extend(tracker.video_ids)
 
-    def print_stats(self):
+    def print_stats(self) -> None:
         print(
             f"Processed {self.videos} videos, {self.frames} frames, {len(self.video_ids)} videos with annotations"
         )
@@ -54,7 +55,8 @@ def setup_rollouts_from_sources(
     split: str | None = None,
 ) -> list[Rollout]:
     """
-    Helper function to setup rollouts from a variety of sources.
+    Helper function to setup rollouts from a variety of sources, e.g. a list of rollout IDs, a dataset filename, or a file path to a list of failed rollout IDs.
+    The file path can be a pickle or a txt file; the pickle file should contain a list of dictionaries with a `rollout_id` key whereas the txt file should contain a list of rollout IDs.
     """
     assert (
         ids_path or rollout_ids or dataset_filename

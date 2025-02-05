@@ -103,12 +103,12 @@ async def run_annotate_and_ingest(
                 video_ids=[video_id],
             )
         except Exception as e:
-            print(f"Error processing task: {e}")
             failures.append(
                 ErrorResult(
                     rollout_id=rollout_id,
                     error_pattern="grounding_failure",
                     error=traceback.format_exc(),
+                    exception=str(e),
                 )
             )
 
@@ -142,6 +142,7 @@ async def setup_query(
             rollout_id=rollout.id,
             error_pattern="grounding_failure",
             error=traceback.format_exc(),
+            exception=str(e),
         )
 
     try:
@@ -154,7 +155,8 @@ async def setup_query(
         return ErrorResult(
             rollout_id=rollout.id,
             error_pattern="grounding_request_failure",
-            error=str(e),
+            error=traceback.format_exc(),
+            exception=str(e),
         )
 
     if check_refusal(label_str):
@@ -162,6 +164,7 @@ async def setup_query(
             rollout_id=rollout.id,
             error_pattern="grounding_request_failure",
             error=f"Refusal phrase triggered: '{label_str}'",
+            exception=None,
         )
     return rollout.id, frames, frame_indices, label_str
 

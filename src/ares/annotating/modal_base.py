@@ -15,7 +15,9 @@ base_image = (
 
 
 class BaseWorker:
-    """Base worker class to be decorated by specific Modal apps."""
+    """
+    Base worker class to be decorated by specific Modal apps.
+    """
 
     @enter()
     def setup(self) -> None:
@@ -24,12 +26,14 @@ class BaseWorker:
 
     @method()
     async def process(self, *args, **kwargs):
-        """Override in subclass with task-specific logic. Now properly marked as async."""
+        """Override in subclass with task-specific logic."""
         pass
 
 
 class BaseModalWrapper:
-    """Base class for Modal task wrappers."""
+    """
+    Base class for Modal task wrappers.
+    """
 
     def __init__(self, app_name: str, worker_cls=BaseWorker, image=base_image):
         self.app_name = app_name

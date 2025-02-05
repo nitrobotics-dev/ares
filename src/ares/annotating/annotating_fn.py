@@ -28,7 +28,7 @@ class AnnotatingFn:
 
 class APIAnnotatingFn(AnnotatingFn):
     """
-    Base class to create annotating functions that use an API.
+    Base class to create annotating functions that use an API. E.g success criteria, grounding phrases, etc.
     """
 
     def __init__(self, annotation_key: str, annotation_type: str):
@@ -41,6 +41,10 @@ class APIAnnotatingFn(AnnotatingFn):
         rollouts_batch: list[Rollout],
         ann_db: AnnotationDatabase,
     ) -> tuple[ResultTracker, list[ErrorResult]]:
+        """
+        Default function to annotate a batch of rollouts and store annotations in the database with an API-driven annotating function.
+        """
+
         # Create futures with their corresponding rollouts
         futures = []
         for rollout in rollouts_batch:
@@ -54,10 +58,11 @@ class APIAnnotatingFn(AnnotatingFn):
             try:
                 result = await future
                 if isinstance(result, ErrorResult):
+                    # check for error result and record if so
                     failures.append(result)
                 else:
+                    # otherwise, get the video id and add the annotaiton to the database
                     video_id = get_video_id(rollout.dataset_filename, rollout.filename)
-                    # Add success criteria annotation to database
                     ann_db.add_annotation(
                         video_id=video_id,
                         key=self.annotation_key,
@@ -76,6 +81,7 @@ class APIAnnotatingFn(AnnotatingFn):
                         rollout_id=rollout.id,
                         error_pattern="batch_processing_failure",
                         error=traceback.format_exc(),
+                        exception=str(e),
                     )
                 )
 
@@ -88,6 +94,10 @@ class APIAnnotatingFn(AnnotatingFn):
         outer_batch_size: int,
         vlm_name: str = "gpt-4o-mini",
     ) -> tuple[ResultTracker, list[ErrorResult]]:
+        """
+        Orchestrating function for this annotating function. The __call__ function instantiates the objects and
+        create the "outer loop" for annotating batches of rollouts.
+        """
         overall_tracker = ResultTracker()
         overall_failures = []
 

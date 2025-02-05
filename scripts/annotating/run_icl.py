@@ -4,7 +4,6 @@ in-context learning by retrieving similar rollouts from the dataset. We can do t
 description of the rollout, or the state and action trajectories of the robot. 
 """
 
-import asyncio
 import os
 import traceback
 
@@ -13,7 +12,6 @@ from sqlalchemy import Engine
 from ares.annotating.annotating_base import ErrorResult, ResultTracker
 from ares.annotating.annotating_fn import APIAnnotatingFn
 from ares.annotating.orchestration import orchestrate_annotating
-from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
 from ares.constants import ANNOTATION_OUTER_BATCH_SIZE, ARES_DATA_DIR, DATASET_NAMES
 from ares.databases.annotation_database import ANNOTATION_DB_PATH, AnnotationDatabase
@@ -28,12 +26,10 @@ from ares.databases.embedding_database import (
 from ares.databases.structured_database import (
     ROBOT_DB_PATH,
     RolloutSQLModel,
-    create_engine,
     get_rollouts_by_ids,
     setup_database,
 )
 from ares.models.base import VLM, parse_response
-from ares.models.shortcuts import get_vlm
 from ares.utils.image_utils import load_video_frames
 
 
@@ -107,6 +103,7 @@ class ICLAnnotatingFn(APIAnnotatingFn):
                 rollout_id=rollout.id,
                 error_pattern="loading_video_failure",
                 error=traceback.format_exc(),
+                exception=str(e),
             )
         try:
             example_values = self.construct_example_values(rollout)
@@ -125,13 +122,12 @@ class ICLAnnotatingFn(APIAnnotatingFn):
                 rollout_id=rollout.id,
                 error_pattern="icl_parsing_failure",
                 error=traceback.format_exc(),
+                exception=str(e),
             )
         return icl_str
 
 
 if __name__ == "__main__":
-    from ares.databases.structured_database import db_to_df
-
     index_manager = IndexManager(EMBEDDING_DB_PATH, FaissIndex)
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
 
