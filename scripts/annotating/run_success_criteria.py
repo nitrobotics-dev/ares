@@ -27,7 +27,7 @@ class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
             )
         except Exception as e:
             return ErrorResult(
-                rollout_id=rollout.id,
+                rollout_id=str(rollout.id),
                 error_pattern="loading_video_failure",
                 error=traceback.format_exc(),
                 exception=str(e),
@@ -41,7 +41,7 @@ class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
             success_criteria = parse_response(res.choices[0], load_json=False)
         except Exception as e:
             return ErrorResult(
-                rollout_id=rollout.id,
+                rollout_id=str(rollout.id),
                 error_pattern="success_constraint_generation_failure",
                 error=traceback.format_exc(),
                 exception=str(e),

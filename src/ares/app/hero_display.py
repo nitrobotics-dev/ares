@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from ares.app.annotation_viz_helpers import draw_annotations
+from ares.app.annotation_viz_helpers import draw_annotations, draw_detection_data
 from ares.app.viz_helpers import (
     create_embedding_similarity_visualization,
     create_similarity_tabs,
@@ -41,7 +41,9 @@ def setup_zero_distance_checkbox_with_state() -> str:
     return zero_distance_filter_key
 
 
-def display_hero_annotations(db_data: dict, video_id: str, dataset: str, fname: str):
+def display_hero_annotations(
+    db_data: dict, video_id: str, dataset: str, fname: str
+) -> None:
     """
     Create a nice display of all the annotations in the database.
     This include grounding annotations (e.g. detections) as well as composed datasets like embodied-chain-of-thought.
@@ -53,29 +55,22 @@ def display_hero_annotations(db_data: dict, video_id: str, dataset: str, fname: 
     else:
         detection_data = annotation_data.get("detection")
         if detection_data:
-            # given detection data, lets display the frames and annotations
-            frame_inds = list(detection_data.keys())
-            all_frame_paths = get_video_frames(
-                dataset, fname, n_frames=None, just_path=True
-            )
-            selected_frames = choose_and_preprocess_frames(
-                all_frame_paths,
-                specified_frames=frame_inds,
-            )
-            annotated_frames = [
-                draw_annotations(frame, anns)
-                for frame, anns in zip(selected_frames, detection_data.values())
-            ]
-            # use an expander for visual clarity
-            with st.expander("Annotated Frames", expanded=False):
-                max_cols = 3
-                cols = st.columns(max_cols)
-                for i, (frame_ind, frame) in enumerate(
-                    zip(frame_inds, annotated_frames)
-                ):
-                    with cols[i % max_cols]:
-                        st.write(f"Frame {frame_ind}")
-                        st.image(frame)
+            draw_detection_data(detection_data, dataset, fname)
+
+        # show other top-level annotations (not frame-based)
+        other_keys = [k for k in annotation_data.keys() if k != "detection"]
+        with st.expander("Annotation Description Data", expanded=False):
+            for key in other_keys:
+                if isinstance(annotation_data[key], list):
+                    this_data = [
+                        ann.description
+                        for ann in annotation_data[key]
+                        if ann.description
+                    ]
+                    if this_data:
+                        st.write(f"**{key.replace('_', ' ').title()}**")
+                        st.write(this_data)
+
         # display all other annotation data, eg pseduo-ECoT, in-context-learning datasets, etc
         with st.expander("Raw Annotation Data (as JSON)", expanded=False):
             if "video_data" in db_data:
@@ -139,9 +134,9 @@ def create_similarity_viz_objects(
 
     # organize tab names and visualizations for tabs
     tab_names = [
-        f"{text_distance_data_key.replace('_',' ').title()} - {text_distance_fn}",
-        *[f"{t.replace('_', ' ')} - Embedding".title() for t in META_INDEX_NAMES]
-        * [t.title() for t in TRAJECTORY_INDEX_NAMES],
+        f"{text_distance_data_key.replace('_',' ').title()} - {text_distance_fn.title()}",
+        *[f"{t.replace('_', ' ')} - Embedding".title() for t in META_INDEX_NAMES],
+        *[t.title() for t in TRAJECTORY_INDEX_NAMES],
     ]
 
     similarity_viz = [

@@ -78,7 +78,7 @@ class APIAnnotatingFn(AnnotatingFn):
             except Exception as e:
                 failures.append(
                     ErrorResult(
-                        rollout_id=rollout.id,
+                        rollout_id=str(rollout.id),
                         error_pattern="batch_processing_failure",
                         error=traceback.format_exc(),
                         exception=str(e),

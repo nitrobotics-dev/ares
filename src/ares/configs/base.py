@@ -8,7 +8,9 @@ contains utility helpers for flattening fields and getting nested attributes.
 
 We make judicious use of pydantic's `Field` object to add metadata to the fields, such as the valid values for a field, or the description of the field.
 These fields include the type, description, and pattern, which we can use both to validate data *and* as instructions for models to generate data. 
-Fields that are not required are given a default value of `None`, and fields with the suffix `estimate` will be inferred by a model.
+Fields that are not required are given a default value of `None`, and fields with the suffix `estimate` will be inferred by a model. For example, see the 
+`COLOR_PATTERN` below, which is used to validate the `color_estimate` field in the `Robot` class and thus force all color estimates to be in the list of valid colors.
+Likewise, for many patterns, we add `PATTERN_EXTRA_CHOICES` to allow for some flexibility in the data, such as allowing for "other" or "unknown" values.
 
 The end of the file includes helpers to transform a BaseConfig object into a labelling instructions and an example dictionary. Additionally, see 
 `ares.configs.pydantic_sql_helpers` to see how we dynamically create SQLModel classes from pydantic models, which requires a bit of extra work.

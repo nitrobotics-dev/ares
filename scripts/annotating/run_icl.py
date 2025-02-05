@@ -91,7 +91,9 @@ class ICLAnnotatingFn(APIAnnotatingFn):
             output_vals[display_key] = example_vals
         return output_vals
 
-    async def run_query(self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase):
+    async def run_query(
+        self, vlm: VLM, rollout: Rollout, ann_db: AnnotationDatabase
+    ) -> str | ErrorResult:
         try:
             frames, frame_indices = load_video_frames(
                 rollout.dataset_filename,
@@ -100,7 +102,7 @@ class ICLAnnotatingFn(APIAnnotatingFn):
             )
         except Exception as e:
             return ErrorResult(
-                rollout_id=rollout.id,
+                rollout_id=str(rollout.id),
                 error_pattern="loading_video_failure",
                 error=traceback.format_exc(),
                 exception=str(e),
@@ -119,7 +121,7 @@ class ICLAnnotatingFn(APIAnnotatingFn):
             icl_str = parse_response(res.choices[0], load_json=False)
         except Exception as e:
             return ErrorResult(
-                rollout_id=rollout.id,
+                rollout_id=str(rollout.id),
                 error_pattern="icl_parsing_failure",
                 error=traceback.format_exc(),
                 exception=str(e),

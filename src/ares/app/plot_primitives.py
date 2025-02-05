@@ -100,6 +100,7 @@ def create_robot_array_plot(
     show_n: int | None = None,
     scores: np.ndarray | None = None,
     colorscale: str = "RdYlGn",
+    ids: list[str] | None = None,
 ) -> plotly.graph_objects.Figure:
     assert (
         robot_array.ndim == 3
@@ -112,13 +113,16 @@ def create_robot_array_plot(
         )
 
         if highlight_idx is not None:
-            # have to include and adjust highlight_idx to match new sampled indices
             sampled_indices = np.unique(np.append(sampled_indices, highlight_idx))
             highlight_idx = np.where(sampled_indices == highlight_idx)[0][0]
 
         robot_array = robot_array[sampled_indices]
         if scores is not None:
             scores = scores[sampled_indices]
+        if ids is not None:
+            ids = [
+                ids[i] for i in sampled_indices
+            ]  # Update ids to match sampled indices
 
     # limit number of timesteps to 100 per trace
     if robot_array.shape[1] > 100:
@@ -129,16 +133,17 @@ def create_robot_array_plot(
 
     # Create subplots - one for each dimension
     n_dims = robot_array.shape[2]
+
     fig = make_subplots(
         rows=n_dims,
         cols=1,
         subplot_titles=[f"Dimension {i+1}" for i in range(n_dims)],
         shared_xaxes=False,
-        vertical_spacing=0.05,
+        vertical_spacing=0.02,  # Reduce spacing between plots
+        row_heights=[1 / n_dims] * n_dims,  # Ensure equal height distribution
     )
     fig.update_layout(title=title_base, showlegend=True)
 
-    traces = []
     for dim in range(n_dims):
         dim_traces = []  # Create a new list for this dimension's traces
         if scores is not None:
@@ -166,9 +171,12 @@ def create_robot_array_plot(
 
             x = np.tile(np.arange(robot_array.shape[1]), mask.sum())
             y = robot_array[mask, :, dim].flatten()
-            traj_ids = np.repeat(
-                np.arange(robot_array.shape[0])[mask], robot_array.shape[1]
+            masked_ids = (
+                np.arange(robot_array.shape[0])[mask]
+                if ids is None
+                else [_id for i, _id in enumerate(ids) if mask[i]]
             )
+            traj_ids = np.repeat(masked_ids, robot_array.shape[1])
 
             dim_traces.append(
                 go.Scatter(
@@ -186,15 +194,18 @@ def create_robot_array_plot(
             )
 
         if highlight_idx is not None and highlight_idx < robot_array.shape[0]:
+            name = f"Trajectory {highlight_idx}" if ids is None else ids[highlight_idx]
             dim_traces.append(
                 go.Scatter(
                     x=list(range(robot_array.shape[1])),
                     y=robot_array[highlight_idx, :, dim],
                     mode="lines",
-                    name=f"Trajectory {highlight_idx}",
+                    name=name,
                     line=dict(color="red", width=3),
                     opacity=1.0,
                     showlegend=dim == 0,  # Only show legend for first dimension
+                    hovertemplate="Trajectory %{customdata}<br>Value: %{y}<extra></extra>",
+                    customdata=[ids[highlight_idx]] if ids is not None else [name],
                 ),
             )
 
@@ -203,15 +214,32 @@ def create_robot_array_plot(
 
     # Update layout
     fig.update_layout(
-        height=250 * n_dims,  # Adjust height based on number of dimensions
+        height=min(max(800, 300 * n_dims), 8000),
         yaxis_title="Value",
-        xaxis_title="Relative Timestep",
         hovermode="closest",
     )
+
+    # Update x-axis titles: hide all except the bottom subplot
+    for i in range(n_dims):
+        if i < n_dims - 1:
+            fig.update_xaxes(title_text="", row=i + 1, col=1)
+        else:
+            # Only show x-axis title for the bottom subplot
+            fig.update_xaxes(title_text="Relative Timestep", row=i + 1, col=1)
+
+    # Update y-axis properties for each subplot to maintain aspect ratio
+    for i in range(n_dims):
+        fig.update_yaxes(row=i + 1, col=1, automargin=True)
+
     return fig
 
 
-def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -> None:
+def display_video_card(
+    row: pd.Series,
+    lazy_load: bool = False,
+    key: str = "",
+    extra_display_keys: list[str] | None = None,
+) -> None:
     if not pd.isna(row["path"]):
         try:
             dataset_filename, fname = (
@@ -239,6 +267,10 @@ def display_video_card(row: pd.Series, lazy_load: bool = False, key: str = "") -
             task = row["task_language_instruction"]
             st.write(f"Task: {task if task else '(No task recorded)' }")
             st.write(f"Dataset: {row['dataset_formalname']}")
+            if extra_display_keys:
+                with st.expander("Extra Info", expanded=False):
+                    for key in extra_display_keys:
+                        st.write(f"**{key.replace('_', ' ').title()}**: {row[key]}")
         except Exception as e:
             st.warning(f"Error loading video for {row['id']}: {e}")
     else:
@@ -250,6 +282,7 @@ def show_dataframe(
     title: str,
     show_columns: list[str] | None = None,
     hide_columns: list[str] | None = None,
+    add_refresh_button: bool = True,
 ) -> None:
     """Helper function to display DataFrames with consistent styling.
 
@@ -265,9 +298,10 @@ def show_dataframe(
     st.subheader(title)
 
     # Add a button to refresh the sample
-    st.button(
-        "Get New Random Sample", key=f"refresh_sample_{title}"
-    )  # Button press triggers streamlit rerun, triggers new random sample
+    if add_refresh_button:
+        st.button(
+            "Get New Random Sample", key=f"refresh_sample_{title}"
+        )  # Button press triggers streamlit rerun, triggers new random sample
 
     # Create copy and filter columns
     display_df = df.copy()

@@ -232,8 +232,7 @@ def visualize_clusters(
             hover_data={"name": True, "x": False, "y": False, "count": True},
             color="cluster",
             color_discrete_sequence=colors,
-            # symbol_sequence=["triangle-up"],
-            symbol_sequence=["circle"],
+            symbol_sequence=["triangle-up"],
             size=[x for x in centroid_count],
         ).data
 

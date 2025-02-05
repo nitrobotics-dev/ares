@@ -2,8 +2,10 @@ import hashlib
 
 import cv2
 import numpy as np
+import streamlit as st
 
 from ares.configs.annotations import Annotation
+from ares.utils.image_utils import choose_and_preprocess_frames, get_video_frames
 
 
 def get_color_mapping(category_str: str) -> tuple[int, int, int]:
@@ -65,8 +67,9 @@ def draw_box(
     color: tuple[int, int, int],
     label: str,
     show_scores: bool,
-):
-
+) -> np.ndarray:
+    if not annotation.bbox:
+        return annotated_image
     x1, y1, x2, y2 = map(int, annotation.bbox)
 
     cv2.rectangle(annotated_image, (x1, y1), (x2, y2), color, 2)  # Border
@@ -162,3 +165,25 @@ def draw_annotations(
     legend_y = image.shape[0] + legend_padding
     draw_legend(canvas, unique_categories, legend_y)
     return canvas
+
+
+def draw_detection_data(detection_data: dict, dataset: str, fname: str) -> None:
+    # given detection data, lets display the frames and annotations
+    frame_inds = list(detection_data.keys())
+    all_frame_paths = get_video_frames(dataset, fname, n_frames=None, just_path=True)
+    selected_frames = choose_and_preprocess_frames(
+        all_frame_paths,
+        specified_frames=frame_inds,
+    )
+    annotated_frames = [
+        draw_annotations(frame, anns)
+        for frame, anns in zip(selected_frames, detection_data.values())
+    ]
+    # use an expander for visual clarity
+    with st.expander("Annotated Frames", expanded=False):
+        max_cols = 3
+        cols = st.columns(max_cols)
+        for i, (frame_ind, frame) in enumerate(zip(frame_inds, annotated_frames)):
+            with cols[i % max_cols]:
+                st.write(f"Frame {frame_ind}")
+                st.image(frame)

@@ -57,7 +57,7 @@ def construct_pseudo_ecot_info(
 
 
 class PseudoECoTAnnotatingFn(APIAnnotatingFn):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(annotation_key="string", annotation_type="pseudo_ecot")
 
     async def run_query(
@@ -71,7 +71,7 @@ class PseudoECoTAnnotatingFn(APIAnnotatingFn):
             )
         except Exception as e:
             return ErrorResult(
-                rollout_id=rollout.id,
+                rollout_id=str(rollout.id),
                 error_pattern="loading_video_failure",
                 error=traceback.format_exc(),
                 exception=str(e),
@@ -86,7 +86,7 @@ class PseudoECoTAnnotatingFn(APIAnnotatingFn):
             pseudo_ecot_str = parse_response(res.choices[0], load_json=False)
         except Exception as e:
             return ErrorResult(
-                rollout_id=rollout.id,
+                rollout_id=str(rollout.id),
                 error_pattern="pseudo_ecot_failure",
                 error=traceback.format_exc(),
                 exception=str(e),

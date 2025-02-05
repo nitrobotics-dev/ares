@@ -282,8 +282,8 @@ class SentenceTransformerEmbedder(Embedder):
         return np.array(self.model.encode(prefix + inp))
 
 
-def parse_response(choice: dict, load_json: bool = False) -> dict:
-    content = choice.message.content
+def parse_response(choice: t.Any, load_json: bool = False) -> dict | str:
+    content: str = choice.message.content
     if load_json:
         content = content.strip().removeprefix("```json").removesuffix("```").strip()
         content = json.loads(content) if isinstance(content, str) else content

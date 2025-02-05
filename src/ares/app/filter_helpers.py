@@ -212,7 +212,7 @@ def create_structured_data_filters(
             skipped_cols.append(col)
             continue
 
-        filtered_df = df
+        # filtered_df = df
         with filter_cols[idx % n_cols]:
             if numeric_coercable_or_float_range(df, col, viz_info, max_options):
                 filtered_df = numberic_col_data_filter(df, filtered_df, col, debug)
@@ -228,6 +228,7 @@ def create_structured_data_filters(
 
     if debug:
         print("\nFinal df shape:", filtered_df.shape)
+
     # Check if len(filtered_df) == 0! something wrong
     if len(filtered_df) == 0:
         breakpoint()
@@ -252,6 +253,13 @@ def structured_data_filters_display(
             st.session_state.temp_filter_values = {}
             st.session_state.active_filter_values = {}
             st.rerun()
+
+    st.write(
+        "Apply changes by clicking the 'Apply Filters' button at the bottom of the form."
+    )
+    st.write(
+        "Reset all filters by clicking the 'Reset Filters' button at the top of the form."
+    )
 
     with st.expander("Filter Data", expanded=False):
         # really nice streamlit element to avoid re-render when messing with the filters
@@ -333,13 +341,13 @@ def select_row_from_df_user(df: pd.DataFrame) -> None:
                 ].iloc[0]
 
     with col4:
-        if st.button("Select Random\n(I'm Feeling Lucky)"):
+        if st.button("Select Random (I'm Feeling Lucky)"):
             random_idx = np.random.randint(len(df))
             st.session_state["selected_row"] = df.iloc[random_idx]
 
     selected_row = st.session_state.get("selected_row")
     if selected_row is None or selected_row.id not in df.id.values:
-        st.warning("No valid row selected, defaulting to first row")
+        st.warning("No row selected, defaulting to first row")
         st.session_state["selected_row"] = df.iloc[0]
 
 
@@ -449,7 +457,10 @@ def embedding_data_filters_display(
         keep_mask = df[id_key].apply(str).tolist()
 
     # for visual clarity, hide the embedding selection until the user requests it.
-    with st.expander(f"Embedding Selection ({raw_data_key})", expanded=False):
+    with st.expander(
+        f"Embedding Selection ({raw_data_key.replace('_', ' ').title()})",
+        expanded=False,
+    ):
         cluster_fig, cluster_df, cluster_to_trace = visualize_clusters(
             reduced,
             labels,

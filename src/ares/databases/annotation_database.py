@@ -335,6 +335,10 @@ class AnnotationDatabase:
     def get_annotation_ids(self) -> list[str]:
         return list(self.annotations.find().distinct("video_id"))
 
+    def delete_annotations_by_type(self, annotation_type: str) -> int:
+        result = self.annotations.delete_many({"type": annotation_type})
+        return result.deleted_count
+
 
 if __name__ == "__main__":
     db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
@@ -342,4 +346,5 @@ if __name__ == "__main__":
     # Preview database contents
     stats = db.get_database_stats()
     preview = db.peek_database(limit=10000)
+    print(f"preview keys: {preview.keys()}")
     breakpoint()

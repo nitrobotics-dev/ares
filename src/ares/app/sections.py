@@ -50,7 +50,6 @@ def state_info_section(df: pd.DataFrame) -> None:
 def structured_data_filters_section(
     df: pd.DataFrame,
 ) -> tuple[pd.DataFrame, dict[str, t.Any]]:
-    # Structured data filters
     st.header(f"Data Filters")
     structured_filtered_df, active_filters = structured_data_filters_display(
         df, debug=False
@@ -160,7 +159,9 @@ def plot_hero_section(
     selected_row = st.session_state.get("selected_row")
 
     if selected_row is not None:
-        show_dataframe(pd.DataFrame([selected_row]), title="Selected Row")
+        show_dataframe(
+            pd.DataFrame([selected_row]), title="Selected Row", add_refresh_button=False
+        )
         st.write(f"Selected row ID: {selected_row.id}")
         hero_visualizations = show_hero_display(
             df,  # compare selected row from filtered_df to all rows in df

@@ -235,6 +235,7 @@ def create_similarity_tabs(
                             found_rows.iloc[0],
                             lazy_load=True,
                             key=f"video_card_{i}_tab_{tab}",
+                            extra_display_keys=["description_estimate"],
                         )
 
 
@@ -282,6 +283,7 @@ def generate_robot_array_plot_visualizations(
             continue
         these_vecs = all_vecs[name_key]
         these_scores = scores.get(name_key) if scores else None
+        these_ids = st.session_state.all_ids[name_key]
 
         with st.expander(f"Trajectory {key.title()} Display", expanded=False):
             if str(row.id) not in st.session_state.all_ids[name_key]:
@@ -296,6 +298,7 @@ def generate_robot_array_plot_visualizations(
                     highlight_idx=highlight_idx,
                     show_n=show_n,
                     scores=these_scores,
+                    ids=these_ids,
                 )
                 st.plotly_chart(
                     fig,

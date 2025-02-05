@@ -119,7 +119,7 @@ async def setup_query(
     rollout: t.Any,
     vlm: VLM,
     target_fps: int = 5,
-) -> tuple[str, list[np.ndarray], list[int], str] | dict[str, t.Any]:
+) -> tuple[str, list[np.ndarray], list[int], str] | ErrorResult:
     """
     Prepare annotation inputs for a rollout.
 
@@ -139,7 +139,7 @@ async def setup_query(
         )
     except Exception as e:
         return ErrorResult(
-            rollout_id=rollout.id,
+            rollout_id=str(rollout.id),
             error_pattern="grounding_failure",
             error=traceback.format_exc(),
             exception=str(e),
@@ -153,7 +153,7 @@ async def setup_query(
         )
     except Exception as e:
         return ErrorResult(
-            rollout_id=rollout.id,
+            rollout_id=str(rollout.id),
             error_pattern="grounding_request_failure",
             error=traceback.format_exc(),
             exception=str(e),
@@ -161,7 +161,7 @@ async def setup_query(
 
     if check_refusal(label_str):
         return ErrorResult(
-            rollout_id=rollout.id,
+            rollout_id=str(rollout.id),
             error_pattern="grounding_request_failure",
             error=f"Refusal phrase triggered: '{label_str}'",
             exception=None,

@@ -8,10 +8,10 @@ ARES_VIDEO_DIR = os.path.join(ARES_DATA_DIR, "videos")
 # using oxe-downloader
 # oxe-download --dataset "name" --path $ARES_OXE_DIR
 DATASET_NAMES: list[dict[str, str]] = [
-    # {
-    #     "dataset_filename": "nyu_rot_dataset_converted_externally_to_rlds",
-    #     "dataset_formalname": "NYU ROT",
-    # },
+    {
+        "dataset_filename": "nyu_rot_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "NYU ROT",
+    },
     # {
     #     "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",
     #     "dataset_formalname": "UCSD Kitchen",
