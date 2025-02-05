@@ -120,8 +120,8 @@ class VLM:
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-        model_kwargs: t.Dict | None = None,
-    ) -> t.tuple[list[dict[str, t.Any]], ModelResponse]:
+        model_kwargs: dict | None = None,
+    ) -> tuple[list[dict[str, t.Any]], ModelResponse]:
         """Rate-limited async version of ask method"""
         async with self.semaphore:
             model_kwargs = model_kwargs or dict()
@@ -139,8 +139,8 @@ class VLM:
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-        model_kwargs: t.Dict | None = None,
-    ) -> t.tuple[list[dict[str, t.Any]], ModelResponse]:
+        model_kwargs: dict | None = None,
+    ) -> tuple[list[dict[str, t.Any]], ModelResponse]:
         return asyncio.run(
             self.ask_async(
                 info,
@@ -160,8 +160,8 @@ class VLM:
             list[t.Sequence[t.Union[str, np.ndarray, Image.Image]]] | None
         ) = None,
         double_prompt: bool = False,
-        model_kwargs: t.Dict | None = None,
-    ) -> list[t.tuple[list[dict[str, t.Any]], ModelResponse]]:
+        model_kwargs: dict | None = None,
+    ) -> list[tuple[list[dict[str, t.Any]], ModelResponse]]:
         """Process multiple requests with rate limiting"""
         if images_list is None:
             images_list = [None] * len(infos)
@@ -200,8 +200,8 @@ class GeminiVideoVLM(VLM):
         images: t.Sequence[t.Union[str, np.ndarray, Image.Image]] | None = None,
         video_path: str | None = None,
         double_prompt: bool = False,
-        model_kwargs: t.Dict | None = None,
-    ) -> t.tuple[list[dict[str, t.Any]], ModelResponse]:
+        model_kwargs: dict | None = None,
+    ) -> tuple[list[dict[str, t.Any]], ModelResponse]:
         model_kwargs = model_kwargs or dict()
         prompt = self._get_prompt(prompt_filename, info)
         if video_path:

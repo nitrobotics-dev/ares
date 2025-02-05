@@ -228,7 +228,8 @@ def load_video_frames(
     fname: str,
     target_fps: int | float = 1,
     include_last_frame: bool = False,
-) -> tuple[t.list[np.ndarray], t.list[int]]:
+    resize: tuple[int, int] | None = None,
+) -> tuple[list[np.ndarray], list[int]]:
     """Load video frames at specified FPS."""
     video_path = get_video_from_path(dataset_filename, fname)
 
@@ -273,6 +274,6 @@ def load_video_frames(
 
     # select the frames
     frames_to_process = choose_and_preprocess_frames(
-        all_frames, specified_frames=frame_indices
+        all_frames, specified_frames=frame_indices, resize=resize
     )
     return frames_to_process, frame_indices

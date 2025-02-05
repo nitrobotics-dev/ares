@@ -90,7 +90,7 @@ def add_rollout(engine: Engine, rollout: Rollout, RolloutSQLModel: SQLModel) -> 
         session.commit()
 
 
-def add_rollouts(engine: Engine, rollouts: t.list[Rollout]) -> None:
+def add_rollouts(engine: Engine, rollouts: list[Rollout]) -> None:
     # use add_all; potentially update to bulk_save_objects
     with Session(engine) as session:
         session.add_all([RolloutSQLModel(**t.flatten_fields("")) for t in rollouts])

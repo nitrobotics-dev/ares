@@ -132,10 +132,10 @@ class InformationExtractor:
         episode: OpenXEmbodimentEpisode,
         dataset_info: DatasetInfo,
         *,  # Force keyword arguments
-        robot_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        environment_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        task_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        model_kwargs: t.Optional[t.dict[str, t.Any]] = None,
+        robot_kwargs: t.Optional[dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[dict[str, t.Any]] = None,
     ) -> Rollout:
         raise NotImplementedError
 
@@ -201,11 +201,11 @@ class VLMInformationExtractor(InformationExtractor):
         episodes: list[OpenXEmbodimentEpisode],
         dataset_info: DatasetInfo,
         *,  # Force keyword arguments
-        robot_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        environment_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        task_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        model_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        trajectory_kwargs: t.Optional[t.dict[str, t.Any]] = None,
+        robot_kwargs: t.Optional[dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[dict[str, t.Any]] = None,
+        trajectory_kwargs: t.Optional[dict[str, t.Any]] = None,
     ) -> list[Rollout]:
         """Process a batch of episodes in parallel."""
         component_kwargs = {
@@ -319,7 +319,7 @@ class RandomInformationExtractor(InformationExtractor):
         )
 
     def finish_random_object(
-        self, object: t.Type[BaseConfig], kwargs: t.dict[str, t.Any]
+        self, object: t.Type[BaseConfig], kwargs: dict[str, t.Any]
     ) -> BaseConfig:
         # Get all fields from the model class
         fields = object.model_fields
@@ -362,10 +362,10 @@ class RandomInformationExtractor(InformationExtractor):
         episode: OpenXEmbodimentEpisode,
         dataset_info: DatasetInfo,
         *,  # Force keyword arguments
-        robot_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        environment_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        task_kwargs: t.Optional[t.dict[str, t.Any]] = None,
-        model_kwargs: t.Optional[t.dict[str, t.Any]] = None,
+        robot_kwargs: t.Optional[dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[dict[str, t.Any]] = None,
     ) -> Rollout:
         robot_kwargs = robot_kwargs or {}
         environment_kwargs = environment_kwargs or {}

@@ -20,6 +20,7 @@ import os
 from collections import defaultdict
 
 import click
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -35,6 +36,29 @@ from ares.databases.structured_database import (
     get_rollouts_by_ids,
     setup_database,
 )
+
+
+def setup_extra_info_col(
+    df: pd.DataFrame, col: str, ann_db: AnnotationDatabase
+) -> list[str]:
+    raw_anns = []
+    for _, row in tqdm(df.iterrows(), desc=f"Collecting annotations for {col}"):
+        video_id = get_video_id(row["dataset_filename"], row["filename"])
+        anns = ann_db.get_annotations(video_id, annotation_type=col)
+        if col in anns:
+            raw_anns.append(
+                json.dumps(
+                    anns[col],
+                    default=lambda x: x.__json__() if hasattr(x, "__json__") else x,
+                )
+            )
+        else:
+            raw_anns.append(None)
+
+    # Check if all annotations are None -- probably an error
+    if all(ann is None for ann in raw_anns):
+        raise ValueError(f"No annotations found for column {col}")
+    return raw_anns
 
 
 @click.command()
@@ -56,7 +80,7 @@ from ares.databases.structured_database import (
 )
 def preprocess(
     output_path: str, ids_df_path: str | None, extra_info_cols: list[str] | None
-):
+) -> None:
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
 
     if ids_df_path:
@@ -75,20 +99,8 @@ def preprocess(
         ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
         extra_info_cols_to_anns = defaultdict(list)
         for col in extra_info_cols:
-            for _, row in tqdm(
-                rollout_df.iterrows(), desc=f"Collecting annotations for {col}"
-            ):
-
-                video_id = get_video_id(row["dataset_filename"], row["filename"])
-                anns = ann_db.get_annotations(video_id, annotation_type=col)
-                if col in anns:
-                    raw_anns = json.dumps(
-                        anns[col],
-                        default=lambda x: x.__json__() if hasattr(x, "__json__") else x,
-                    )
-                else:
-                    raw_anns = None
-                extra_info_cols_to_anns[col].append(raw_anns)
+            raw_anns = setup_extra_info_col(rollout_df, col, ann_db)
+            extra_info_cols_to_anns[col] = raw_anns
 
     # construct train df
     train_df = rollout_df.copy()
@@ -96,8 +108,6 @@ def preprocess(
     train_df.id = train_df.id.astype(str)
     for col in extra_info_cols:
         train_df[col] = extra_info_cols_to_anns[col]
-
-    breakpoint()
 
     # save to parquet
     print(f"Saving to {output_path}")
