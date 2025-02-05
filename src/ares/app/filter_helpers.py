@@ -89,7 +89,7 @@ def numberic_col_data_filter(
 
 def categorical_col_data_filter(
     df: pd.DataFrame, filtered_df: pd.DataFrame, col: str, debug: bool, max_options: int
-) -> tuple[pd.Dataframe, t.Optional[str]]:
+) -> tuple[pd.DataFrame, t.Optional[str]]:
     """
     Helper function for categorical data filters. Streamlit handles some of the multiselect logic, so we just enforce some types
     and limits for visual clarity.
@@ -242,7 +242,7 @@ def create_structured_data_filters(
 
 def structured_data_filters_display(
     df: pd.DataFrame, debug: bool = False
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, dict[str, t.Any]]:
     """
     Create the streamlit wrappers for the structured data filters display, wrapping everything in a streamlit `form` in order to
     avoid re-rendering until form submission. Also add a `reset` button to return all temp and active values to the original defaults.
@@ -277,7 +277,13 @@ def structured_data_filters_display(
             st.warning(
                 f"Skipped columns: {skipped_cols} due to high cardinality or lack of unique values"
             )
-    return value_filtered_df
+
+    active_filters = (
+        dict()
+        if "active_filter_values" not in st.session_state
+        else st.session_state.active_filter_values
+    )
+    return value_filtered_df, active_filters
 
 
 def select_row_from_df_user(df: pd.DataFrame) -> None:

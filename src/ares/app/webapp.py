@@ -9,7 +9,7 @@ import streamlit as st
 
 from ares.app.export_data import export_options
 from ares.app.plot_primitives import show_dataframe
-from ares.app.webapp_sections import (
+from ares.app.sections import (
     data_distributions_section,
     embedding_data_filters_section,
     loading_data_section,
@@ -63,6 +63,7 @@ def main() -> None:
     with filter_error_context(section_loading), timer_context(section_loading):
         df = loading_data_section(title, tmp_dump_dir)
 
+    # simple expander for st.session_state information; helpful for debugging
     section_state_info = "state info"
     with filter_error_context(section_state_info), timer_context(section_state_info):
         state_info_section(df)
@@ -73,7 +74,9 @@ def main() -> None:
     ######################################################################
     section_filters = "structured data filters"
     with filter_error_context(section_filters), timer_context(section_filters):
-        structured_filtered_df = structured_data_filters_section(df)
+        structured_filtered_df, active_structured_filters = (
+            structured_data_filters_section(df)
+        )
 
     section_embedding_filters = "embedding data filters"
     with (
@@ -148,10 +151,10 @@ def main() -> None:
 
     ######################################################################
     # Export the data and all visualizations to a file or training format.
+    # Note: we don't export video grids due to file size.
     ######################################################################
     section_export = "exporting data"
     with filter_error_context(section_export), timer_context(section_export):
-        # TODO: add structured data filters to export
         all_visualizations = [
             *data_distributation_visualizations,
             *success_rate_visualizations,
@@ -161,9 +164,10 @@ def main() -> None:
         ]
         export_options(
             filtered_df,
+            active_structured_filters,
             all_visualizations,
             title,
-            cluster_fig=embedding_figs.get(next(iter(embedding_figs))),
+            go_figs=embedding_figs,
         )
 
     ######################################################################

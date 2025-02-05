@@ -1,3 +1,5 @@
+import typing as t
+
 import pandas as pd
 import streamlit as st
 
@@ -40,16 +42,20 @@ def state_info_section(df: pd.DataFrame) -> None:
     annotation_statistics(st.session_state.annotations_db)
 
 
-def structured_data_filters_section(df: pd.DataFrame) -> pd.DataFrame:
+def structured_data_filters_section(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, t.Any]]:
     # Structured data filters
     st.header(f"Data Filters")
-    structured_filtered_df = structured_data_filters_display(df, debug=False)
+    structured_filtered_df, active_filters = structured_data_filters_display(
+        df, debug=False
+    )
     st.write(
         f"Selected {len(structured_filtered_df)} rows out of {len(df)} total via structured data filters"
     )
     if len(structured_filtered_df) == 0:
         st.warning("No data matches the structured filters!")
-    return structured_filtered_df
+    return structured_filtered_df, active_filters
 
 
 def embedding_data_filters_section(
