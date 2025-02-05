@@ -78,8 +78,17 @@ def setup_extra_info_col(
     required=False,
     default=None,
 )
+@click.option(
+    "--drop-nones",
+    is_flag=True,
+    default=False,
+    help="If True, drop rows where any extra_info_col contains None values",
+)
 def preprocess(
-    output_path: str, ids_df_path: str | None, extra_info_cols: list[str] | None
+    output_path: str,
+    ids_df_path: str | None,
+    extra_info_cols: list[str] | None,
+    drop_nones: bool,
 ) -> None:
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
 
@@ -92,7 +101,9 @@ def preprocess(
         extra_info_cols = []
 
     # collect rollouts
-    rollout_df = get_rollouts_by_ids(engine, ids_df.id.tolist(), return_df=True)
+    rollout_df: pd.DataFrame = get_rollouts_by_ids(
+        engine, ids_df.id.tolist(), return_df=True
+    )
 
     # collect annotations from annotation database via extra_info_cols
     if extra_info_cols:
@@ -108,6 +119,16 @@ def preprocess(
     train_df.id = train_df.id.astype(str)
     for col in extra_info_cols:
         train_df[col] = extra_info_cols_to_anns[col]
+
+    # Drop rows with None values in extra info columns if requested
+    if drop_nones and extra_info_cols:
+        initial_len = len(train_df)
+        train_df = train_df.dropna(subset=extra_info_cols)
+        train_df = train_df.reset_index(drop=True)
+        dropped_count = initial_len - len(train_df)
+        print(
+            f"Dropped {dropped_count} rows with None values in {extra_info_cols}: {dropped_count/initial_len*100:.2f}%"
+        )
 
     # save to parquet
     print(f"Saving to {output_path}")

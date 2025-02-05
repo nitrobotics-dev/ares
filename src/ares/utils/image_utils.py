@@ -260,9 +260,6 @@ def load_video_frames(
     # some videos/frame sequences are too long for context lengths or API limits
     # so we downsample to a max number of frames but maintain the first and last frames
     if len(frame_indices) > MAX_N_FRAMES:
-        print(
-            f"Downsampling video from {len(frame_indices)} frames to {MAX_N_FRAMES} frames"
-        )
         middle_indices = np.linspace(
             1, len(frame_indices) - 2, MAX_N_FRAMES - 2, dtype=int
         )

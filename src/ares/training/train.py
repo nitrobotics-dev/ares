@@ -157,6 +157,24 @@ def pad_sequence(
         return padded, mask, None
 
 
+def get_trajectory_tensor(rollout: Rollout, attr_name: str) -> torch.Tensor:
+    """Helper function to safely get trajectory tensors from rollout.
+
+    Args:
+        rollout: Rollout object containing trajectory data
+        attr_name: Name of trajectory attribute ('states', 'actions', or 'rewards')
+
+    Returns:
+        torch.Tensor: Empty tensor if data is invalid/None, otherwise tensor of trajectory data
+    """
+    array = getattr(rollout.trajectory, f"{attr_name}_array")
+    if array is None or (
+        isinstance(array, np.ndarray) and array.dtype == np.dtype("O")
+    ):
+        return torch.zeros((0,))
+    return torch.tensor(np.array(array, dtype=float))
+
+
 def collate_fn(
     batch: list[dict[str, Rollout | dict[str, t.Any] | list[np.ndarray]]],
     max_seq_len: int,
@@ -170,28 +188,13 @@ def collate_fn(
 
     # Convert and pad trajectory data with None handling
     states_tensors = [
-        (
-            torch.tensor(item["rollout"].trajectory.states_array)
-            if item["rollout"].trajectory.states_array is not None
-            else torch.zeros((0,))
-        )
-        for item in batch
+        get_trajectory_tensor(item["rollout"], "states") for item in batch
     ]
     actions_tensors = [
-        (
-            torch.tensor(item["rollout"].trajectory.actions_array)
-            if item["rollout"].trajectory.actions_array is not None
-            else torch.zeros((0,))
-        )
-        for item in batch
+        get_trajectory_tensor(item["rollout"], "actions") for item in batch
     ]
     rewards_tensors = [
-        (
-            torch.tensor(item["rollout"].trajectory.rewards_array)
-            if item["rollout"].trajectory.rewards_array is not None
-            else torch.zeros((0,))
-        )
-        for item in batch
+        get_trajectory_tensor(item["rollout"], "rewards") for item in batch
     ]
 
     padded_states, states_seq_mask, states_feat_mask = pad_sequence(
@@ -272,8 +275,8 @@ def main(preprocessed_path: str, extra_info_cols: list[str]) -> None:
         if i == 0:
             print(inputs.keys())
             print(outputs.keys())
+            breakpoint()
 
-        breakpoint()
         preds = MOCK_MODEL(inputs)
 
         if i > 10:
