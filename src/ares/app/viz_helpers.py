@@ -374,5 +374,7 @@ def annotation_statistics(ann_db: AnnotationDatabase) -> None:
         st.write(f"{stats['total_annotations']:,}")
     with col4:
         st.subheader(f"Annotations by type:")
-        for k, v in sorted(stats["annotations_by_type"].items(), key=lambda x: x[1]):
+        for k, v in sorted(
+            stats["annotations_by_type"].items(), key=lambda x: x[1], reverse=True
+        ):
             st.write(f"{k}: {v:,}")

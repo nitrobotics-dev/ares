@@ -19,6 +19,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from ares.app.data_analysis import infer_visualization_type
+from ares.constants import IGNORE_COLS
 from ares.models.shortcuts import summarize
 from ares.utils.clustering import visualize_clusters
 
@@ -189,14 +190,7 @@ def create_structured_data_filters(
     """
     Function to apply filters over all the available dataframe columns, excluding some simple ones.
     """
-
-    ignore_cols = ignore_cols or [
-        "dataset_filename",
-        "dataset_formalname",
-        "id",
-        "path",
-        "filename",
-    ]
+    ignore_cols = ignore_cols or IGNORE_COLS
     filtered_df = df.copy()
     skipped_cols = []
 

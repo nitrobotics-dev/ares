@@ -1,28 +1,35 @@
+"""
+Simple helpers for inferring data types and generating visualizations. For example, a column of data containing a small number of unique strings can 
+be inferred to be a bar chart, while a column of data containing a large number of unique floats can be inferred to be a histogram. We also choose
+to *not* display certain columns that have poor visualizations, such as a column of data containing a large number of unique strings such as IDs or file paths.
+"""
+
 import typing as t
 
 import pandas as pd
 
 from ares.app.plot_primitives import create_bar_plot, create_histogram
+from ares.constants import IGNORE_COLS
 
 
 def infer_visualization_type(
     column_name: str,
     data: pd.DataFrame,
-    skip_columns: list | None = None,
+    ignore_cols: list | None = None,
     max_str_length: int = 500,
 ) -> dict[str, t.Any]:
     """
     Heuristic solution for transforming a column of data into a visualization type,
     focusing on numeric ranges or category counts.
     """
-    skip_columns = skip_columns or ["path", "id"]
+    ignore_cols = ignore_cols or IGNORE_COLS
 
     dtype = str(data[column_name].dtype)
     nunique = data[column_name].nunique()
 
     result = {"viz_type": None, "dtype": dtype, "nunique": nunique}
 
-    if column_name.lower() in skip_columns:
+    if column_name.lower() in ignore_cols:
         return result
 
     if pd.api.types.is_string_dtype(data[column_name]):
@@ -64,7 +71,7 @@ def generate_automatic_visualizations(
     """
     After inferring the 'type' of a column, we can create automatic visualizations.
     """
-    ignore_cols = ignore_cols or ["dataset_filename", "dataset_formalname"]
+    ignore_cols = ignore_cols or IGNORE_COLS
     visualizations = []
 
     # Pre-calculate visualization types for all columns at once

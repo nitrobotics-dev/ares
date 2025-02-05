@@ -1,3 +1,19 @@
+"""
+Main configuration classes for ARES. This configurations are used throughout the repository in order to standardize the data across many datasets.
+We use pydantic to define the configurations and manually construct many subclasses of these classes.
+
+The configuration starts with the toplevel `Rollout` class, which contains all information about a given episode. The Rollout class contains
+a Robot, Environment, Task, and Trajectory, which all contain many fields or subconfigs. All configs inherit from the `BaseConfig` class, which
+contains utility helpers for flattening fields and getting nested attributes. 
+
+We make judicious use of pydantic's `Field` object to add metadata to the fields, such as the valid values for a field, or the description of the field.
+These fields include the type, description, and pattern, which we can use both to validate data *and* as instructions for models to generate data. 
+Fields that are not required are given a default value of `None`, and fields with the suffix `estimate` will be inferred by a model.
+
+The end of the file includes helpers to transform a BaseConfig object into a labelling instructions and an example dictionary. Additionally, see 
+`ares.configs.pydantic_sql_helpers` to see how we dynamically create SQLModel classes from pydantic models, which requires a bit of extra work.
+"""
+
 import json
 import typing as t
 import uuid
@@ -143,7 +159,7 @@ class Environment(BaseConfig):
     )
 
     @model_validator(mode="before")
-    def validate_surface(cls, values):
+    def validate_surface(cls, values: dict) -> dict:
         for k in ["surface_estimate", "background_estimate", "lighting_estimate"]:
             if k in values:
                 values[k] = values[k].lower()
@@ -258,7 +274,7 @@ def pydantic_to_field_instructions(
             continue
 
         # Skip optional fields if required_only is True
-        if required_only and (not field.is_required or field.default is None):
+        if required_only and (not field.is_required() or field.default is None):
             continue
 
         # Check if field exists in exclude_fields (both nested and top-level)

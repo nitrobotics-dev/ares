@@ -72,7 +72,7 @@ DATASET_NAMES: list[dict[str, str]] = [
 #     "dataset_formalname": "Saytap",
 # },
 
-DATASET_KEY_TO_DATASET_INFO: dict[str, dict[str, str]] = defaultdict(dict)
+DATASET_KEY_TO_DATASET_INFO: dict[str, dict[str, dict[str, str]]] = defaultdict(dict)
 keys = ["dataset_filename", "dataset_formalname"]
 for dataset_info in DATASET_NAMES:
     for key in keys:
@@ -80,6 +80,7 @@ for dataset_info in DATASET_NAMES:
 
 
 def get_dataset_info_by_key(key_type: str, key: str) -> dict[str, str]:
+    # allows us to get dataset info by key (like filename or formalname)
     if key_type not in DATASET_KEY_TO_DATASET_INFO:
         raise ValueError(f"Invalid key type: {key_type}")
     if key not in DATASET_KEY_TO_DATASET_INFO[key_type]:
@@ -97,3 +98,12 @@ ANNOTATION_OUTER_BATCH_SIZE = 100
 
 # for grounding, annotate the frames at set FPS
 ANNOTATION_GROUNDING_FPS = 5
+
+# for displays, we want to ignore some columns consistently
+IGNORE_COLS = [
+    "dataset_filename",
+    "dataset_formalname",
+    "id",
+    "path",
+    "filename",
+]

@@ -1,3 +1,9 @@
+"""
+We use pydantic configs as the base unit of information in ARES. We use SQLModel classes to store these configs in a database, which requires
+flattening the pydantic model into a SQLModel. This file contains helpers to do this, as well as a helper to reconstruct a pydantic model from a
+flattened SQLModel. This allows us to use the same configs in both the frontend and backend of the application and easily convert between the two.
+"""
+
 import typing as t
 import uuid
 
@@ -5,10 +11,16 @@ from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
 
-# dynamically build flattened SQLModel class
 def create_flattened_model(
     data_model: t.Type[BaseModel], non_nullable_fields: list[str] = ["id"]
 ) -> t.Type[SQLModel]:
+    """
+    Create a flattened SQLModel class from a pydantic model. This allows us to store the pydantic model in a database. This requires recursively
+    extracting all the fields from the pydantic model and adding them to the SQLModel class and inferring the type of the field in the SQLModel.
+
+    For example, a config field like `rollout.robot.environment.lighting_estimate` will be flattened into `rollout_robot_environment_lighting_estimate`
+    and the appropriate type will be inferred.
+    """
     fields: dict[str, t.Any] = {
         "__annotations__": {},
         "__tablename__": "rollout",

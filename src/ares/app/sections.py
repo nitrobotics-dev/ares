@@ -1,3 +1,8 @@
+"""
+Helper functions for building the Streamlit app. This file exists to abstract out the code for building the app into smaller, more manageable components
+and leave the main `ares.app.webapp.py` file clean and readable, exclusively for display, metrics, and export functionality.
+"""
+
 import typing as t
 
 import pandas as pd
@@ -68,7 +73,7 @@ def embedding_data_filters_section(
 
     # Get filtered dataframes for each embedding
     for raw_data_key in META_INDEX_NAMES:
-        st.write(f"**Filtering on {raw_data_key}**")
+        st.write(f"**Filtering on {raw_data_key.replace('_', ' ').title()}**")
         filtered_df, cluster_fig = create_embedding_data_filter_display(
             df=df,  # Pass original df each time
             id_key="id",
@@ -170,9 +175,7 @@ def plot_hero_section(
     return hero_visualizations, selected_row
 
 
-def robot_array_section(
-    filtered_df: pd.DataFrame, selected_row: pd.Series
-) -> list[dict]:
+def robot_array_section(selected_row: pd.Series) -> list[dict]:
     if st.button("Generate Robot Array Plots", key="robot_array_plots_button"):
         st.header("Robot Array Display")
         # Number of trajectories to display in plots
