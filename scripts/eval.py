@@ -15,7 +15,8 @@ from tqdm import tqdm
 
 from ares.configs.base import pydantic_to_field_instructions
 from ares.constants import ARES_DATA_DIR
-from ares.extras.pi_demo_utils import PI_DEMO_PATH, PI_DEMO_TASKS
+
+# from ares.extras.pi_demo_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 from ares.models.base import VLM
 from ares.utils.image_utils import load_video_frames
 

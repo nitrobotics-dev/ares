@@ -65,6 +65,10 @@ DATASET_NAMES: list[dict[str, str]] = [
     #     "dataset_filename": "berkeley_mvp_converted_externally_to_rlds",
     #     "dataset_formalname": "Berkeley MVP Data",
     # },
+    {
+        "dataset_filename": "pi_demos",
+        "dataset_formalname": "Physical Intelligence Demos",
+    },
 ]
 # Saytap does not have pixel data, so we exclude it
 # {

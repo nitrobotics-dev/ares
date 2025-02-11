@@ -83,25 +83,24 @@ async def process_batch(
     result = BatchResult()
     valid_episodes = []
 
-    # Add debug print
     print(f"Initial batch size: {len(episodes)}")
 
     # Filter and construct episodes
     for i, ep in tqdm(episodes, desc="Processing episodes"):
         try:
-            episode = construct_openxembodiment_episode(ep, dataset_info, i)
+            episode = construct_openxembodiment_episode(ep, i)
             # we patch this during rollout creation but need to check here
             if episode.episode_metadata.file_path.removeprefix("/") in existing_paths:
                 result.n_skipped += 1
                 continue
             valid_episodes.append((i, episode))
         except Exception as e:
-            print(f"Failed to construct episode {i}: {str(e)}")  # Add debug print
+            print(f"Failed to construct episode {i}: {str(e)}")
             result.fails.append(
                 {"index": i, "error": e, "traceback": traceback.format_exc()}
             )
 
-    print(f"Valid episodes after filtering: {len(valid_episodes)}")  # Add debug print
+    print(f"Valid episodes after filtering: {len(valid_episodes)}")
     if not valid_episodes:
         return result
 
@@ -131,6 +130,7 @@ async def process_batch(
                     # there was an error in processing
                     result.fails.append(rollout)
                     continue
+                breakpoint()
                 add_rollout(engine, rollout, RolloutSQLModel)
                 result.new_ids.add(rollout.id)
                 result.n_new += 1

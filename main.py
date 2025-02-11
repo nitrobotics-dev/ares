@@ -1,5 +1,9 @@
 import asyncio
 import os
+import typing as t
+
+import tensorflow_datasets as tfds
+from sqlalchemy import Engine
 
 from ares.annotating.orchestration import orchestrate_annotating
 from ares.configs.open_x_embodiment_configs import get_dataset_information
@@ -22,13 +26,66 @@ from scripts.run_trajectory_embedding_ingestion import (
     run_embedding_database_ingestion_per_dataset,
 )
 
+
+def run_ingestion_pipeline(
+    ds: t.Iterator,
+    dataset_info: dict,
+    dataset_formalname: str,
+    vlm_name: str,
+    engine: Engine,
+    dataset_filename: str,
+) -> dict[str, list[dict]]:
+    """
+    Helper function to run the ingestion pipeline for a given dataset.
+    Currently, this means ingesting structured data, embedding rollouts, and annotating rollouts.
+    """
+    # run structured ingestion
+    structured_failures, new_rollout_ids = asyncio.run(
+        run_structured_database_ingestion(
+            ds,
+            dataset_info,
+            dataset_formalname,
+            vlm_name,
+            engine,
+            dataset_filename,
+        )
+    )
+
+    # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
+    # to db and videos to disk then reconstitute rollouts for indexing
+    rollouts = setup_rollouts(engine, dataset_formalname)
+    if new_rollout_ids is not None:
+        rollouts = [r for r in rollouts if r.id in new_rollout_ids]
+    if len(rollouts) == 0:
+        breakpoint()
+    run_embedding_database_ingestion_per_dataset(
+        rollouts, embedder, index_path=EMBEDDING_DB_PATH
+    )
+
+    # run grounding annotation with modal
+    annotation_results, grounding_failures = orchestrate_annotating(
+        engine_path=ROBOT_DB_PATH,
+        ann_db_path=ANNOTATION_DB_PATH,
+        annotating_fn=GroundingModalAnnotatingFn(),
+        rollout_ids=[str(r.id) for r in rollouts],
+        failures_path=os.path.join(
+            ARES_DATA_DIR,
+            "annotating_failures",
+            f"grounding_{dataset_filename}_{split}.pkl",
+        ),
+    )
+    return dict(
+        structured_failures=structured_failures,
+        grounding_failures=[dict(f) for f in grounding_failures],
+    )
+
+
 if __name__ == "__main__":
     vlm_name = "gpt-4o-mini"
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     embedder = get_nomic_embedder()
 
     for i, dataset_info in enumerate(DATASET_NAMES):
-
         dataset_filename = dataset_info["dataset_filename"]
         dataset_formalname = dataset_info["dataset_formalname"]
         builder, dataset_dict = build_dataset(dataset_filename, ARES_OXE_DIR)
@@ -45,40 +102,13 @@ if __name__ == "__main__":
             dataset_info["Dataset Filename"] = dataset_filename
             dataset_info["Dataset Formalname"] = dataset_formalname
             dataset_info["Split"] = split
+            breakpoint()
 
-            # run structured ingestion
-            # new_rollout_ids = None
-            fails, new_rollout_ids = asyncio.run(
-                run_structured_database_ingestion(
-                    ds,
-                    dataset_info,
-                    dataset_formalname,
-                    vlm_name,
-                    engine,
-                    dataset_filename,
-                )
-            )
-
-            # # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
-            # # to db and videos to disk then reconstitute rollouts for indexing!
-            rollouts = setup_rollouts(engine, dataset_formalname)
-            if new_rollout_ids is not None:
-                rollouts = [r for r in rollouts if r.id in new_rollout_ids]
-            if len(rollouts) == 0:
-                breakpoint()
-            run_embedding_database_ingestion_per_dataset(
-                rollouts, embedder, index_path=EMBEDDING_DB_PATH
-            )
-
-            # run grounding annotation with modal
-            orchestrate_annotating(
-                engine_path=ROBOT_DB_PATH,
-                ann_db_path=ANNOTATION_DB_PATH,
-                annotating_fn=GroundingModalAnnotatingFn(),
-                rollout_ids=[r.id for r in rollouts],
-                failures_path=os.path.join(
-                    ARES_DATA_DIR,
-                    "annotating_failures",
-                    f"grounding_{dataset_filename}_{split}.pkl",
-                ),
+            failures = run_ingestion_pipeline(
+                ds,
+                dataset_info,
+                dataset_formalname,
+                vlm_name,
+                engine,
+                dataset_filename,
             )

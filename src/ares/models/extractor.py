@@ -139,6 +139,19 @@ class InformationExtractor:
     ) -> Rollout:
         raise NotImplementedError
 
+    async def extract_batch(
+        self,
+        episodes: list[OpenXEmbodimentEpisode],
+        dataset_info: DatasetInfo,
+        *,  # Force keyword arguments
+        robot_kwargs: t.Optional[dict[str, t.Any]] = None,
+        environment_kwargs: t.Optional[dict[str, t.Any]] = None,
+        task_kwargs: t.Optional[dict[str, t.Any]] = None,
+        model_kwargs: t.Optional[dict[str, t.Any]] = None,
+        trajectory_kwargs: t.Optional[dict[str, t.Any]] = None,
+    ) -> list[Rollout]:
+        raise NotImplementedError
+
 
 class VLMInformationExtractor(InformationExtractor):
     def __init__(self, vlm: VLM):
@@ -224,9 +237,9 @@ class VLMInformationExtractor(InformationExtractor):
         ]
         print(f"found {len(hardcoded_infos)} hardcoded infos")
         # Prepare prompts and images
-        prompts = []
-        images_list = []
-        rollouts = []
+        prompts: list[dict | None] = []
+        images_list: list[list[np.ndarray] | None] = []
+        rollouts: list[Rollout | dict] = []
         for episode, hardcoded_info in zip(episodes, hardcoded_infos):
             try:
                 # Load video frames

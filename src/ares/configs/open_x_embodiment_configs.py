@@ -100,7 +100,7 @@ class OpenXEmbodimentStepObservation(TensorConverterMixin, BaseModel):
 
 
 class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
-    action: np.ndarray
+    action: np.ndarray | None
     discount: float | None = None
     is_first: bool
     is_last: bool
@@ -108,7 +108,7 @@ class OpenXEmbodimentStep(TensorConverterMixin, BaseModel):
     language_embedding: np.ndarray | None = None
     language_instruction: str | None = None
     observation: OpenXEmbodimentStepObservation
-    reward: float
+    reward: float | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -169,10 +169,7 @@ def get_dataset_information(dataset_filename: str) -> pd.DataFrame:
     return dict(df[df["Registered Dataset Name"] == dataset_filename].iloc[0])
 
 
-def construct_openxembodiment_episode(
-    ep: dict, dataset_info: dict, i: int
-) -> OpenXEmbodimentEpisode:
-    raw_steps = list(ep["steps"])
+def construct_openxembodiment_episode(ep: dict, i: int) -> OpenXEmbodimentEpisode:
     if "episode_metadata" not in ep:
         ep["episode_metadata"] = dict(file_path=f"episode_{i}.npy")
     episode = OpenXEmbodimentEpisode(**ep)

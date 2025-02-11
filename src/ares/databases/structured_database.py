@@ -22,7 +22,9 @@ TEST_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(
 RolloutSQLModel = create_flattened_model(Rollout)
 
 
-def setup_database(RolloutSQLModel: SQLModel, path: str = ROBOT_DB_PATH) -> Engine:
+def setup_database(
+    RolloutSQLModel: type[SQLModel], path: str = ROBOT_DB_PATH
+) -> Engine:
     engine = create_engine(path)
     inspector = inspect(engine)
 
@@ -83,7 +85,9 @@ def get_sql_type(python_type: type) -> str:
     return type_map.get(python_type, "TEXT")
 
 
-def add_rollout(engine: Engine, rollout: Rollout, RolloutSQLModel: SQLModel) -> None:
+def add_rollout(
+    engine: Engine, rollout: Rollout, RolloutSQLModel: type[SQLModel]
+) -> None:
     rollout_sql_model = RolloutSQLModel(**rollout.flatten_fields(""))
     with Session(engine) as session:
         session.add(rollout_sql_model)

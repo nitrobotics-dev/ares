@@ -113,13 +113,13 @@ def merge_config_sources(
 
 
 class Robot(BaseConfig):
-    embodiment: str
+    embodiment: str | None
     gripper: str | None = None
-    morphology: str
-    action_space: str
-    rgb_cams: int
-    depth_cams: int
-    wrist_cams: int
+    morphology: str | None
+    action_space: str | None
+    rgb_cams: int | None
+    depth_cams: int | None
+    wrist_cams: int | None
     color_estimate: str = Field(
         description="The main color of the robot. 'other' implies a color that is not in the list of valid colors; 'unknown' implies that the color of the robot is not known.",
         pattern=COLOR_PATTERN,
@@ -131,7 +131,7 @@ class Robot(BaseConfig):
 
 
 class Environment(BaseConfig):
-    name: str
+    name: str | None
     lighting_estimate: str = Field(
         description="Lighting conditions in the environment",
         pattern=f"^(dim|normal|bright{PATTERN_EXTRA_CHOICES})$",
@@ -146,12 +146,10 @@ class Environment(BaseConfig):
         pattern=f"^(wood|metal|plastic|glass|concrete|carpet|tile|rubber|fabric|composite|marble|granite|cardboard|foam{PATTERN_EXTRA_CHOICES})$",
     )
     focus_objects_estimate: str = Field(
-        description="The object(s) is the robot supposed to interact with.",
-        default_factory=list,
+        description="The object(s) is the robot supposed to interact with. Should be a comma-separated list of objects as a string.",
     )
     distractor_objects_estimate: str = Field(
-        description="Objects present in the scene that the robot is NOT supposed to interact with.",
-        default_factory=list,
+        description="Objects present in the scene that the robot is NOT supposed to interact with. Should be a comma-separated list of objects as a string.",
     )
     people_estimate: bool = Field(
         description="Whether there are people present in the scene or not.",
@@ -166,6 +164,14 @@ class Environment(BaseConfig):
             if k in values:
                 values[k] = values[k].lower()
         return values
+
+    @property
+    def focus_objects_estimate_list(self) -> list[str]:
+        return self.focus_objects_estimate.split(",")
+
+    @property
+    def distractor_objects_estimate_list(self) -> list[str]:
+        return self.distractor_objects_estimate.split(",")
 
 
 class Task(BaseConfig):

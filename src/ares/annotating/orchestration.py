@@ -26,7 +26,9 @@ def orchestrate_annotating(
     split: str | None = None,
     rollout_ids: list[str] | None = None,
     outer_batch_size: int = ANNOTATION_OUTER_BATCH_SIZE,  # RAM limits number of concurrent rollouts formatted into requests
-    ids_path: str = None,  # Path to ids to load; may be failed IDs from previous run
+    ids_path: (
+        str | None
+    ) = None,  # Path to ids to load; may be failed IDs from previous run
     annotating_kwargs: dict | None = None,
     failures_path: str | None = None,
 ) -> tuple[ResultTracker, list[ErrorResult]]:

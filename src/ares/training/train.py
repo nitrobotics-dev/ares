@@ -240,9 +240,6 @@ def get_dataloader(
     )
 
 
-MOCK_MODEL = lambda x: x
-
-
 @click.command()
 @click.option("--preprocessed-path", type=str)
 @click.option(
@@ -269,6 +266,8 @@ def main(preprocessed_path: str, extra_info_cols: list[str]) -> None:
         num_workers=config.num_workers,
         shuffle=True,
     )
+
+    MOCK_MODEL = lambda x: x
 
     # example loop
     for i, (inputs, outputs) in enumerate(dataloader):

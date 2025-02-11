@@ -29,11 +29,10 @@ PI_DEMO_TASKS = {
         "task": "The robot must place the tupperware in the microwave and close the door.",
         "filename_prefix": "processed_tupperware",
     },
-    # actually bad
-    # "Items in drawer": {
-    #     "task": "The robot must place all of the items in the drawer and close the drawer.",
-    #     "filename_prefix": "processed_drawer",
-    # },
+    "Items in drawer": {
+        "task": "The robot must place all of the items in the drawer and close the drawer.",
+        "filename_prefix": "processed_drawer",
+    },
     "Laundry fold (shirts)": {
         "task": "The robot must fold the shirt.",
         "filename_prefix": "processed_folding_single_shirt",
