@@ -16,6 +16,7 @@ from ares.databases.structured_database import (
     setup_database,
     setup_rollouts,
 )
+from ares.models.base import Embedder
 from ares.models.shortcuts import get_nomic_embedder
 from scripts.annotating.run_grounding import GroundingModalAnnotatingFn
 from scripts.run_structured_ingestion import (
@@ -34,6 +35,8 @@ def run_ingestion_pipeline(
     vlm_name: str,
     engine: Engine,
     dataset_filename: str,
+    embedder: Embedder,
+    split: str,
 ) -> dict[str, list[dict]]:
     """
     Helper function to run the ingestion pipeline for a given dataset.
@@ -102,7 +105,6 @@ if __name__ == "__main__":
             dataset_info["Dataset Filename"] = dataset_filename
             dataset_info["Dataset Formalname"] = dataset_formalname
             dataset_info["Split"] = split
-            breakpoint()
 
             failures = run_ingestion_pipeline(
                 ds,
@@ -111,4 +113,6 @@ if __name__ == "__main__":
                 vlm_name,
                 engine,
                 dataset_filename,
+                embedder,
+                split,
             )

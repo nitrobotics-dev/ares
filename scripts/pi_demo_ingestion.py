@@ -22,14 +22,6 @@ from ares.extras.pi_demo_utils import PI_DEMO_TASKS
 from ares.models.shortcuts import get_nomic_embedder
 from ares.utils.image_utils import get_video_frames
 from main import run_ingestion_pipeline
-from scripts.annotating.run_grounding import GroundingModalAnnotatingFn
-from scripts.run_structured_ingestion import (
-    build_dataset,
-    run_structured_database_ingestion,
-)
-from scripts.run_trajectory_embedding_ingestion import (
-    run_embedding_database_ingestion_per_dataset,
-)
 
 dataset_filename = "pi_demos"
 split = "test"
@@ -122,6 +114,7 @@ if __name__ == "__main__":
             vlm_name,
             engine,
             dataset_filename,
+            embedder,
         )
         breakpoint()
     # run_ingestion_pipeline(

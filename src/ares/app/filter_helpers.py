@@ -95,13 +95,17 @@ def categorical_col_data_filter(
     Helper function for categorical data filters. Streamlit handles some of the multiselect logic, so we just enforce some types
     and limits for visual clarity.
     """
-    # try to sort options for visual clarity, may have to convert to numbers if possible!
-    if pd.api.types.is_numeric_dtype(df[col]):
-        options = sorted(df[col].unique())
-    else:
-        options = sorted(
-            [str(x) if x is not None else "(None)" for x in df[col].unique()]
-        )
+    # Convert values to strings, replacing NaN/None with "(None)"
+    unique_values = df[col].unique()
+    options = []
+    for x in unique_values:
+        if pd.isna(x):
+            options.append("(None)")
+        elif pd.api.types.is_numeric_dtype(df[col]):
+            options.append(str(float(x)) if isinstance(x, float) else str(int(x)))
+        else:
+            options.append(str(x))
+    options = sorted(set(options))  # Remove duplicates and sort
 
     # the dashboard gets quickly filled if too many options, so limit cardinality of options
     if len(options) > max_options:
@@ -123,34 +127,29 @@ def categorical_col_data_filter(
     st.session_state.temp_filter_values[select_key] = selected
     active_selected = st.session_state.temp_filter_values.get(select_key)
 
-    # in the event of active filters selected, apply those to the dataframe
+    # Apply filters if any are selected
     if active_selected:
         old_shape = filtered_df.shape[0]
-        # Convert selected options back to original data type if numeric
-        if pd.api.types.is_numeric_dtype(df[col]):
-            # Ensure all selections are numeric
-            try:
-                active_selected_converted = [
-                    (float(x) if isinstance(x, float) or "." in str(x) else int(x))
-                    for x in active_selected
-                ]
-            except ValueError as ve:
-                if debug:
-                    print(f"ValueError converting selections for {col}: {ve}")
-                active_selected_converted = []
-        else:
-            # Handle None selection
-            active_selected_converted = [
-                None if x == "(None)" else x for x in active_selected
-            ]
+        mask = pd.Series(False, index=filtered_df.index)
 
-        # Apply the filter only if conversion was successful
-        if active_selected_converted:
-            filtered_df = filtered_df[filtered_df[col].isin(active_selected_converted)]
-            if debug:
-                print(
-                    f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows"
-                )
+        for value in active_selected:
+            if value == "(None)":
+                mask |= filtered_df[col].isna()
+            elif pd.api.types.is_numeric_dtype(df[col]):
+                try:
+                    # Convert string back to number
+                    num_value = float(value) if "." in value else int(value)
+                    mask |= filtered_df[col] == num_value
+                except ValueError:
+                    if debug:
+                        print(f"ValueError converting {value} for {col}")
+            else:
+                mask |= filtered_df[col].astype(str) == value
+
+        filtered_df = filtered_df[mask]
+        if debug:
+            print(f"After filtering {col}: {old_shape} -> {filtered_df.shape[0]} rows")
+
     return filtered_df, None
 
 

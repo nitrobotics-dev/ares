@@ -130,7 +130,6 @@ async def process_batch(
                     # there was an error in processing
                     result.fails.append(rollout)
                     continue
-                breakpoint()
                 add_rollout(engine, rollout, RolloutSQLModel)
                 result.new_ids.add(rollout.id)
                 result.n_new += 1
