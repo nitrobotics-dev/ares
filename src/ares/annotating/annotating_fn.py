@@ -1,5 +1,6 @@
 import asyncio
 import traceback
+import typing as t
 
 from tqdm import tqdm
 
@@ -22,8 +23,9 @@ class AnnotatingFn:
         rollouts: list[Rollout],
         ann_db: AnnotationDatabase,
         outer_batch_size: int,
-        **kwargs,
-    ) -> tuple[ResultTracker, list[ErrorResult]]: ...
+        **kwargs: t.Any,
+    ) -> tuple[ResultTracker, list[ErrorResult]]:
+        raise NotImplementedError
 
 
 class APIAnnotatingFn(AnnotatingFn):
@@ -34,6 +36,14 @@ class APIAnnotatingFn(AnnotatingFn):
     def __init__(self, annotation_key: str, annotation_type: str):
         self.annotation_key = annotation_key
         self.annotation_type = annotation_type
+
+    async def run_query(
+        self,
+        vlm: VLM,
+        rollout: Rollout,
+        ann_db: AnnotationDatabase,
+    ) -> t.Any:
+        raise NotImplementedError
 
     async def run_batch(
         self,

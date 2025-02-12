@@ -68,7 +68,9 @@ class AnnotationDatabase:
             annotation_type: Type of annotation (e.g., "bbox", "label", "mask")
             frame: t.Optional frame number or list of frames this applies to
         """
-        assert isinstance(value, Annotation)
+        assert isinstance(
+            value, Annotation
+        ), f"Value must be an Annotation, got {type(value)}"
         value_dict = value.to_dict()
         annotation = {
             "video_id": video_id,
@@ -265,7 +267,7 @@ class AnnotationDatabase:
         Returns:
             video_id: Unique identifier for the video
         """
-        # Create video metadata
+        # create video metadata
         video_id = get_video_id(dataset_filename, video_path)
         metadata = {
             "dataset_filename": dataset_filename,

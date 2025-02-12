@@ -14,6 +14,7 @@ from ares.annotating.annotating_base import ErrorResult, ResultTracker
 from ares.annotating.annotating_fn import AnnotatingFn
 from ares.annotating.modal_grounding import GroundingModalWrapper
 from ares.annotating.orchestration import orchestrate_annotating
+from ares.configs.annotations import Annotation
 from ares.configs.base import Rollout
 from ares.constants import (
     ANNOTATION_GROUNDING_FPS,
@@ -81,24 +82,28 @@ async def run_annotate_and_ingest(
     # Submit annotation tasks to Modal
     annotation_results = await annotator.annotate_videos(tasks)
 
-    for rollout_id, all_frame_annotation_dicts in annotation_results:
+    for rollout_id, all_frame_annotations in annotation_results:
         try:
             rollout = id_to_rollout[rollout_id]
             _, frames, frame_indices, label_str = id_to_annotation_inputs[rollout_id]
+            all_frame_annotation_objs = []
+            for frame_annotations in all_frame_annotations:
+                for ann in frame_annotations:
+                    all_frame_annotation_objs.append(Annotation(**ann))
             video_id = db.add_video_with_annotations(
                 dataset_filename=rollout.dataset_filename,
                 video_path=rollout.filename + ".mp4",
                 frames=frames,
                 frame_indices=frame_indices,
-                annotations=all_frame_annotation_dicts,
+                annotations=all_frame_annotations,
                 label_str=label_str,
             )
             tracker.update_via_batch(
                 n_videos=1,
-                n_frames=len(all_frame_annotation_dicts),
+                n_frames=len(all_frame_annotations),
                 n_annotations=sum(
                     len(frame_annotations)
-                    for frame_annotations in all_frame_annotation_dicts
+                    for frame_annotations in all_frame_annotations
                 ),
                 video_ids=[video_id],
             )
@@ -213,7 +218,7 @@ class GroundingModalAnnotatingFn(AnnotatingFn):
         ann_db: AnnotationDatabase,
         outer_batch_size: int,
         annotation_fps: int = ANNOTATION_GROUNDING_FPS,
-    ):
+    ) -> tuple[ResultTracker, list[ErrorResult]]:
         """
         Main function to run grounding annotation using Modal.
         """

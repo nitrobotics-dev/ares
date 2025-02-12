@@ -51,7 +51,7 @@ class GroundingModalWrapper(BaseModalWrapper):
 
     async def annotate_videos(
         self, tasks: list[tuple[str, list, str]]
-    ) -> list[tuple[str, list]]:
+    ) -> list[tuple[str, list[list["Annotation"]]]]:
         """
         Submit a batch of annotation tasks to the GroundingWorker.
 
@@ -59,6 +59,6 @@ class GroundingModalWrapper(BaseModalWrapper):
             tasks (list[tuple[str, list, str]]): List of tuples containing rollout_id, frames, and label_str.
 
         Returns:
-            list[tuple[str, list]]: List of annotation results.
+            list[tuple[str, list[list[Annotation]]]]:
         """
         return await self.run_batch(tasks)

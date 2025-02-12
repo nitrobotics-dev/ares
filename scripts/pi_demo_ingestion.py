@@ -16,7 +16,6 @@ from ares.databases.structured_database import (
     ROBOT_DB_PATH,
     RolloutSQLModel,
     setup_database,
-    setup_rollouts,
 )
 from ares.extras.pi_demo_utils import PI_DEMO_TASKS
 from ares.models.shortcuts import get_nomic_embedder
@@ -115,8 +114,6 @@ if __name__ == "__main__":
             engine,
             dataset_filename,
             embedder,
+            split,
         )
         breakpoint()
-    # run_ingestion_pipeline(
-    #     ds, dataset_info, dataset_formalname, vlm_name, engine, dataset_filename
-    # )
