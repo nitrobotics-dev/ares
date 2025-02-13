@@ -101,6 +101,8 @@ def categorical_col_data_filter(
     for x in unique_values:
         if pd.isna(x):
             options.append("(None)")
+        elif isinstance(x, (bool, np.bool_)):  # Add special handling for boolean values
+            options.append(str(x))
         elif pd.api.types.is_numeric_dtype(df[col]):
             options.append(str(float(x)) if isinstance(x, float) else str(int(x)))
         else:
@@ -135,9 +137,10 @@ def categorical_col_data_filter(
         for value in active_selected:
             if value == "(None)":
                 mask |= filtered_df[col].isna()
+            elif value.lower() in ("True", "False"):
+                mask |= filtered_df[col] == (value.lower() == "True")
             elif pd.api.types.is_numeric_dtype(df[col]):
                 try:
-                    # Convert string back to number
                     num_value = float(value) if "." in value else int(value)
                     mask |= filtered_df[col] == num_value
                 except ValueError:
@@ -211,7 +214,6 @@ def create_structured_data_filters(
             skipped_cols.append(col)
             continue
 
-        # filtered_df = df
         with filter_cols[idx % n_cols]:
             if numeric_coercable_or_float_range(df, col, viz_info, max_options):
                 filtered_df = numberic_col_data_filter(df, filtered_df, col, debug)
@@ -413,7 +415,7 @@ def create_embedding_data_filters(
 
 def summarize_selection(
     selection: t.Any, cluster_to_trace: dict[str, int], custom_data_keys: list[str]
-) -> str:
+) -> None:
     """
     Helpful tool to understand clusters. Given a selection users can send a sample of a selection to an LLM and request a summary.
     """

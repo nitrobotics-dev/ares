@@ -32,6 +32,11 @@ def infer_visualization_type(
     if column_name.lower() in ignore_cols:
         return result
 
+    # Add special handling for boolean columns
+    if pd.api.types.is_bool_dtype(data[column_name]):
+        result["viz_type"] = "bar"
+        return result
+
     if pd.api.types.is_string_dtype(data[column_name]):
         if data[column_name].str.len().max() > max_str_length:
             return result
@@ -113,7 +118,24 @@ def generate_automatic_visualizations(
     # Create bar visualizations - handle each column separately
     for col in bar_cols:
         col_title = col.replace("_", " ").replace("-", " ").title()
-        agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
+
+        # Special handling for boolean columns
+        if pd.api.types.is_bool_dtype(df[col]):
+            # Convert to string before aggregation to preserve True/False
+            agg_data = (
+                df[col]
+                .astype(str)
+                .groupby(df[col])
+                .agg(count=(time_column, "count"))
+                .reset_index()
+            )
+            agg_data.columns = [
+                col,
+                time_column,
+            ]  # Rename columns to match expected format
+        else:
+            agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
+
         visualizations.append(
             {
                 "figure": create_bar_plot(
