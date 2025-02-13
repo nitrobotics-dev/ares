@@ -46,12 +46,16 @@ full_dataset_info = {
 }
 
 
-def prep_for_oxe_episode(task_info: dict, success_flag: str) -> dict:
+def prep_for_oxe_episode(task_info: dict, success_flag: str) -> dict | None:
     """
     Force the PI Demo videos and task information into the OpenXEmbodimentEpisode format.
     """
     filename = f"{task_info['filename_prefix']}_{success_flag}"
-    frames = get_video_frames(dataset_filename="pi_demos", filename=filename)
+    try:
+        frames = get_video_frames(dataset_filename="pi_demos", filename=filename)
+    except Exception as e:
+        print(f"Error getting video frames for {filename}: {e}")
+        return None
     metadata = {"file_path": filename, "success": success_flag == "success"}
     steps = []
     for i, frame in enumerate(frames):
@@ -81,7 +85,9 @@ class PiDemoIngestion:
         self._episodes = []
         for task_info in tqdm(task_infos):
             for success_flag in success_flags:
-                self._episodes.append(prep_for_oxe_episode(task_info, success_flag))
+                episode = prep_for_oxe_episode(task_info, success_flag)
+                if episode is not None:
+                    self._episodes.append(episode)
         self._index = 0
 
     def __iter__(self) -> "PiDemoIngestion":
@@ -105,15 +111,16 @@ if __name__ == "__main__":
     embedder = get_nomic_embedder()
     task_infos = list(PI_DEMO_TASKS.values())
     for task_info in tqdm(task_infos):
-        ds = PiDemoIngestion([task_info], ["success", "fail"])
-        run_ingestion_pipeline(
-            ds,
-            full_dataset_info,
-            dataset_formalname,
-            vlm_name,
-            engine,
-            dataset_filename,
-            embedder,
-            split,
-        )
-        breakpoint()
+        for flag in ["success", "fail"]:
+            print(task_info)
+            ds = PiDemoIngestion([task_info], [flag])
+            run_ingestion_pipeline(
+                ds,
+                full_dataset_info,
+                dataset_formalname,
+                vlm_name,
+                engine,
+                dataset_filename,
+                embedder,
+                split,
+            )

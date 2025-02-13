@@ -43,27 +43,28 @@ def run_ingestion_pipeline(
     Currently, this means ingesting structured data, embedding rollouts, and annotating rollouts.
     """
     # run structured ingestion
-    # structured_failures, new_rollout_ids = asyncio.run(
-    #     run_structured_database_ingestion(
-    #         ds,
-    #         dataset_info,
-    #         dataset_formalname,
-    #         vlm_name,
-    #         engine,
-    #         dataset_filename,
-    #     )
-    # )
+    structured_failures, new_rollout_ids = asyncio.run(
+        run_structured_database_ingestion(
+            ds,
+            dataset_info,
+            dataset_formalname,
+            vlm_name,
+            engine,
+            dataset_filename,
+        )
+    )
 
     # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
     # to db and videos to disk then reconstitute rollouts for indexing
     rollouts = setup_rollouts(engine, dataset_formalname)
-    # if new_rollout_ids is not None:
-    #     rollouts = [r for r in rollouts if r.id in new_rollout_ids]
-    # if len(rollouts) == 0:
-    #     breakpoint()
-    # run_embedding_database_ingestion_per_dataset(
-    #     rollouts, embedder, index_path=EMBEDDING_DB_PATH
-    # )
+    if new_rollout_ids is not None:
+        rollouts = [r for r in rollouts if r.id in new_rollout_ids]
+
+    if len(rollouts) == 0:
+        breakpoint()
+    run_embedding_database_ingestion_per_dataset(
+        rollouts, embedder, index_path=EMBEDDING_DB_PATH
+    )
 
     # run grounding annotation with modal
     annotation_results, grounding_failures = orchestrate_annotating(
@@ -79,7 +80,7 @@ def run_ingestion_pipeline(
     )
     return dict(
         structured_failures=structured_failures,
-        grounding_failures=[dict(f) for f in grounding_failures],
+        grounding_failures=[f.__dict__ for f in grounding_failures],
     )
 
 

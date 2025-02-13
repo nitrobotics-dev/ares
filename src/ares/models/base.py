@@ -288,3 +288,15 @@ def parse_response(choice: t.Any, load_json: bool = False) -> dict | str:
         content = content.strip().removeprefix("```json").removesuffix("```").strip()
         content = json.loads(content) if isinstance(content, str) else content
     return content
+
+
+def parse_responses(res: ModelResponse, load_json: bool = False) -> list[dict | str]:
+    outputs = []
+    for choice in res.choices:
+        try:
+            outputs.append(parse_response(choice, load_json))
+        except Exception as e:
+            print(f"Failed to parse JSON from response: {e}")
+            print(f"Response: {choice.message.content}")
+            outputs.append(choice.message.content)
+    return outputs

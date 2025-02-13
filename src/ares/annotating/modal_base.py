@@ -1,5 +1,6 @@
 """
-Base Modal infrastructure for running serverless compute tasks.
+Base Modal infrastructure for running serverless compute tasks. In order to prevent copying over the ARES repository and dependencies,
+avoid importing any ARES modules in this file; instead, import the necessary modules in the specific Modal app classes.
 """
 
 import asyncio
@@ -61,5 +62,5 @@ class BaseModalWrapper:
             batch = items[i : i + batch_size]
             tasks.append(self.WorkerCls().process.remote.aio(batch))
         results = await asyncio.gather(*tasks)
-        breakpoint()
+        results = [item for batch in results for item in batch]
         return results

@@ -81,21 +81,20 @@ async def run_annotate_and_ingest(
 
     # Submit annotation tasks to Modal
     annotation_results = await annotator.annotate_videos(tasks)
-
     for rollout_id, all_frame_annotations in annotation_results:
         try:
             rollout = id_to_rollout[rollout_id]
             _, frames, frame_indices, label_str = id_to_annotation_inputs[rollout_id]
-            all_frame_annotation_objs = []
-            for frame_annotations in all_frame_annotations:
-                for ann in frame_annotations:
-                    all_frame_annotation_objs.append(Annotation(**ann))
+            all_frame_annotation_objs = [
+                [Annotation(**ann) for ann in frame_annotations]
+                for frame_annotations in all_frame_annotations
+            ]
             video_id = db.add_video_with_annotations(
                 dataset_filename=rollout.dataset_filename,
                 video_path=rollout.filename + ".mp4",
                 frames=frames,
                 frame_indices=frame_indices,
-                annotations=all_frame_annotations,
+                annotations=all_frame_annotation_objs,
                 label_str=label_str,
             )
             tracker.update_via_batch(
