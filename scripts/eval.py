@@ -1,22 +1,25 @@
+""" 
+Script to evaluate the performance of leading API models on the Physical Intelligence Demos dataset. See `notebooks/eval_nb.ipynb` for more details.
+We generate a success constraint for the task based on the first frame and then evaluate the performance of the model at the task.
+We evaluate two methods: 
+- `video`: analyze the stream of frames all at once, aka [image 1, image 2, image 3, ...]
+- `frame_descriptions`: generate a description for each frame, then process only text descriptions. [image 1] -> description 1, [image 2] -> description 2, ... and then process [description 1, description 2, ...]
+
+Additionally, we evaluate different VLMs (openai, anthropic, google, etc.) and different FPS (0, 0.25, 0.5, 1, 2), as well as mean/median of vote performance. Note that 0 FPS means only the first and last frames are used.
+
+All functions are implemented asynchronously to allow for parallel processing of tasks, with each VLM maintaining its own semaphore to avoid rate limiting.
+"""
+
 import asyncio
-import json
 import os
 import traceback
-from collections import defaultdict
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from litellm import completion_cost
-from pydantic import BaseModel, Field
-from tqdm import tqdm
+from pydantic import Field
 
-from ares.configs.base import (
-    BaseConfig,
-    Rollout,
-    pydantic_to_example_dict,
-    pydantic_to_field_instructions,
-)
+from ares.configs.base import BaseConfig, Rollout, pydantic_to_field_instructions
 from ares.constants import ARES_DATA_DIR, get_dataset_info_by_key
 from ares.databases.structured_database import (
     ROBOT_DB_PATH,
@@ -24,15 +27,14 @@ from ares.databases.structured_database import (
     setup_database,
     setup_rollouts,
 )
-
-# from ares.extras.pi_demo_utils import PI_DEMO_PATH, PI_DEMO_TASKS
 from ares.models.base import VLM, parse_response, parse_responses
 from ares.utils.image_utils import load_video_frames
 
 IMAGE_TILE_SIZE = (512, 512)
-MAX_N_FRAMES = 40  # combination of experiments with FPS and API throughout limits
+MAX_N_FRAMES = 40
 
 
+# define an EvalConfig pydantic model to parse the output of the API models, define the input types, and output format
 class EvalConfig(BaseConfig):
     description: str = Field(
         description="A thorough description of everything that happens in the sequence of images. Focus on the robot's actions and how it performs the task."
@@ -51,7 +53,7 @@ async def dynamic_constraint_generation_async(
     vlm: VLM, task: str, frames: list[np.ndarray]
 ) -> str:
     """
-    Helper function for generating success constraints for a task.
+    Helper function for generating success constraints for a task based on the first frame and the task description.
     """
     messages, res = await vlm.ask_async(
         info=dict(task=task),
@@ -59,6 +61,21 @@ async def dynamic_constraint_generation_async(
         images=[frames[0]],
     )
     return parse_response(res.choices[0], load_json=False)
+
+
+async def get_frame_description(
+    vlm: VLM,
+    task: str,
+    frame: np.ndarray,
+    frame_idx: int,
+    success_constraints_str: str,
+) -> str:
+    messages, res = await vlm.ask_async(
+        info=dict(task=task, success_constraints=success_constraints_str),
+        prompt_filename="task_frame_description.jinja2",
+        images=[frame],
+    )
+    return f"Frame {frame_idx}: {res.choices[0].message.content}"
 
 
 async def simple_single_video_eval_async(
@@ -94,18 +111,14 @@ async def simple_single_frame_description_eval_async(
 ) -> list[dict | str | None]:
     """
     Helper function for describing each frame in the sequence of images and then summarizing the descriptions.
+    This yields min(N, MAX_N_FRAMES) descriptions which are then all passed to the VLM to get the performance score.
     """
 
-    async def get_frame_description(frame: np.ndarray, frame_idx: int) -> str:
-        messages, res = await vlm.ask_async(
-            info=dict(task=task, success_constraints=success_constraints_str),
-            prompt_filename="task_frame_description.jinja2",
-            images=[frame],
-        )
-        return f"Frame {frame_idx}: {res.choices[0].message.content}"
-
     descriptions = await asyncio.gather(
-        *[get_frame_description(frame, i) for i, frame in enumerate(frames)]
+        *[
+            get_frame_description(vlm, task, frame, i, success_constraints_str)
+            for i, frame in enumerate(frames)
+        ]
     )
     descriptions_str = "\n".join(descriptions)
     messages, res = await vlm.ask_async(
@@ -154,9 +167,9 @@ async def process_task_async(
                 output_format,
             )
         else:
-            raise ValueError(f"Invalid method: {method}")
+            print(f"Invalid method: {method}")
+            return None
 
-        breakpoint()
         votes = [x["performance"] if isinstance(x, dict) else np.nan for x in outputs]
         return dict(
             vlm=vlm.name,
@@ -183,10 +196,7 @@ async def main(
     fps_options: list[float],
 ) -> list[dict | None]:
     all_results = []
-
-    # Process each method sequentially to avoid concurrent calls to same VLM
     for method in methods:
-        # Process all VLMs in parallel for this method
         for vlm in vlm_options:
             tasks_to_process = []
             for rollout in rollouts:
@@ -220,11 +230,6 @@ async def main(
 
 
 if __name__ == "__main__":
-    # FPS of 0 just means first and last frames
-    fps_options = [0, 0.25, 0.5, 1, 2]
-    dataset_filename = "pi_demos"
-    dataset_info = get_dataset_info_by_key("dataset_filename", dataset_filename)
-    dataset_formalname = dataset_info["dataset_formalname"]
 
     from ares.models.shortcuts import (
         get_claude_3_5_sonnet,
@@ -236,9 +241,17 @@ if __name__ == "__main__":
         get_gpt_o1_mini,
     )
 
-    vlm_options = [get_gpt_4o_mini()]
-    methods = ["frame_descriptions", "video"]
+    # FPS of 0 just means first and last frames
+    fps_options = [0, 0.25, 0.5, 1, 2]
+    dataset_filename = "pi_demos"
+    dataset_info = get_dataset_info_by_key("dataset_filename", dataset_filename)
+    dataset_formalname = dataset_info["dataset_formalname"]
 
+    # vlm_options = [get_gpt_4o_mini()]
+    # vlm_options = [get_gpt_4o()]
+    vlm_options = [get_gemini_2_flash()]
+    # methods = ["frame_descriptions", "video"]
+    methods = ["video"]
     output_format = "\n".join(pydantic_to_field_instructions(EvalConfig))
 
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)

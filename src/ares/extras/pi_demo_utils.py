@@ -26,10 +26,10 @@ PI_DEMO_TASKS = {
     #     "filename_prefix": "processed_stack",
     # },
     # maybe bad??
-    "Tupperware in microwave": {
-        "task": "The robot must place the tupperware in the microwave and close the door.",
-        "filename_prefix": "processed_tupperware",
-    },
+    # "Tupperware in microwave": {
+    #     "task": "The robot must place the tupperware in the microwave and close the door.",
+    #     "filename_prefix": "processed_tupperware",
+    # },
     # "Items in drawer": {
     #     "task": "The robot must place all of the items in the drawer and close the drawer.",
     #     "filename_prefix": "processed_drawer",
