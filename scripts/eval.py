@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
     # vlm_options = [get_gpt_4o_mini()]
     # vlm_options = [get_gpt_4o()]
-    vlm_options = [get_gemini_2_flash()]
+    vlm_options = [get_claude_3_5_sonnet()]
     # methods = ["frame_descriptions", "video"]
     methods = ["video"]
     output_format = "\n".join(pydantic_to_field_instructions(EvalConfig))

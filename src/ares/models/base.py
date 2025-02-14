@@ -23,7 +23,7 @@ from ares.utils.image_utils import encode_image
 # dependent on your key / organization tier
 RATE_LIMITS = {
     "openai": 10,  # 5000 RPM
-    "anthropic": 4,  # 1000 RPM
+    "anthropic": 2,  # 1000 RPM
     "gemini": 4,  # 1000 RPM
 }
 
