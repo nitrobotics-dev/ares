@@ -137,8 +137,8 @@ def categorical_col_data_filter(
         for value in active_selected:
             if value == "(None)":
                 mask |= filtered_df[col].isna()
-            elif value.lower() in ("True", "False"):
-                mask |= filtered_df[col] == (value.lower() == "True")
+            elif value in ("True", "False"):
+                mask |= filtered_df[col] == (value == "True")
             elif pd.api.types.is_numeric_dtype(df[col]):
                 try:
                     num_value = float(value) if "." in value else int(value)
@@ -230,8 +230,8 @@ def create_structured_data_filters(
     if debug:
         print("\nFinal df shape:", filtered_df.shape)
 
-    # Check if len(filtered_df) == 0! something wrong
     if len(filtered_df) == 0:
+        print(f"No rows left after filtering: {skipped_cols}")
         breakpoint()
     return filtered_df, skipped_cols
 

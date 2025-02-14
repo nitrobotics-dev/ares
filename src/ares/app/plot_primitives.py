@@ -313,7 +313,13 @@ def show_dataframe(
     # Auto-generate column configs based on data types
     column_config = {}
     for col in display_df.columns:
-        if pd.api.types.is_datetime64_any_dtype(display_df[col]):
+        # Convert UUID columns to strings for pyarrow
+        if col == "id":
+            display_df[col] = display_df[col].astype(str)
+            column_config[col] = st.column_config.TextColumn(
+                col.replace("_", " ").title()
+            )
+        elif pd.api.types.is_datetime64_any_dtype(display_df[col]):
             column_config[col] = st.column_config.DateColumn(
                 col.replace("_", " ").title()
             )

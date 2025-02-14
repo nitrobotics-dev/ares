@@ -119,32 +119,24 @@ def generate_automatic_visualizations(
     for col in bar_cols:
         col_title = col.replace("_", " ").replace("-", " ").title()
 
-        # Special handling for boolean columns
+        # Create aggregation consistently for both boolean and non-boolean columns
         if pd.api.types.is_bool_dtype(df[col]):
-            # Convert to string before aggregation to preserve True/False
-            agg_data = (
-                df[col]
-                .astype(str)
-                .groupby(df[col])
-                .agg(count=(time_column, "count"))
-                .reset_index()
-            )
-            agg_data.columns = [
-                col,
-                time_column,
-            ]  # Rename columns to match expected format
+            value_counts = df[col].astype(str).value_counts()
         else:
-            agg_data = df.groupby(col).agg({time_column: "count"}).reset_index()
+            value_counts = df[col].value_counts()
+
+        agg_data = value_counts.reset_index()
+        agg_data.columns = [col, "count"]
 
         visualizations.append(
             {
                 "figure": create_bar_plot(
                     agg_data,
                     x=col,
-                    y=time_column,
+                    y="count",
                     color="#1f77b4",
                     title=f"Count by {col_title}",
-                    labels={col: col_title, time_column: "Count"},
+                    labels={col: col_title, "count": "Count"},
                 ),
                 "title": f"{col_title} Distribution",
             }

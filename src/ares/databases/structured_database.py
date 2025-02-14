@@ -278,19 +278,7 @@ if __name__ == "__main__":
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     df = db_to_df(engine)
     print(df.dataset_name.value_counts())
-    # uniqueness check
-    scores = {k: (len(v), v.path.nunique()) for k, v in df.groupby("dataset_name")}
-    failed_unique = {k: v for k, v in scores.items() if v[0] != v[1]}
-    print(f"failed unique! {failed_unique}")
 
     first_id = df.iloc[0].id
     first_rollout = get_rollouts_by_ids(engine, [first_id])[0]
     breakpoint()
-
-    # breakpoint()
-    # add_rollout(engine, ROLL1, RolloutSQLModel)
-    # add_rollout(engine, ROLL2, RolloutSQLModel)
-
-    # sess = Session(engine)
-    # res = sess.query(RolloutSQLModel).filter(RolloutSQLModel.task_success > 0.5)
-    # breakpoint()
