@@ -47,7 +47,7 @@ HEAL_INFO_DIR = os.path.join(ARES_DATA_DIR, "heal_info")
 
 @click.command("find-heal")
 @click.option("--heal-info-dir", type=str, default=HEAL_INFO_DIR)
-def find_heal_opportunities(heal_info_dir: str) -> str:
+def find_heal_opportunities(heal_info_dir: str) -> None:
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     ann_db = AnnotationDatabase(connection_string=ANNOTATION_DB_PATH)
     embedding_db = IndexManager(EMBEDDING_DB_PATH, FaissIndex)
@@ -153,7 +153,7 @@ def find_heal_opportunities(heal_info_dir: str) -> str:
 
 @click.command("exec-heal")
 @click.option("--time-dir", type=str, required=True)
-def execute_heal(time_dir: str):
+def execute_heal(time_dir: str) -> None:
     heal_dir = os.path.join(HEAL_INFO_DIR, time_dir)
 
     # run embedding ingestion via click's command from our embedding ingestion script
