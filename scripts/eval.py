@@ -170,14 +170,28 @@ async def process_task_async(
             print(f"Invalid method: {method}")
             return None
 
-        votes = [x["performance"] if isinstance(x, dict) else np.nan for x in outputs]
+        # Convert performance values to float, using np.nan for invalid values
+        votes = [
+            (
+                float(x["performance"])
+                if isinstance(x, dict)
+                and isinstance(x.get("performance"), (int, float, str))
+                else np.nan
+            )
+            for x in outputs
+        ]
+
         return dict(
             vlm=vlm.name,
             task=rollout.task.language_instruction,
             fps=fps,
             performance=votes,
-            mean_performance=(np.nanmean(votes) if any(votes) else np.nan),
-            median_performance=(np.nanmedian(votes) if any(votes) else np.nan),
+            mean_performance=(
+                np.nanmean(votes) if any(not np.isnan(x) for x in votes) else np.nan
+            ),
+            median_performance=(
+                np.nanmedian(votes) if any(not np.isnan(x) for x in votes) else np.nan
+            ),
             method=method,
             success_flag=rollout.task.success,
         )
@@ -234,23 +248,27 @@ if __name__ == "__main__":
     from ares.models.shortcuts import (
         get_claude_3_5_sonnet,
         get_gemini_2_flash,
+        get_gemini_2_pro,
         get_gemini_15_flash,
         get_gemini_15_pro,
+        get_gpt_4_turbo,
         get_gpt_4o,
         get_gpt_4o_mini,
         get_gpt_o1_mini,
     )
 
     # FPS of 0 just means first and last frames
-    fps_options = [0, 0.25, 0.5, 1, 2]
+    fps_options = [0]  # , 0.25, 0.5, 1, 2]
     dataset_filename = "pi_demos"
     dataset_info = get_dataset_info_by_key("dataset_filename", dataset_filename)
     dataset_formalname = dataset_info["dataset_formalname"]
 
     # vlm_options = [get_gpt_4o_mini()]
     # vlm_options = [get_gpt_4o()]
-    vlm_options = [get_claude_3_5_sonnet()]
+    # vlm_options = [get_gemini_15_flash()]
+    # vlm_options = [get_gemini_2_flash()]
     # methods = ["frame_descriptions", "video"]
+    vlm_options = [get_gemini_2_pro()]
     methods = ["video"]
     output_format = "\n".join(pydantic_to_field_instructions(EvalConfig))
 
