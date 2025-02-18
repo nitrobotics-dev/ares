@@ -24,7 +24,7 @@ from ares.configs.base import (
     pydantic_to_field_instructions,
 )
 from ares.configs.open_x_embodiment_configs import OpenXEmbodimentEpisode
-from ares.models.base import VLM
+from ares.models.base import VLM, parse_response
 from ares.utils.image_utils import load_video_frames
 
 
@@ -290,12 +290,7 @@ class VLMInformationExtractor(InformationExtractor):
         # Process responses and create rollouts
         for i, response in enumerate(responses):
             try:
-                content = response.choices[0].message.content.strip()
-                content = content.removeprefix("```json").removesuffix("```").strip()
-                structured_info = (
-                    json.loads(content) if isinstance(content, str) else content
-                )
-
+                structured_info = parse_response(response.choices[0], load_json=True)
                 rollout = self._create_rollout(
                     hardcoded_info=hardcoded_infos[valid_indices[i]],
                     structured_info=structured_info,

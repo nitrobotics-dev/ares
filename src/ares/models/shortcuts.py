@@ -27,7 +27,11 @@ def get_gemini_15_pro() -> VLM:
 
 
 def get_gemini_2_flash() -> VLM:
-    return VLM(provider="gemini", name="gemini-2.0-flash-exp")
+    return VLM(provider="gemini", name="gemini-2.0-flash")
+
+
+def get_gemini_2_pro() -> VLM:
+    return VLM(provider="gemini", name="gemini-2.0-pro-exp-02-05")
 
 
 def get_gpt_4o_mini() -> VLM:
@@ -42,12 +46,16 @@ def get_gpt_o1_mini() -> VLM:
     return VLM(provider="openai", name="o1-preview")
 
 
+def get_gpt_4_turbo() -> VLM:
+    return VLM(provider="openai", name="gpt-4-turbo")
+
+
 def get_claude_3_5_sonnet() -> VLM:
-    return VLM(provider="anthropic", name="claude-3-5-sonnet-20240620")
+    return VLM(provider="anthropic", name="claude-3-5-sonnet")
 
 
 def get_claude_3_5_haiku() -> VLM:
-    return VLM(provider="anthropic", name="claude-3-5-haiku-20241022")
+    return VLM(provider="anthropic", name="claude-3-5-haiku")
 
 
 name_to_vlm_fn_mapping = {
@@ -58,6 +66,7 @@ name_to_vlm_fn_mapping = {
     "gpt-4o": get_gpt_4o,
     "gpt-o1-mini": get_gpt_o1_mini,
     "claude-3-5-sonnet": get_claude_3_5_sonnet,
+    "gpt-4-turbo": get_gpt_4_turbo,
 }
 
 

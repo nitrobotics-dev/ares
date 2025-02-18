@@ -178,7 +178,7 @@ class GroundingAnnotator:
         frames: list,
         labels_str: str,
         batch_size: int = 8,
-    ) -> list[list[dict]]:
+    ) -> tuple[str, list[list[dict]]]:
         """Annotate video frames in batches."""
         all_annotations = []
 

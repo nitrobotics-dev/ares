@@ -20,9 +20,7 @@ class AnnotatingFn:
 
     def __call__(
         self,
-        rollouts: list[Rollout],
-        ann_db: AnnotationDatabase,
-        outer_batch_size: int,
+        *args: t.Any,
         **kwargs: t.Any,
     ) -> tuple[ResultTracker, list[ErrorResult]]:
         raise NotImplementedError

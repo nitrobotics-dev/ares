@@ -45,6 +45,7 @@ class VLM:
     def __init__(self, provider: str, name: str):
         self.provider = provider
         self.name = name
+        self.full_name = f"{provider}/{name}"
         # Add rate limiting per provider
         self.semaphore: Semaphore | nullcontext = nullcontext()
         self._setup_rate_limits()
@@ -58,7 +59,7 @@ class VLM:
         # note: don't use litellm util here, it uses 10 tokens! roll our own check with 1
         try:
             res = completion(
-                model=self.name,
+                model=self.full_name,
                 messages=[{"role": "user", "content": "!"}],
                 max_tokens=1,
             )
@@ -111,7 +112,9 @@ class VLM:
         self, messages: list[dict], model_kwargs: dict
     ) -> ModelResponse:
         """Wrapper for API calls with retry logic"""
-        return await acompletion(model=self.name, messages=messages, **model_kwargs)
+        return await acompletion(
+            model=self.full_name, messages=messages, **model_kwargs
+        )
 
     async def ask_async(
         self,

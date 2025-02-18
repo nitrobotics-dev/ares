@@ -3,7 +3,7 @@ import asyncio
 import numpy as np
 
 from ares.configs.annotations import Annotation, binary_mask_to_rle
-from ares.models.base import VLM
+from ares.models.base import VLM, parse_response
 
 
 async def get_grounding_nouns_async(
@@ -20,7 +20,7 @@ async def get_grounding_nouns_async(
         prompt_filename=prompt_filename,
         images=[image],
     )
-    label_str = response.choices[0].message.content
+    label_str = parse_response(response.choices[0], load_json=False)
     label_str = label_str.replace("a ", "").replace("an ", "")
     return label_str
 
