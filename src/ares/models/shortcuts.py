@@ -51,11 +51,7 @@ def get_gpt_4_turbo() -> VLM:
 
 
 def get_claude_3_5_sonnet() -> VLM:
-    return VLM(provider="anthropic", name="claude-3-5-sonnet")
-
-
-def get_claude_3_5_haiku() -> VLM:
-    return VLM(provider="anthropic", name="claude-3-5-haiku")
+    return VLM(provider="anthropic", name="claude-3-5-sonnet-20240620")
 
 
 name_to_vlm_fn_mapping = {
