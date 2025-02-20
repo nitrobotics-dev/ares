@@ -1,6 +1,6 @@
 # ARES: Automatic Robot Evaluation System
 
-<img src="assets/ares.png" alt="ARES System Diagram" width="300"/> 
+<img src="assets/ares.png" alt="ARES System Diagram"/> 
 
 ARES is a open-source system for automatically evaluating robot data using machine learning to quickly and accurately understand performance, identify areas for improvement, and enable rapid prototyping of new robot behaviors. The goal of this system is to shorten iteration cycles by using machine learning to provide fast, accurate feedback on robot data. ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs (model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc.), requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
 
