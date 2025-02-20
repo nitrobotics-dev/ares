@@ -85,7 +85,7 @@ def run_ingestion_pipeline(
 
 
 if __name__ == "__main__":
-    vlm_name = "gpt-4o-mini"
+    vlm_name = "gpt-4o"
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     embedder = get_nomic_embedder()
 

@@ -4,6 +4,11 @@
 
 ARES is a open-source system for automatically evaluating robot data using machine learning to quickly and accurately understand performance, identify areas for improvement, and enable rapid prototyping of new robot behaviors. The goal of this system is to shorten iteration cycles by using machine learning to provide fast, accurate feedback on robot data. ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs (model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc.), requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
 
+At a high level, ARES is composed of three main components: 
+- Ingestion: automatically transform raw robot data into a structured format with VLMs
+- Annotation: annotate the rollouts with pseduo-labels for downstream tasks
+- Curation and Modeling: understand data distributions and select data for training or evaluation
+
 [Demo Video](https://example.com/demo) TODO!
 
 [Blog Post](https://example.com/blog) TODO! 
@@ -20,6 +25,7 @@ ARES is a platform for understanding robot data, targeted at robot developers an
 ## Overview
 - [Stack](#stack)
 - [Installation](#installation)
+- [Data](#data)
 - [Configuration](#configuration)
 - [Ingestion](#ingestion)
 - [Annotation](#annotation)
@@ -37,19 +43,86 @@ ARES is built to be simple and scalable. As such, we select tools that are easy 
 - Frontend: [Streamlit](https://streamlit.io/), [Plotly](https://plotly.com/python/)
 - Development: [Docker](https://www.docker.com/), [Cursor](https://www.cursor.com/), [VSCode](https://code.visualstudio.com/), [Pydantic](https://docs.pydantic.dev/)
 
-## Installation
+## Installation + Setup
 
-## Configuration
+### Prerequisites
+First, clone the repository:
+```bash
+git clone https://github.com/jacobphillips99/ares.git
+cd ares
+```
 
-## Ingestion
+### Docker + Devcontainer Setup
+ARES was built with a Docker container in mind for easy setup, containerization, and deployment. We reccomend using a Docker container to run ARES, specifically using a VSCode/Cursor devcontainer extension. The Dockerfile contains the necessary system packages for ARES, including a reference to the `requirements.txt` file for Python dependencies. Follow the steps below to setup Docker Desktop and the VSCode/Cursor devcontainer extension.
 
-## Annotation
+#### Docker Desktop Setup
+Go to the [Docker Desktop](https://www.docker.com/products/docker-desktop/) website and download the latest version. Depending on your operating system, setup the Docker Desktop application. 
 
-## Curation
+#### VSCode/Cursor Devcontainer Setup
+Download and install the IDE of your choice. We recommend [VSCode](https://code.visualstudio.com/) or [Cursor](https://www.cursor.com/). Open the ARES directory in the IDE (using `File > Open Folder...`). Then use the Command Prompt to re-open the devcontainer using `Dev Containers: Reopen in Container` command. This should build the Docker container and start the ARES application, including opening an integrated terminal to the container. 
 
-## Training
+The `devcontainer.json` file contains the necessary configuration for the devcontainer, including the Dockerfile. It mounts some local directories into the container, such as the `data` directory for storing robot data, the `/tmp` directory for storing temporary files, and the `.cache/huggingface` directory for storing model weights.
+
+### MongoDB Setup
+In order to use the AnnotationDatabase, you will need to setup a MongoDB instance. We use `docker-compose` to start the MongoDB instance; see `mongo-docker-compose.yml` for the configuration. You can start the MongoDB instance by running `docker-compose -f mongo-docker-compose.yml up -d` in the root directory. This will start the MongoDB instance and expose it to the host machine on port 27017; the instance will automatically restart on container restart.
+
+### Environment Variables
+ARES uses environment variables to configure secrets like API keys. We mount these environment variables into the devcontainer using the `devcontainer.json` file. We copy over variables like API keys and credentials. If needed, you can also add your own certificates to the `/etc/ssl/certs` directory.
+
+Once your IDE and environment are setup, you're ready to start using ARES!
+
+## Data
+TODO
+
+## Configurations
+All of ARES refers back to a base unit of data: the `Rollout` object defined in `ares/configs/base.py`. A `Rollout` object contains a single "episode" of robot data, such as a video of a robot conducting a task. These rollouts may be examples of a policy rollout, a human teleoperation session, simulated data, etc. The `Rollout` object can contain multiple modalities of data, such as video, pointclouds, motor actions and joint states, etc. Rollouts contain metadata about the episode, such as the dataset name, the robot configuration and embodiment, and other relevant information. During ingestion, the user can provide some hard-coded information about the rollout; other fields in the `Rollout` class will be provided by a VLM during ingestion. 
+
+### Rollout
+The `Rollout` class contains recursive subconfigurations: `Robot`, `Environment`, `Task`, and `Trajectory`. These subconfigurations may contain Pydantic fields or other subconfigurations. We use Pydantic not only to validate types, but also provide rich type information, such as descriptions, examples, regex patterns, and other numerical constraints. These `Field` objects are then used to automatically configure prompts for VLMs during ingestion. The configuration classes can be recursively flattened or re-constructed into the original object; this enables a flexible system that can be used to create SQLModel types for database ingestion. Users can define their own configurations by inheriting from the base configuration class or adding `Field` objects to the configuration classes. 
+
+## Ingestion & Annotation
+We adopt three main steps during ingestion: structured ingestion, embedding ingestion, and grounding ingestion. First, structured ingestion transforms the raw data into a structured format, which is then dumped into a SQL database. Second, embedding ingestion transforms data (such as the text description, video, action and state trajectories) into dense embeddings, which are then stored in a series of FAISS indexes. Third, grounding ingestion uses a VLM to detect objects and then detector and segmenter models to annotate the rollout with ground-truth labels and store these in a MongoDB database. 
+
+We adopt the OpenXEmbodiment specification as the starting point for ingestion, allowing users to ingest dataset from the [Open X-Embodiment](https://robotics-transformer-x.github.io/) project. During ingestion, the user can provide hard-coded information about the episode, such as the natrual language or templated task instructions. We load the raw data into an `OpenXEmbodimentEpisode` object, which includes Pydantic `model_validator` functions to process the raw data, such as swapping in `highres_image` or pulling `end_effector_cartesian_pos` from `state`. 
+
+The general ingestion pipeline can be found in `main.py`, which runs structured, embedding, and grounding ingestion. An example of ingesting a user-defined dataset can be found in `ares/scripts/pi_demo_ingestion.py`. This script contains the details on ingesting a series of demonstrations from a [Physical Intelligence blogpost](https://www.physicalintelligence.company/blog/pi0), hereafter referred to as the "PI Demos".
+
+### Structured Ingestion
+The script for structured ingestion can be found in `ares/scripts/run_structured_ingestion.py`. The script iterates through asynchronous batches of episodes, extracting structured, hard-coded information from each episode and "filling in the blanks" for estimated fields like `description_estiamte`, `surface_estimate`, `success_estimate` etc. The information populates a `Rollout` object, which is then flattened and dumped into the SQL database. This allows retrieval over the entire dataset, and allows users to query the database for rollouts that match certain criteria. 
+
+### Embedding Ingestion
+We are interested in finding *similar* rollouts across a dataset, amongst many axes: text description, task instruction, actions, states, etc. To enable this, we embed the rollouts into a dense vector space, where the euclidean distance between rollouts approximates their semantic similarity. See the script in `ares/scripts/run_trajectory_embedding_ingestion.py` for more details. For the text axes, we use a [Nomic Embedder](https://github.com/nomic-ai/nomic-embedder) to embed the text into a dense vector space. For the state and action axes, we first interpolate trajectories to a common time step, normalize sensor values per-dimension, and then flatten and embed the trajectories into a common vector space. This enables comparing and contrasting rollouts across different axes, such as finding rollouts in a similar `task` space but extremely different `action` spaces. 
+
+### Grounding Ingestion
+We want to make it as easy as possible to annotate rollouts with models. This can be further text descriptions (such annotating success criteria or grounding descriptions) or more traditional object detection and segmentation labels. During ingestion, we annotate at 5 FPS using `grounding-dino-tiny` and `sam-vit-base` models to detect objects and perform object segmentation. These annotations are stored in the AnnotationDatabase, which is backed by a MongoDB instance. The compute orchestration is handled by `Modal`, which allows us to scale to cloud-level resources and perform asynchronous, parallelized inference. The script for grounding ingestion can be found in `ares/scripts/run_grounding.py`.
+
+## Curation + Analysis
+Once we've ingested and annotated a dataset, we can use ARES to curate and analyze the data. We provide a series of tools for visualizing and understanding the data in a simple frontend powered by Streamlit. You can run the frontend locally by running `streamlit run ares/frontend/app.py`. This provides a high level overview of the ingested data, covering structured metadata, videos, annotations, and more. The ability to visualization annotations and retrieve rollouts by their annotations is a powerful tool for curation, as well as the ability to filter rollouts by their attributes. Retrieval over trajectory embeddings enables a powerful tool for finding in- and out-of-distribution rollouts. Exploring 2D projections of embeddings (such as task or description) enables the user to find clusters in the data, resulting in deeper understanding of the distributions.
+
+The frontend also contains lots of interactive tools for curation. For example, the user can select a 2D space of task embeddings are use an LLM to summarize the cluster. Alternatively, the user could view success rates for robot rollouts containing `red tshit`, `low light`, `dynamic background`. Another interesting use of the system could be to analyze out-of-distribution trajectories relative to the rest of the dataset; by normalizing and displaying the successes and failures in the *trajectory* space, we can try to understand why certain trajectories are out-of-distribution. 
+
+
+## Training + Export
+After curating and analyzing a dataset, we provide functionality for the user to export a curated slice. This export can be a graphical depiction of the dataset saved to PDF or HTML; alternatively, you can export the data to CSV or Parquet files. These CSV and Parquet files can also be used as a pre-processsed dataset for training downstream models. We provide a `RolloutDataset` and `RolloutDatasetConfig` class to help train models using the ARES platform. See examples in `ares/training/preprocess.py` and `ares/training/train.py`.
 
 ## Evaluation
+In order to decide which models should be used to power the ARES platform, we developed a benchmark based on the demonstrations released by [Physical Intelligence](https://www.physicalintelligence.company) in the [π₀ release](https://www.physicalintelligence.company/blog/pi0). The benchmark contains 20 videos over 11 tasks, most with both a success and failure rollout (as provided by the PI team). We use this benchmark to evaluate the performance of the ARES platform, as well as to select the best models for use inthe platform. We conduct evaluations over binary success classification, covering a range of VLMs, methods, consensus votes, and frames-per-second. We demonstrate the flexibility of the ARES platform by using the `VLM` object, creating a Pydantic `EvalConfig`, and launching batch asynchronous evaluations. In order to maintain consistent, robust evaluations, we first annotate `success_criteria` for each rollout using a VLM before predicting success. Evaluation results are summarized below, as plotted by `ares/notebooks/eval_nb.ipynb`.
+
+We evaluate over: 
+- **Models**: `claude-3.5-sonnet`, `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2-flash`, `gpt-4-turbo`, `gpt-4o`, and `gpt-4o-mini`
+- **Methods**: `video` (feeding frames directly), `frame_descriptions` (describing each frame individually, then feeding all descriptions to the VLM)
+- **Frames-per-second**: `2`, `1`, `0.5`, `0.25`, `0`, where `0` means just the first and final frames
+- **Consensus**: Consensus of either the mean or median of the predictions
+- **N Votes**: Number of votes to take for the consensus prediction, ranging over `1`, `2`, `3`, `4`, `5`
+
+<img src="assets/ares_performance_vlm.png" alt="ARES Performance by VLM"/> 
+<img src="assets/ares_performance_fps.png" alt="ARES Performance by FPS"/> 
+<img src="assets/ares_performance_n.png" alt="ARES Performance by N Votes"/> 
+<img src="assets/ares_performance_method.png" alt="ARES Performance by Method"/> 
+
+We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually outperform the `video` method, calling into question progress on long-context video benchmarks. However, this method is more expensive and more difficult to run with respect to request-per-minute rate limits. As such, we adopt the `video` method at 1 FPS on `gpt-4o` for all ARES data ingestion. 
+
+
 
 ## Limitations
 

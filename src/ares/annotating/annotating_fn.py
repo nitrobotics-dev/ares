@@ -100,7 +100,7 @@ class APIAnnotatingFn(AnnotatingFn):
         rollouts: list[Rollout],
         ann_db: AnnotationDatabase,
         outer_batch_size: int,
-        vlm_name: str = "gpt-4o-mini",
+        vlm_name: str = "gpt-4o",
     ) -> tuple[ResultTracker, list[ErrorResult]]:
         """
         Orchestrating function for this annotating function. The __call__ function instantiates the objects and

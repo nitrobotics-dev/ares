@@ -261,7 +261,7 @@ def main(
     data_dir: str,
     engine_url: str,
 ) -> None:
-    vlm_name = "gpt-4o-mini"
+    vlm_name = "gpt-4o"
     engine = setup_database(RolloutSQLModel, path=engine_url)
     builder, dataset_dict = build_dataset(dataset_filename, data_dir)
     for split in dataset_dict.keys():
