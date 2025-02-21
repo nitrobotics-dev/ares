@@ -24,7 +24,7 @@ ARES is a platform for understanding robot data, targeted at robot developers an
 
 ## Overview
 - [Stack](#stack)
-- [Installation](#installation)
+- [Installation and Setup](#installation-and-setup)
 - [Configurations](#configurations)
 - [Data](#data)
 - [Ingestion and Annotation](#ingestion-and-annotation)
