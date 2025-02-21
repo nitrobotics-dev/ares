@@ -156,12 +156,14 @@ class OpenXEmbodimentEpisode(TensorConverterMixin, BaseModel):
     steps: list[OpenXEmbodimentStep]
 
 
-PATH_TO_SPREADSHEET = os.path.join(ARES_OXE_DIR, "oxe.csv")
+# hardcoded path to OXE spreadsheet
+# see original version at https://docs.google.com/spreadsheets/d/1rPBD77tk60AEIGZrGSODwyyzs5FgCU9Uz3h-3_t2A9g/edit?gid=0#gid=0
+PATH_TO_OXE_SPREADSHEET = "/workspaces/ares/src/ares/extras/oxe.csv"
 HEADER_ROW = 16
 
 
 def get_oxe_dataframe() -> pd.DataFrame:
-    return pd.read_csv(PATH_TO_SPREADSHEET, header=HEADER_ROW)
+    return pd.read_csv(PATH_TO_OXE_SPREADSHEET, header=HEADER_ROW)
 
 
 def get_dataset_information(dataset_filename: str) -> pd.DataFrame:
