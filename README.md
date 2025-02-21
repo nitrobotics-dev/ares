@@ -116,7 +116,9 @@ The main focus of the ARES platform is examining individual rollouts and finding
 <img src="assets/ares_hero_plot_extras.png" alt="Example of ARES hero plot extra annotation and similarity retrieval"/>
 
 ### Trajectory Analysis
+We can also examine trajectories to find in- and out-of-distribution rollouts. We view can find examples of difficult-to-reach joint angles or unusual action sequences. Researchers may use this tool to find poor performing regions of action or state spaces, or to find examples of successful trajectories that can be used to improve policies.
 
+<img src="assets/ares_trajecties.png" alt="Example of ARES trajectory analysis"/>
 
 
 ## Training and Export
