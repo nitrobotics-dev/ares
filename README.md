@@ -25,12 +25,14 @@ ARES is a platform for understanding robot data, targeted at robot developers an
 ## Overview
 - [Stack](#stack)
 - [Installation](#installation)
-- [Data](#data)
 - [Configuration](#configuration)
+- [Data](#data)
 - [Ingestion](#ingestion)
 - [Annotation](#annotation)
 - [Curation](#curation)
 - [Training](#training)
+- [Evaluation](#evaluation)
+- [Limitations and Next Steps](#limitations-and-next-steps)
 - [Acknowledgements](#acknowledgements)
 - [Citation](#citation)
 
@@ -71,14 +73,15 @@ ARES uses environment variables to configure secrets like API keys. We mount the
 
 Once your IDE and environment are setup, you're ready to start using ARES!
 
-## Data
-TODO
 
 ## Configurations
 All of ARES refers back to a base unit of data: the `Rollout` object defined in `ares/configs/base.py`. A `Rollout` object contains a single "episode" of robot data, such as a video of a robot conducting a task. These rollouts may be examples of a policy rollout, a human teleoperation session, simulated data, etc. The `Rollout` object can contain multiple modalities of data, such as video, pointclouds, motor actions and joint states, etc. Rollouts contain metadata about the episode, such as the dataset name, the robot configuration and embodiment, and other relevant information. During ingestion, the user can provide some hard-coded information about the rollout; other fields in the `Rollout` class will be provided by a VLM during ingestion. 
 
 ### Rollout
 The `Rollout` class contains recursive subconfigurations: `Robot`, `Environment`, `Task`, and `Trajectory`. These subconfigurations may contain Pydantic fields or other subconfigurations. We use Pydantic not only to validate types, but also provide rich type information, such as descriptions, examples, regex patterns, and other numerical constraints. These `Field` objects are then used to automatically configure prompts for VLMs during ingestion. The configuration classes can be recursively flattened or re-constructed into the original object; this enables a flexible system that can be used to create SQLModel types for database ingestion. Users can define their own configurations by inheriting from the base configuration class or adding `Field` objects to the configuration classes. 
+
+## Data
+We start with data from Tensorflow Datasets ports of the Open X-Embodiment project. While these datasets being open and available is great for general robot model training research, the iterator-style dataset makes it extremely difficult to do fast understanding and analysis, which motivates much of this work. As explained below in [Ingestion & Annotation](#ingestion-and-annotation), we can use Open X-Embodiment data or user-defined datasets. In order to download the Open X-Embodiment data, use the [`oxe_downloader` tool](https://github.com/mishmish66/oxe_downloader).
 
 ## Ingestion & Annotation
 We adopt three main steps during ingestion: structured ingestion, embedding ingestion, and grounding ingestion. First, structured ingestion transforms the raw data into a structured format, which is then dumped into a SQL database. Second, embedding ingestion transforms data (such as the text description, video, action and state trajectories) into dense embeddings, which are then stored in a series of FAISS indexes. Third, grounding ingestion uses a VLM to detect objects and then detector and segmenter models to annotate the rollout with ground-truth labels and store these in a MongoDB database. 
@@ -122,9 +125,9 @@ We evaluate over:
 
 We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually outperform the `video` method, calling into question progress on long-context video benchmarks. However, this method is more expensive and more difficult to run with respect to request-per-minute rate limits. As such, we adopt the `video` method at 1 FPS on `gpt-4o` for all ARES data ingestion. 
 
+## Limitations and Next Steps
+Right now, ARES is a platform to accelerate robot researchers. However, we need to acknowledge that current-generation VLMs are not perfect, leading to discrepencies or inaccuraies in the data during ingestion. At the same time, a lot of the questions being posed to the VLMs to understand robot data are relatively simple, so we are hopeful that next-generation VLMs will continue to improve in accuracy at long-context video understanding tasks. ARES is designed to be simple and scalable, so great next steps would be to make it easier to scale ARES into the cloud via hosted instances like Mongo Atlas, AWS, Snowflake, etc. On top of that, ingesting and open-sourcing more rollouts from the Open X-Embodiment project would be a great way to continue to expand the usefulness of the platform. Right now, we have ingested roughly 5000 rollouts from the roughly 1 million available, focusing on those with natural language task annotations that can also fit on a laptop.
 
-
-## Limitations
 
 ## Acknowledgements
 This project was developed by [Jacob Phillips](jacobdphillips.com) as a part of the [Andreessen Horowitz American Dynamism Engineering Fellows](https://a16z.com/the-american-dynamism-engineering-fellows-program/) program. 
