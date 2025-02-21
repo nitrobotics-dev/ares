@@ -1,6 +1,6 @@
 # ARES: Automatic Robot Evaluation System
 
-<img src="assets/ares.png" alt="ARES System Diagram"/> 
+<img src="assets/ares_system_diagram.png" alt="ARES System Diagram"/> 
 
 ARES is a open-source system for automatically evaluating robot data using machine learning to quickly and accurately understand performance, identify areas for improvement, and enable rapid prototyping of new robot behaviors. The goal of this system is to shorten iteration cycles by using machine learning to provide fast, accurate feedback on robot data. ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs (model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc.), requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
 
@@ -25,12 +25,11 @@ ARES is a platform for understanding robot data, targeted at robot developers an
 ## Overview
 - [Stack](#stack)
 - [Installation](#installation)
-- [Configuration](#configuration)
+- [Configurations](#configurations)
 - [Data](#data)
-- [Ingestion](#ingestion)
-- [Annotation](#annotation)
-- [Curation](#curation)
-- [Training](#training)
+- [Ingestion & Annotation](#ingestion-and-annotation)
+- [Curation & Analysis](#curation-and-analysis)
+- [Training & Export](#training-and-export)
 - [Evaluation](#evaluation)
 - [Limitations and Next Steps](#limitations-and-next-steps)
 - [Acknowledgements](#acknowledgements)
@@ -130,7 +129,7 @@ Right now, ARES is a platform to accelerate robot researchers. However, we need 
 
 
 ## Acknowledgements
-This project was developed by [Jacob Phillips](jacobdphillips.com) as a part of the [Andreessen Horowitz American Dynamism Engineering Fellows](https://a16z.com/the-american-dynamism-engineering-fellows-program/) program. 
+This project was developed by [Jacob Phillips](jacobdphillips.com) as a part of the [Andreessen Horowitz American Dynamism Engineering Fellows program](https://a16z.com/the-american-dynamism-engineering-fellows-program/). Special thanks to the American Dynamism team for their support and feedback on the project.
 
 
 ## Citation
