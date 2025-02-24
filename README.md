@@ -15,26 +15,18 @@ At a high level, ARES is composed of three main components:
 
 [Arxiv Paper](https://arxiv.org/) TODO!
 
-## Who and what is ARES for?
-
-ARES is a platform for understanding robot data, targeted at robot developers and researchers. You can use ARES to: 
-- Curate and annotate ground-truth teleoperation data
-- Evaluate the performance of robot policy rollouts
-- Analyze batches of robot data to improve policies
-
 ## Overview
-- [Stack](#stack)
-- [Installation and Setup](#installation-and-setup)
-- [Configurations](#configurations)
-- [Data](#data)
-- [Ingestion and Annotation](#ingestion-and-annotation)
-- [Curation and Analysis](#curation-and-analysis)
-- [Training and Export](#training-and-export)
-- [Evaluation](#evaluation)
-- [Limitations and Next Steps](#limitations-and-next-steps)
-- [Acknowledgements](#acknowledgements)
-- [Citation](#citation)
-
+- [🛠️ Stack](#stack)
+- [🧠 Installation and Setup](#installation-and-setup)
+- [👤 Configurations](#configurations) 
+- [📊 Data](#data)
+- [📥 Ingestion and Annotation](#ingestion-and-annotation)
+- [🔍 Curation and Analysis](#curation-and-analysis)
+- [🤖 Training and Export](#training-and-export)
+- [📈 Evaluation](#evaluation)
+- [💰 Costs](#costs)
+- [🔮 Limitations and Next Steps](#limitations-and-next-steps)
+- [📝 Acknowledgements and Citation](#acknowledgements-and-citation)
 
 ## Stack
 ARES is built to be simple and scalable. As such, we select tools that are easy to setup locally but also smooth to scale to cloud-level resources.
@@ -141,15 +133,17 @@ We evaluate over:
 
 We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually outperform the `video` method, calling into question progress on long-context video benchmarks. However, this method is more expensive and more difficult to run with respect to request-per-minute rate limits. As such, we adopt the `video` method at 1 FPS on `gpt-4o` for all ARES data ingestion. 
 
+## Costs
+Ingesting, annotating, and annotating data can be quite expensive; we aim to use ARES to make robot research as accessible as possible. The original development of ARES was conducted solely on a laptop, using a combination of local resources (CPU and Disk) and cloud APIs. First, we mitigate costs by holding all data strucutres locally, including the `StrucutredDatabase`, `AnnotationDatabase`, and `EmbeddingDatabase`. Second, we downsample frames-per-second while ingesting, running `gpt-4o` at 1 FPS via API, using `grounding-dino-tiny` and `sam-vit-base` at 5 FPS via Modal, and the Nomic Embedder via local CPU. Back-of-the-envelope costs comes out to roughly 1 cent per rollout for `gpt-4o`, as most rollouts are relatively short. Annotating 5000 rollouts at 5 FPS (totaling >100,000 frames) for detection and segmentation costs less than $10 of free Modal credits. We expect these costs to remain low as the pareto-frontier of efficicent multimodal models continues to bring down the cost of inference.
+
+
 ## Limitations and Next Steps
 Right now, ARES is a platform to accelerate robot researchers. However, we need to acknowledge that current-generation VLMs are not perfect, leading to discrepencies or inaccuraies in the data during ingestion. At the same time, a lot of the questions being posed to the VLMs to understand robot data are relatively simple, so we are hopeful that next-generation VLMs will continue to improve in accuracy at long-context video understanding tasks. ARES is designed to be simple and scalable, so great next steps would be to make it easier to scale ARES into the cloud via hosted instances like Mongo Atlas, AWS, Snowflake, etc. On top of that, ingesting and open-sourcing more rollouts from the Open X-Embodiment project would be a great way to continue to expand the usefulness of the platform. Right now, we have ingested roughly 5000 rollouts from the roughly 1 million available, focusing on those datasets with natural language task annotations that can also fit on a laptop. Building stronger ingestion pipelines for more complex data types would be a great next step. 
 
 
-## Acknowledgements
+## Acknowledgements and Citation
 This project was developed by [Jacob Phillips](jacobdphillips.com) as a part of the [Andreessen Horowitz American Dynamism Engineering Fellows program](https://a16z.com/the-american-dynamism-engineering-fellows-program/). Special thanks to the American Dynamism team for their support and feedback on the project.
 
-
-## Citation
 If using the ARES platform in your work, please cite it to acknowledge the authors. Suggested format:
 
 ```bibtex
@@ -163,7 +157,7 @@ If using the ARES platform in your work, please cite it to acknowledge the autho
 }
 ```
 
-You can also cite the whitepaper:
+You can also cite the whitepaper or blog:
 TODO TODO TODO
 
 

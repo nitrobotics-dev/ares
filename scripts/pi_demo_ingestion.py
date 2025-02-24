@@ -110,6 +110,7 @@ if __name__ == "__main__":
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     embedder = get_nomic_embedder()
     task_infos = list(PI_DEMO_TASKS.values())
+    # the PI Demo videos are enormous, so we can only ingest them one-at-a-time
     for task_info in tqdm(task_infos):
         for flag in ["success", "fail"]:
             print(task_info)
