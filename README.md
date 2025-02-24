@@ -2,7 +2,9 @@
 
 <img src="assets/ares_system_diagram.png" alt="ARES System Diagram"/> 
 
-ARES is a open-source (Apache 2.0) platform for automatically evaluating robot data using ML models to quickly and accurately understand policy performance, identify areas for improvement, and annotate new robot datasets. The goal of this system is to shorten iteration cycles by using machine learning to provide fast, accurate feedback on robot data. ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs (model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc.), requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
+ARES is a open-source (Apache 2.0) platform for automatically evaluating robot data using ML models to quickly and accurately understand policy performance, identify areas for improvement, and annotate new robot datasets.
+Researchers tend to chase point-solutions for specific tasks or paper implmentations, but ARES is designed to be a generalized platform for long-term robot research.
+ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs (model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc.), requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
 
 At a high level, ARES is composed of three main components: 
 - Ingestion: automatically transform raw robot data into a structured format with VLMs
@@ -14,6 +16,15 @@ At a high level, ARES is composed of three main components:
 [Blog Post](https://example.com/blog) TODO! 
 
 [Arxiv Paper](https://arxiv.org/) TODO!
+
+## Who and what is ARES for?
+
+ARES is a platform for understanding robot data, targeted at robot developers and researchers. Researchers and developers suffer from two main problems: building point-solutions for specific tasks or papers and transitioning from research-scripts to production-tools. ARES aims to solve both of these problems by providing a *platform* for robot data understanding, enabling rapid development of new robot systems.
+
+You can use ARES to: 
+- Curate and annotate ground-truth teleoperation data
+- Evaluate the performance of robot models
+- Analyze batches of robot data to improve policies
 
 ## Overview
 - [🛠️ Stack](#stack)
@@ -66,7 +77,9 @@ Once your IDE and environment are setup, you're ready to start using ARES!
 
 
 ## Configurations
-All of ARES refers back to a base unit of data: the `Rollout` object defined in `ares/configs/base.py`. A `Rollout` object contains a single "episode" of robot data, such as a video of a robot conducting a task. These rollouts may be examples of a policy rollout, a human teleoperation session, simulated data, etc. The `Rollout` object can contain multiple modalities of data, such as video, pointclouds, motor actions and joint states, etc. Rollouts contain metadata about the episode, such as the dataset name, the robot configuration and embodiment, and other relevant information. During ingestion, the user can provide some hard-coded information about the rollout; other fields in the `Rollout` class will be provided by a VLM during ingestion. 
+All of ARES refers back to a base unit of data: the `Rollout` object defined in `ares/configs/base.py`. In reinforcement learning, a *rollout* is a collection of states, actions, and rewards in some environment. For our purposes, a `Rollout` is a collection of information about a robot completing a task, also called an episode.
+These rollouts may be examples of a policy evaluation, a human teleoperation session, simulated or synthetic data, or other data formats. The `Rollout` object can contain multiple modalities of data, such as video, pointclouds, motor actions, and joint states. Rollouts can contain metadata about the episode, such as the dataset name, the robot configuration and embodiment, the data collection method, and more.
+During ingestion, the user can provide hard-coded information about the rollout; other fields in the `Rollout` class will be provided by a VLM during ingestion. 
 
 ### Rollout
 The `Rollout` class contains recursive subconfigurations: `Robot`, `Environment`, `Task`, and `Trajectory`. These subconfigurations may contain Pydantic fields or other subconfigurations. We use Pydantic not only to validate types, but also provide rich type information, such as descriptions, examples, regex patterns, and other numerical constraints. These `Field` objects are then used to automatically configure prompts for VLMs during ingestion, including the extra metadata from the Field. Fields with the suffix `_estimate` are inferred by the VLM during ingestion. The configuration classes can be recursively flattened or re-constructed into the original object; this enables a flexible system that can be used to create SQLModel types for database ingestion. Users can define their own configurations by inheriting from the base configuration class or adding `Field` objects to the configuration classes. 
@@ -77,14 +90,17 @@ The `Rollout` class contains recursive subconfigurations: `Robot`, `Environment`
 We start with data from Tensorflow Datasets ports of the Open X-Embodiment project. While these datasets being open and available is great for general robot model training research, the iterator-style dataset makes it extremely difficult to do fast understanding and analysis, which motivates much of this work. As explained below in [Ingestion and Annotation](#ingestion-and-annotation), we can use Open X-Embodiment data or user-defined datasets. In order to download the Open X-Embodiment data, use the [`oxe_downloader` tool](https://github.com/mishmish66/oxe_downloader).
 
 ## Ingestion and Annotation
-We adopt three main steps during ingestion: structured ingestion, embedding ingestion, and grounding ingestion. First, structured ingestion transforms the raw data into a structured format, which is then dumped into a SQL database. Second, embedding ingestion transforms data (such as the text description, video, action and state trajectories) into dense embeddings, which are then stored in a series of FAISS indexes. Third, grounding ingestion uses a VLM to detect objects and then detector and segmenter models to annotate the rollout with ground-truth labels and store these in a MongoDB database. 
+We adopt three main steps during ingestion: structured ingestion, embedding ingestion, and grounding ingestion. First, structured ingestion transforms the raw data into a structured format, which is then dumped into a SQL database. Second, embedding ingestion transforms data (such as the text description, video, action and state trajectories) into dense embeddings, which are then stored in a series of FAISS indexes. Third, grounding ingestion uses a VLM to detect objects in the scene and then detector and segmenter models to annotate the rollout with ground-truth labels and store these in a MongoDB database. 
 
 We adopt the OpenXEmbodiment specification as the starting point for ingestion, allowing users to ingest datasets from the [Open X-Embodiment](https://robotics-transformer-x.github.io/) project. During ingestion, the user can provide hard-coded information about the episode, such as the natural language or templated task instructions. We load the raw data into an `OpenXEmbodimentEpisode` object, which includes Pydantic `model_validator` functions to process the raw data, such as swapping in `highres_image` or pulling `end_effector_cartesian_pos` from `state`. We also pull data from the [Open X-Embodiment spreadsheet](https://docs.google.com/spreadsheets/d/1rPBD77tk60AEIGZrGSODwyyzs5FgCU9Uz3h-3_t2A9g/edit?gid=0#gid=0), which contains metadata about the datasets and is copied into the repository at `ares/extras/oxe.csv`.
 
 The general ingestion pipeline can be found in `main.py`, which runs structured, embedding, and grounding ingestion. An example of ingesting a user-defined dataset can be found in `ares/scripts/pi_demo_ingestion.py`. This script contains the details on ingesting a series of demonstrations from a [Physical Intelligence blogpost](https://www.physicalintelligence.company/blog/pi0), hereafter referred to as the "PI Demos".
 
 ### Structured Ingestion
-The script for structured ingestion can be found in `ares/scripts/run_structured_ingestion.py`. The script iterates through asynchronous batches of episodes, extracting structured, hard-coded information from each episode and "filling in the blanks" for estimated fields like `description_estiamte`, `surface_estimate`, `success_estimate` etc. The information populates a `Rollout` object, which is then flattened and dumped into the SQL database. This allows retrieval over the entire dataset, and allows users to query the database for rollouts that match certain criteria. 
+The script for structured ingestion can be found in `ares/scripts/run_structured_ingestion.py`. The script iterates through asynchronous batches of episodes, extracting structured, hard-coded information from each episode and "filling in the blanks" for estimated fields like `description_estimate`, `surface_estimate`, `success_estimate` etc. The information from the VLM populates a `Rollout` object, which is then flattened into the `RolloutSQLModel` object and dumped into the SQL database. Our `StrucutredDatabase` contains columns that match the recursively flattened `Rollout` object, enabling retrieval over the entire dataset. This yields long-term, structured metadata about the rollouts, which can be used for downstream analysis and curation.
+```bash
+VLM(video, task, Field Annotations) -> Rollout -> Flattened RolloutSQLModel -> SQL Database
+```
 
 ### Embedding Ingestion
 We are interested in finding *similar* rollouts across a dataset, amongst many axes: text description, task instruction, actions, states, etc. To enable this, we embed the rollouts into a dense vector space, where the euclidean distance between rollouts approximates their semantic similarity. See the script in `ares/scripts/run_trajectory_embedding_ingestion.py` for more details. For the text axes, we use a [Nomic Embedder](https://github.com/nomic-ai/nomic-embedder) to embed the text into a dense vector space. For the state and action axes, we first interpolate trajectories to a common time step, normalize sensor values per-dimension, and then flatten and embed the trajectories into a common vector space. This enables comparing and contrasting rollouts across different axes, such as finding rollouts in a similar `task` space but extremely different `action` spaces. 
@@ -110,7 +126,7 @@ The main focus of the ARES platform is examining individual rollouts and finding
 ### Trajectory Analysis
 We can also examine trajectories to find in- and out-of-distribution rollouts. We view can find examples of difficult-to-reach joint angles or unusual action sequences. Researchers may use this tool to find poor performing regions of action or state spaces, or to find examples of successful trajectories that can be used to improve policies.
 
-<img src="assets/ares_trajecties.png" alt="Example of ARES trajectory analysis"/>
+<img src="assets/ares_trajectories.png" alt="Example of ARES trajectory analysis"/>
 
 
 ## Training and Export
@@ -131,7 +147,7 @@ We evaluate over:
 <img src="assets/ares_performance_n.png" alt="ARES Performance by N Votes"/> 
 <img src="assets/ares_performance_method.png" alt="ARES Performance by Method"/> 
 
-We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually outperform the `video` method, calling into question progress on long-context video benchmarks. However, this method is more expensive and more difficult to run with respect to request-per-minute rate limits. As such, we adopt the `video` method at 1 FPS on `gpt-4o` for all ARES data ingestion. 
+We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually slightly outperform the generalized `video` method, calling into question progress on long-context video benchmarks. However, this method is significantly more expensive and more difficult to run with respect to request-per-minute and token-per-minute rate limits. As such, we adopt the `video` method at 1 FPS with `gpt-4o` for all ARES data ingestion. 
 
 ## Costs
 Ingesting, annotating, and annotating data can be quite expensive; we aim to use ARES to make robot research as accessible as possible. The original development of ARES was conducted solely on a laptop, using a combination of local resources (CPU and Disk) and cloud APIs. First, we mitigate costs by holding all data strucutres locally, including the `StrucutredDatabase`, `AnnotationDatabase`, and `EmbeddingDatabase`. Second, we downsample frames-per-second while ingesting, running `gpt-4o` at 1 FPS via API, using `grounding-dino-tiny` and `sam-vit-base` at 5 FPS via Modal, and the Nomic Embedder via local CPU. Back-of-the-envelope costs comes out to roughly 1 cent per rollout for `gpt-4o`, as most rollouts are relatively short. Annotating 5000 rollouts at 5 FPS (totaling >100,000 frames) for detection and segmentation costs less than $10 of free Modal credits. We expect these costs to remain low as the pareto-frontier of efficicent multimodal models continues to bring down the cost of inference.
