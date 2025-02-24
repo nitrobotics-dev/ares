@@ -35,6 +35,7 @@ You can use ARES to:
 - [🔍 Curation and Analysis](#curation-and-analysis)
 - [🤖 Training and Export](#training-and-export)
 - [📈 Evaluation](#evaluation)
+- [🎉 Extras](#extras)
 - [💰 Costs](#costs)
 - [🔮 Limitations and Next Steps](#limitations-and-next-steps)
 - [📝 Acknowledgements and Citation](#acknowledgements-and-citation)
@@ -130,7 +131,7 @@ We can also examine trajectories to find in- and out-of-distribution rollouts. W
 
 
 ## Training and Export
-After curating and analyzing a dataset, we provide functionality for the user to export a curated slice. This export can be a graphical depiction of the dataset saved to PDF or HTML; alternatively, you can export the data to CSV or Parquet files. These CSV and Parquet files can also be used as a pre-processsed dataset for training downstream models. We provide a `RolloutDataset` and `RolloutDatasetConfig` class to help train models using the ARES platform. See examples in `ares/training/preprocess.py` and `ares/training/train.py`.
+After curating and analyzing a dataset, we provide functionality for the user to export a curated slice. This export can be the graphical depiction of the dashboard saved to PDF or HTML; alternatively, you can export the data to CSV or Parquet files. These CSV and Parquet files can also be used as a pre-processsed dataset for training downstream models. We provide a `RolloutDataset` and `RolloutDatasetConfig` class to help train models using the ARES platform. See examples in `ares/training/preprocess.py` and `ares/training/train.py`.
 
 ## Evaluation
 In order to decide which models should be used to power the ARES platform, we developed a benchmark based on the demonstrations released by [Physical Intelligence](https://www.physicalintelligence.company) in the [π₀ release](https://www.physicalintelligence.company/blog/pi0). The benchmark contains 20 videos over 11 tasks, most with both a success and failure rollout (as provided by the PI team). We use this benchmark to evaluate the performance of the ARES platform, as well as to select the best models for use inthe platform. We conduct evaluations over binary success classification, covering a range of VLMs, methods, consensus votes, and frames-per-second. We demonstrate the flexibility of the ARES platform by using the `VLM` object, creating a Pydantic `EvalConfig`, and launching batch asynchronous evaluations. In order to maintain consistent, robust evaluations, we first annotate `success_criteria` for each rollout using a VLM before predicting success. Evaluation results are summarized below, as plotted by `ares/notebooks/eval_nb.ipynb`.
@@ -138,7 +139,7 @@ In order to decide which models should be used to power the ARES platform, we de
 We evaluate over: 
 - **Models**: `claude-3.5-sonnet`, `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2-flash`, `gpt-4-turbo`, `gpt-4o`, and `gpt-4o-mini`
 - **Methods**: `video` (feeding frames directly), `frame_descriptions` (describing each frame individually, then feeding all descriptions to the VLM)
-- **Frames-per-second**: `2`, `1`, `0.5`, `0.25`, `0`, where `0` means just the first and final frames
+- **Frames-per-second**: `0`, `0.25`, `0.5`, `1`, `2`, where `0` means just the first and final frames
 - **Consensus**: Consensus of either the mean or median of the predictions
 - **N Votes**: Number of votes to take for the consensus prediction, ranging over `1`, `2`, `3`, `4`, `5`
 
@@ -147,10 +148,22 @@ We evaluate over:
 <img src="assets/ares_performance_n.png" alt="ARES Performance by N Votes"/> 
 <img src="assets/ares_performance_method.png" alt="ARES Performance by Method"/> 
 
-We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually slightly outperform the generalized `video` method, calling into question progress on long-context video benchmarks. However, this method is significantly more expensive and more difficult to run with respect to request-per-minute and token-per-minute rate limits. As such, we adopt the `video` method at 1 FPS with `gpt-4o` for all ARES data ingestion. 
+We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be mostly consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually slightly outperform the generalized `video` method, calling into question progress on long-context video benchmarks. However, this method is significantly more expensive and more difficult to run with respect to request-per-minute and token-per-minute rate limits. As such, we adopt the `video` method at 1 FPS with `gpt-4o` for all ARES data ingestion. 
 
+
+## Extras
+We provide some fun extra tools to help with robot research. 
+- The `Rollout` and `RolloutSQLModel` classes can be used to dynamically flatten and reconstruct rollouts, enabled by hierarchical prefix matching. This enables smooth transitions between Pydantic and SQLModel types.
+- The `ares/notebooks` directory contains a few notebooks for visualization; one for VLM results and the other for annotation results.
+- The `ares/scripts` directory provides the top-level entrypoint for interacting with data in ARES, including the main ingestion pipeline. Other scripts include:
+    - `ares/scripts/db_updaters/`: scripts for amending the `AnnotationDatabase` and `StrucutredDatabase`
+    - `ares/scripts/annotating`: scripts for running annotations for grounding, in-context-learning, Embodied Chain of Thought, success criteria, and more.
+    - `ares/scripts/self_heal.py`: a tool for automatically syncing the `StructuredDatabase` with the `AnnotationDatabase` and `EmbeddingDatabase`. This means that there should never be ingested rollouts without annotations or embeddings.
+- In order to provide robust error tracking during annotation, we provide a `ResultTracker` object that can be used to track the results of an annotation. This is useful for providing feedback on the status of an annotation job, as well as for providing a record of the annotation. See `ares/annotating/annotating_base.py` for more details.
+- Normalization in ARES is dependent on the entire dataset being collected ahead of time. However, in practice, we often want to normalize data on-the-fly. To enable this, we provide the `NormalizationTracker` object to perform batch or online normalization. See `ares/databases/embedding_database.py` for more details.
+ 
 ## Costs
-Ingesting, annotating, and annotating data can be quite expensive; we aim to use ARES to make robot research as accessible as possible. The original development of ARES was conducted solely on a laptop, using a combination of local resources (CPU and Disk) and cloud APIs. First, we mitigate costs by holding all data strucutres locally, including the `StrucutredDatabase`, `AnnotationDatabase`, and `EmbeddingDatabase`. Second, we downsample frames-per-second while ingesting, running `gpt-4o` at 1 FPS via API, using `grounding-dino-tiny` and `sam-vit-base` at 5 FPS via Modal, and the Nomic Embedder via local CPU. Back-of-the-envelope costs comes out to roughly 1 cent per rollout for `gpt-4o`, as most rollouts are relatively short. Annotating 5000 rollouts at 5 FPS (totaling >100,000 frames) for detection and segmentation costs less than $10 of free Modal credits. We expect these costs to remain low as the pareto-frontier of efficicent multimodal models continues to bring down the cost of inference.
+Ingesting, annotating, and annotating data can be quite expensive; we aim to use ARES to make robot research as accessible as possible. The original development of ARES was conducted solely on a laptop, using a combination of local resources (CPU and Disk) and cloud APIs. First, we mitigate costs by holding all data strucutres locally, including the `StrucutredDatabase`, `AnnotationDatabase`, and `EmbeddingDatabase`. Second, we downsample frames-per-second while ingesting, running `gpt-4o` at 1 FPS via API, using `grounding-dino-tiny` and `sam-vit-base` at 5 FPS via Modal, and the Nomic Embedder via local CPU. Back-of-the-envelope costs comes out to roughly 1 cent per rollout for `gpt-4o`, as most rollouts are relatively short. Annotating 5000 rollouts at 5 FPS (totaling >100,000 frames) for detection and segmentation costs less than $10 of $30 of monthly free Modal credits. We expect these costs to remain low as the pareto-frontier of efficicent multimodal models continues to bring down the cost of inference.
 
 
 ## Limitations and Next Steps
