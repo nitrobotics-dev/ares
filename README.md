@@ -2,9 +2,9 @@
 
 <img src="assets/ares_system_diagram.png" alt="ARES System Diagram"/> 
 
-ARES is a open-source (Apache 2.0) platform for automatically evaluating robot data using ML models to quickly and accurately understand policy performance, identify areas for improvement, and annotate new robot datasets.
-Researchers tend to chase point-solutions for specific tasks or paper implmentations, but ARES is designed to be a generalized platform for long-term robot research.
-ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs (model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc.), requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
+ARES (Automatic Robot Evaluation System) is a open-source (Apache 2.0) platform for automatically ingesting, curating, and evaluating robot data using ML models to quickly and accurately understand policy performance, identify areas for improvement, and generate new robot datasets, all without setting up any heavy infrastructure.
+Researchers tend to chase point-solutions for specific tasks or paper implmentations, but ARES is designed to be a generalized platform for long-term robot research that scales from a laptop to the cloud.
+ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs via model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc., requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
 
 At a high level, ARES is composed of three main components: 
 - Ingestion: automatically transform raw robot data into a structured format with VLMs
@@ -41,7 +41,7 @@ You can use ARES to:
 - [📝 Acknowledgements and Citation](#acknowledgements-and-citation)
 
 ## Stack
-ARES is built to be simple and scalable. As such, we select tools that are easy to setup locally but also smooth to scale to cloud-level resources.
+ARES is built to be a low-friction, easy-to-use infrastructure platform for robot research. As such, we select tools that are simple to setup locally but also smooth to scale to cloud-level resources.
 - Databases: [MongoDB](https://www.mongodb.com/), [SQLAlchemy](https://www.sqlalchemy.org/), [FAISS](https://github.com/facebookresearch/faiss)
 - Model Inference: [litellm](https://github.com/BerriAI/litellm), configured with your choice of model provider (OpenAI, Anthropic, Gemini, HuggingFace, etc.)
 - Compute Orchestration: [Modal](https://modal.com/)
@@ -57,8 +57,14 @@ git clone https://github.com/jacobphillips99/ares.git
 cd ares
 ```
 
+Then, install the Python requirements and install the package (add `-e` to install in editable mode and make changes):
+```bash
+pip install -r requirements.txt
+pip install -e .
+```
+
 ### Docker and Devcontainer Setup
-ARES was built with a Docker container in mind for easy setup, containerization, and deployment. We reccomend using a Docker container to run ARES, specifically using a VSCode/Cursor devcontainer extension. The Dockerfile contains the necessary system packages for ARES, including a reference to the `requirements.txt` file for Python dependencies. Follow the steps below to setup Docker Desktop and the VSCode/Cursor devcontainer extension.
+ARES was built with a Docker container in mind for easy setup, containerization, and deployment -- this makes it quick, easy, and consistent to setup ARES. We reccomend using a Docker container to run ARES, specifically utilizing a VSCode/Cursor devcontainer extension. The Dockerfile contains the necessary system packages for ARES, including a reference to the `requirements.txt` file for Python dependencies. Follow the steps below to setup Docker Desktop and the VSCode/Cursor devcontainer extension.
 
 #### Docker Desktop Setup
 Go to the [Docker Desktop](https://www.docker.com/products/docker-desktop/) website and download the latest version. Depending on your operating system, setup the Docker Desktop application. 
@@ -75,7 +81,6 @@ In order to use the AnnotationDatabase, you will need to setup a MongoDB instanc
 ARES uses environment variables to configure secrets like API keys. We mount these environment variables into the devcontainer using the `devcontainer.json` file. We copy over variables like API keys and credentials. If needed, you can also add your own certificates to the `/etc/ssl/certs` directory, which is also mounted into the container.
 
 Once your IDE and environment are setup, you're ready to start using ARES!
-
 
 ## Configurations
 All of ARES refers back to a base unit of data: the `Rollout` object defined in `ares/configs/base.py`. In reinforcement learning, a *rollout* is a collection of states, actions, and rewards in some environment. For our purposes, a `Rollout` is a collection of information about a robot completing a task, also called an episode.
@@ -110,7 +115,13 @@ We are interested in finding *similar* rollouts across a dataset, amongst many a
 We want to make it as easy as possible to annotate rollouts with models. This can be further text descriptions (such annotating success criteria or grounding descriptions) or more traditional object detection and segmentation labels. During ingestion, we annotate at 5 FPS using `grounding-dino-tiny` and `sam-vit-base` models to detect objects and perform object segmentation. These annotations are stored in the AnnotationDatabase, which is backed by a MongoDB instance. The compute orchestration is handled by [Modal](https://modal.com/), which allows us to scale to cloud-level resources and perform asynchronous, parallelized inference. The script for grounding ingestion can be found in `ares/scripts/run_grounding.py`.
 
 ## Curation and Analysis
-Once we've ingested and annotated a dataset, we can use ARES to curate and analyze the data. We provide a series of tools for visualizing and understanding the data in a simple frontend powered by Streamlit. You can run the frontend locally by running `streamlit run ares/frontend/app.py`. This provides a high level overview of the ingested data, covering structured metadata, videos, annotations, and more. The ability to visualization annotations and retrieve rollouts by their annotations is a powerful tool for curation, as well as the ability to filter rollouts by their attributes. Retrieval over trajectory embeddings enables a powerful tool for finding in- and out-of-distribution rollouts. Exploring 2D projections of embeddings (such as task or description) enables the user to find clusters in the data, resulting in deeper understanding of the distributions.
+Once we've ingested and annotated a dataset, we can use ARES to curate and analyze the data. We provide a series of tools for visualizing and understanding the data in a simple frontend powered by Streamlit. You can run the frontend locally by running:
+
+```bash
+streamlit run ares/frontend/app.py
+```
+
+This opens a local Streamlit web app at `localhost:8501` that provides a high level overview of the ingested data, covering structured metadata, videos, annotations, and more. The ability to visualization annotations and retrieve rollouts by their annotations is a powerful tool for curation, as well as the ability to filter rollouts by their attributes. Retrieval over trajectory embeddings enables a powerful tool for finding in- and out-of-distribution rollouts. Exploring 2D projections of embeddings (such as task or description) enables the user to find clusters in the data, resulting in deeper understanding of the distributions.
 
 ### Structured and Unstructured Curation
 The user can easily select a subset of rollouts based on their hard-coded or inferred attributes. For example, the user can select all rollouts with `dynamic background` and `low light` to understand the performance of the robot in low-light conditions with a dynamic background. Instead, the user can also select rollouts based on a UMAP projection of the unstructured attributes, such as the task instructions or inferred natural language description.
@@ -157,7 +168,7 @@ We provide some fun extra tools to help with robot research.
 - The `ares/notebooks` directory contains a few notebooks for visualization; one for VLM results and the other for annotation results.
 - The `ares/scripts` directory provides the top-level entrypoint for interacting with data in ARES, including the main ingestion pipeline. Other scripts include:
     - `ares/scripts/db_updaters/`: scripts for amending the `AnnotationDatabase` and `StrucutredDatabase`
-    - `ares/scripts/annotating`: scripts for running annotations for grounding, in-context-learning, Embodied Chain of Thought, success criteria, and more.
+    - `ares/scripts/annotating`: scripts for running annotations for in-context-learning, Embodied Chain of Thought, success criteria, and more, including the Modal-based grounding and detection scripts.
     - `ares/scripts/self_heal.py`: a tool for automatically syncing the `StructuredDatabase` with the `AnnotationDatabase` and `EmbeddingDatabase`. This means that there should never be ingested rollouts without annotations or embeddings.
 - In order to provide robust error tracking during annotation, we provide a `ResultTracker` object that can be used to track the results of an annotation. This is useful for providing feedback on the status of an annotation job, as well as for providing a record of the annotation. See `ares/annotating/annotating_base.py` for more details.
 - Normalization in ARES is dependent on the entire dataset being collected ahead of time. However, in practice, we often want to normalize data on-the-fly. To enable this, we provide the `NormalizationTracker` object to perform batch or online normalization. See `ares/databases/embedding_database.py` for more details.
@@ -167,7 +178,7 @@ Ingesting, annotating, and annotating data can be quite expensive; we aim to use
 
 
 ## Limitations and Next Steps
-Right now, ARES is a platform to accelerate robot researchers. However, we need to acknowledge that current-generation VLMs are not perfect, leading to discrepencies or inaccuraies in the data during ingestion. At the same time, a lot of the questions being posed to the VLMs to understand robot data are relatively simple, so we are hopeful that next-generation VLMs will continue to improve in accuracy at long-context video understanding tasks. ARES is designed to be simple and scalable, so great next steps would be to make it easier to scale ARES into the cloud via hosted instances like Mongo Atlas, AWS, Snowflake, etc. On top of that, ingesting and open-sourcing more rollouts from the Open X-Embodiment project would be a great way to continue to expand the usefulness of the platform. Right now, we have ingested roughly 5000 rollouts from the roughly 1 million available, focusing on those datasets with natural language task annotations that can also fit on a laptop. Building stronger ingestion pipelines for more complex data types would be a great next step. 
+Right now, ARES is a platform to accelerate robot researchers. However, we need to acknowledge that current-generation VLMs are not perfect, leading to discrepencies or inaccuraies in the data during ingestion. At the same time, a lot of the questions being posed to the VLMs to understand robot data are relatively simple, so we are hopeful that next-generation VLMs will continue to improve in accuracy at long-context video understanding tasks. ARES is designed to be simple and scalable, so great next steps would be to make it easier to scale ARES into the cloud via hosted instances like Mongo Atlas, AWS, Snowflake, etc. On top of that, ingesting and open-sourcing more rollouts from the Open X-Embodiment project would be a great way to continue to expand the usefulness of the platform. Right now, we have ingested roughly 5000 rollouts from the roughly 1 million available, focusing on those datasets with natural language task annotations that can also fit on a laptop. Building stronger ingestion pipelines for more complex data types would be a great next step. Further next steps would refactor the ARES frontend (currently running on Streamlit) into a more performant system.
 
 
 ## Acknowledgements and Citation

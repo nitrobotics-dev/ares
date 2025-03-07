@@ -8,14 +8,14 @@ ARES_VIDEO_DIR = os.path.join(ARES_DATA_DIR, "videos")
 # using oxe-downloader
 # oxe-download --dataset "name" --path $ARES_OXE_DIR
 DATASET_NAMES: list[dict[str, str]] = [
-    {
-        "dataset_filename": "nyu_rot_dataset_converted_externally_to_rlds",
-        "dataset_formalname": "NYU ROT",
-    },
     # {
-    #     "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",
-    #     "dataset_formalname": "UCSD Kitchen",
+    #     "dataset_filename": "nyu_rot_dataset_converted_externally_to_rlds",
+    #     "dataset_formalname": "NYU ROT",
     # },
+    {
+        "dataset_filename": "ucsd_kitchen_dataset_converted_externally_to_rlds",
+        "dataset_formalname": "UCSD Kitchen",
+    },
     # {
     #     "dataset_filename": "cmu_franka_exploration_dataset_converted_externally_to_rlds",
     #     "dataset_formalname": "CMU Franka Exploration",
@@ -24,10 +24,10 @@ DATASET_NAMES: list[dict[str, str]] = [
     #     "dataset_filename": "berkeley_fanuc_manipulation",
     #     "dataset_formalname": "Berkeley Fanuc Manipulation",
     # },
-    # {
-    #     "dataset_filename": "cmu_stretch",
-    #     "dataset_formalname": "CMU Stretch",
-    # },
+    {
+        "dataset_filename": "cmu_stretch",
+        "dataset_formalname": "CMU Stretch",
+    },
     # {"dataset_filename": "cmu_play_fusion", "dataset_formalname": "CMU Play Fusion"},
     # {
     #     "dataset_filename": "jaco_play",
@@ -41,10 +41,10 @@ DATASET_NAMES: list[dict[str, str]] = [
     #     "dataset_filename": "imperialcollege_sawyer_wrist_cam",
     #     "dataset_formalname": "Imperial Wrist Cam",
     # },
-    {
-        "dataset_filename": "tokyo_u_lsmo_converted_externally_to_rlds",
-        "dataset_formalname": "LSMO Dataset",
-    },
+    # {
+    #     "dataset_filename": "tokyo_u_lsmo_converted_externally_to_rlds",
+    #     "dataset_formalname": "LSMO Dataset",
+    # },
     # {
     #     "dataset_filename": "ucsd_pick_and_place_dataset_converted_externally_to_rlds",
     #     "dataset_formalname": "UCSD Pick Place",
@@ -65,10 +65,10 @@ DATASET_NAMES: list[dict[str, str]] = [
     #     "dataset_filename": "berkeley_mvp_converted_externally_to_rlds",
     #     "dataset_formalname": "Berkeley MVP Data",
     # },
-    {
-        "dataset_filename": "pi_demos",
-        "dataset_formalname": "Physical Intelligence Demos",
-    },
+    # {
+    #     "dataset_filename": "pi_demos",
+    #     "dataset_formalname": "Physical Intelligence Demos",
+    # },
 ]
 # Saytap does not have pixel data, so we exclude it
 # {

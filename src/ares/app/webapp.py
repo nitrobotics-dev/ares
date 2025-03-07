@@ -32,6 +32,7 @@ from ares.constants import ARES_DATA_DIR
 title = "ARES Dashboard"
 tmp_dump_dir = os.path.join(ARES_DATA_DIR, "tmp2")
 section_times: dict[str, float] = defaultdict(float)
+breakpoint()
 
 
 ######################################################################
@@ -45,6 +46,7 @@ def error_context(section_name: str) -> t.Any:
     Context manager for gracefully handling errors in computation of a section.
     Catch the error and render it in the app for easy debugging and readability.
     """
+    print(section_name)
     try:
         yield
     except Exception as e:
@@ -70,6 +72,7 @@ def timer_context(section_name: str) -> t.Any:
 # Note: streamlit displays standalone-strings like `"""..."""` as markdown!
 # Use `#` for comments in the streamlit context.
 def main() -> None:
+    print("Starting main")
     ######################################################################
     # Load data and setup state info
     ######################################################################
