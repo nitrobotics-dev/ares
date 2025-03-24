@@ -13,11 +13,8 @@ from ares.constants import ARES_DATA_DIR
 
 SQLITE_PREFIX = "sqlite:///"
 SQLITE_ABS_PREFIX = SQLITE_PREFIX + "/"
-
-ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(ARES_DATA_DIR, "robot_data.db")
-TEST_ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(
-    ARES_DATA_DIR, "test_robot_data.db"
-)
+ROBOT_DB_NAME = "robot_data.db"
+ROBOT_DB_PATH = SQLITE_ABS_PREFIX + os.path.join(ARES_DATA_DIR, ROBOT_DB_NAME)
 
 RolloutSQLModel = create_flattened_model(Rollout)
 

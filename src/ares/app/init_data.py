@@ -141,7 +141,6 @@ def initialize_data(tmp_dump_dir: str) -> None:
         print(f"Processing {index_name} index")
         stored_embeddings = index_manager.indices[index_name].get_all_vectors()
         stored_ids = index_manager.indices[index_name].get_all_ids()
-
         # Try loading from cache first
         cached_data = load_cached_embeddings(
             tmp_dump_dir, index_name, stored_embeddings

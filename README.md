@@ -122,7 +122,7 @@ We want to make it as easy as possible to annotate rollouts with models. This ca
 Once we've ingested and annotated a dataset, we can use ARES to curate and analyze the data. We provide a series of tools for visualizing and understanding the data in a simple frontend powered by Streamlit. You can run the frontend locally by running:
 
 ```bash
-streamlit run ares/frontend/app.py
+streamlit run src/ares/app/webapp.py
 ```
 
 This opens a local Streamlit web app at `localhost:8501` that provides a high level overview of the ingested data, covering structured metadata, videos, annotations, and more. The ability to visualization annotations and retrieve rollouts by their annotations is a powerful tool for curation, as well as the ability to filter rollouts by their attributes. Retrieval over trajectory embeddings enables a powerful tool for finding in- and out-of-distribution rollouts. Exploring 2D projections of embeddings (such as task or description) enables the user to find clusters in the data, resulting in deeper understanding of the distributions.

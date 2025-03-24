@@ -1,6 +1,6 @@
 """
 Main file for displaying the Streamlit app. This file contains the main function that defines the order of the sections in the app as well as
-state management, error handling, timing, and data export functionality. 
+state management, error handling, timing, and data export functionality.
 """
 
 import os
@@ -30,9 +30,8 @@ from ares.constants import ARES_DATA_DIR
 
 # top level global variables
 title = "ARES Dashboard"
-tmp_dump_dir = os.path.join(ARES_DATA_DIR, "tmp2")
+tmp_dump_dir = os.path.join(ARES_DATA_DIR, "webapp_tmp")
 section_times: dict[str, float] = defaultdict(float)
-breakpoint()
 
 
 ######################################################################

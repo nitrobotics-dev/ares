@@ -15,7 +15,7 @@ from ares.configs.base import Rollout
 from ares.databases.embedding_database import (
     EMBEDDING_DB_PATH,
     META_INDEX_NAMES,
-    TEST_TIME_STEPS,
+    STANDARDIZED_TIME_STEPS,
     FaissIndex,
     IndexManager,
     rollout_to_embedding_pack,
@@ -72,7 +72,7 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
             index_manager.init_index(
                 k,
                 feature_dim,
-                TEST_TIME_STEPS,
+                STANDARDIZED_TIME_STEPS,
                 norm_means=means,  # normalize with dimension-specific means
                 norm_stds=stds,  # normalize with dimension-specific stds
             )
