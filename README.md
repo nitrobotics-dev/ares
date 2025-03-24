@@ -4,7 +4,7 @@
 
 ARES (Automatic Robot Evaluation System) is a open-source (Apache 2.0) platform for automatically ingesting, curating, and evaluating robot data using ML models to quickly and accurately understand policy performance, identify areas for improvement, and generate new robot datasets, all without setting up any heavy infrastructure.
 Researchers tend to chase point-solutions for specific tasks or paper implmentations, but ARES is designed to be a generalized platform for long-term robot research that scales from a laptop to the cloud.
-ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs via model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc., requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
+ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs via model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc., requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. We make our data available on the [Hugging Face Hub](https://huggingface.co/datasets/jacobphillips99/ares-data), which contains roughly 5000 rollouts from the Open X-Embodiment project.
 
 At a high level, ARES is composed of three main components: 
 - Ingestion: automatically transform raw robot data into a structured format with VLMs
@@ -98,6 +98,13 @@ The `Rollout` class contains recursive subconfigurations: `Robot`, `Environment`
 
 ## Data
 We start with data from Tensorflow Datasets ports of the Open X-Embodiment project. While these datasets being open and available is great for general robot model training research, the iterator-style dataset makes it extremely difficult to do fast understanding and analysis, which motivates much of this work. As explained below in [Ingestion and Annotation](#ingestion-and-annotation), we can use Open X-Embodiment data or user-defined datasets. In order to download the Open X-Embodiment data, use the [`oxe_downloader` tool](https://github.com/mishmish66/oxe_downloader).
+
+We make our data available on the [Hugging Face Hub](https://huggingface.co/datasets/jacobphillips99/ares-data), which contains roughly 5000 rollouts from the Open X-Embodiment project. Users can download the data by running the [`pull_from_hub.sh` script](https://github.com/jacobphillips99/ares/blob/main/scripts/release/pull_from_hub.sh), which should download, extract, and restore the databases. Users can also upload their own data to the Hub by running the [`push_to_hub.sh` script](https://github.com/jacobphillips99/ares/blob/main/scripts/release/push_to_hub.sh). We upload the StructuredDatabase, AnnotationDatabase, EmbeddingDatabase, and videos to the Hub. The data is stored in the `data` directory in the root of the repository. The dataset contains the following:
+- `robot_data.db`: the StructuredDatabase SQLite database containing the structured metadata, descriptions, environment details, performance metrics, and more.
+- `embedding_data`: the EmbeddingDatabase IndexManager, containing the FAISS-backed indexes of trajectory states, actions, descriptions, and task instructions.
+- `annotation_mongodump`: the AnnotationDatabase MongoDB dump, containing the labeled rollouts, detections, success criteria, and other annotations stored in a MongoDB instance.
+- `videos`: a directory containing the videos and frames of the ingested rollouts.
+
 
 ## Ingestion and Annotation
 We adopt three main steps during ingestion: structured ingestion, embedding ingestion, and grounding ingestion. First, structured ingestion transforms the raw data into a structured format, which is then dumped into a SQL database. Second, embedding ingestion transforms data (such as the text description, video, action and state trajectories) into dense embeddings, which are then stored in a series of FAISS indexes. Third, grounding ingestion uses a VLM to detect objects in the scene and then detector and segmenter models to annotate the rollout with ground-truth labels and store these in a MongoDB database. 
