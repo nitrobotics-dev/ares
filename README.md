@@ -57,7 +57,7 @@ git clone https://github.com/jacobphillips99/ares.git
 cd ares
 ```
 
-Then, install the Python requirements and install the package (add `-e` to install in editable mode and make changes):
+If you want to use ARES as a package in your own project, follow the instructions below to install the requirements and install the package (add `-e` to install in editable mode and make changes). Otherwise, continue to the [Docker and Devcontainer Setup](#docker-and-devcontainer-setup) section to run ARES locally.
 ```bash
 pip install -r requirements.txt
 pip install -e .
@@ -75,7 +75,11 @@ Download and install the IDE of your choice. We recommend [VSCode](https://code.
 The `devcontainer.json` file contains the necessary configuration for the devcontainer, including the Dockerfile. It mounts some local directories into the container, such as the `data` directory for storing robot data, the `/tmp` directory for storing temporary files, and the `.cache/huggingface` directory for storing model weights.
 
 ### MongoDB Setup
-In order to use the AnnotationDatabase, you will need to setup a MongoDB instance. We use `docker-compose` to run the MongoDB instance; see `mongo-docker-compose.yml` for the configuration. You can start the MongoDB instance by running `docker-compose -f mongo-docker-compose.yml up -d` in the root directory. This will start the MongoDB instance and expose it to the host machine on port 27017; the instance will automatically restart on container restart.
+In order to use the AnnotationDatabase, you will need to set up a MongoDB instance. We use `docker-compose` to run the MongoDB instance; see `mongo-docker-compose.yml` for the configuration. You can start the MongoDB instance by running
+```bash
+docker-compose -f mongo-docker-compose.yml up -d
+```
+in the root directory. This will start the MongoDB instance and expose it to the host machine on port 27017; the instance will automatically restart on container restart.
 
 ### Environment Variables
 ARES uses environment variables to configure secrets like API keys. We mount these environment variables into the devcontainer using the `devcontainer.json` file. We copy over variables like API keys and credentials. If needed, you can also add your own certificates to the `/etc/ssl/certs` directory, which is also mounted into the container.
