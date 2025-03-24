@@ -99,7 +99,14 @@ The `Rollout` class contains recursive subconfigurations: `Robot`, `Environment`
 ## Data
 We start with data from Tensorflow Datasets ports of the Open X-Embodiment project. While these datasets being open and available is great for general robot model training research, the iterator-style dataset makes it extremely difficult to do fast understanding and analysis, which motivates much of this work. As explained below in [Ingestion and Annotation](#ingestion-and-annotation), we can use Open X-Embodiment data or user-defined datasets. In order to download the Open X-Embodiment data, use the [`oxe_downloader` tool](https://github.com/mishmish66/oxe_downloader).
 
-We make our data available on the [Hugging Face Hub](https://huggingface.co/datasets/jacobphillips99/ares-data), which contains roughly 5000 rollouts from the Open X-Embodiment project. Users can download the data by running the [`pull_from_hub.sh` script](https://github.com/jacobphillips99/ares/blob/main/scripts/release/pull_from_hub.sh), which should download, extract, and restore the databases. Users can also upload their own data to the Hub by running the [`push_to_hub.sh` script](https://github.com/jacobphillips99/ares/blob/main/scripts/release/push_to_hub.sh). We upload the StructuredDatabase, AnnotationDatabase, EmbeddingDatabase, and videos to the Hub. The data is stored in the `data` directory in the root of the repository. The dataset contains the following:
+We make our data available on the [Hugging Face Hub](https://huggingface.co/datasets/jacobphillips99/ares-data), which contains roughly 5000 rollouts from the Open X-Embodiment project. Users can download the data by running the  [`pull_from_hub.sh` script](https://github.com/jacobphillips99/ares/blob/main/scripts/release/pull_from_hub.sh), which should download, extract, and restore the databases. This can be done by running:
+```bash
+chmod +x scripts/release/pull_from_hub.sh
+./scripts/release/pull_from_hub.sh
+```
+
+
+Users can also upload their own data to the Hub by running [`python -m scripts.release.push_to_hub`](https://github.com/jacobphillips99/ares/blob/main/scripts/release/push_to_hub.sh). We upload the StructuredDatabase, AnnotationDatabase, EmbeddingDatabase, and videos to the Hub. The data is stored in the `data` directory in the root of the repository. The dataset contains the following:
 - `robot_data.db`: the StructuredDatabase SQLite database containing the structured metadata, descriptions, environment details, performance metrics, and more.
 - `embedding_data`: the EmbeddingDatabase IndexManager, containing the FAISS-backed indexes of trajectory states, actions, descriptions, and task instructions.
 - `annotation_mongodump`: the AnnotationDatabase MongoDB dump, containing the labeled rollouts, detections, success criteria, and other annotations stored in a MongoDB instance.
