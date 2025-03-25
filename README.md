@@ -223,8 +223,6 @@ After ingestion, the user can choose the `Physical Intelligence Demos` dataset d
 This case study demonstrates how ARES can easily adapt to custom datasets with minimal configuration, requiring only the definition of how to extract frames and map metadata. The resulting ingested dataset served as the foundation for our VLM performance evaluation on success/failure classification, as detailed in the [Evaluation](#evaluation) section.
 
 
-# TODO: add viz of pi demos
-
 ## Extras
 We provide some fun extra tools to help with robot research. 
 - The `Rollout` and `RolloutSQLModel` classes can be used to dynamically flatten and reconstruct rollouts, enabled by hierarchical prefix matching. This enables smooth transitions between Pydantic and SQLModel types.
