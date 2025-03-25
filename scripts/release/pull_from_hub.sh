@@ -34,15 +34,18 @@ curl -L -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_DOWNLOAD/annotation
 tar -xzf "$OUTDIR/annotation_mongodump.tar.gz" -C "$OUTDIR"
 rm "$OUTDIR/annotation_mongodump.tar.gz"
 
-# echo "restoring mongo backup..."
-# mongorestore --uri="mongodb://localhost:27017" "$OUTDIR/annotation_mongodump"
+echo "restoring mongo backup..."
+mongorestore --uri="mongodb://localhost:27017" "$OUTDIR/annotation_mongodump"
 
 echo "downloading videos..."
 mkdir -p "$OUTDIR/videos"
 
 # Get list of video dataset tars from HF hub
 echo "fetching video datasets..."
-for tar_file in $(curl -s -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_BASE/tree/main/videos" | grep -o 'videos_[^"]*\.tar\.gz'); do
+API_URL="https://huggingface.co/api/datasets/$HF_REPO/tree/main/videos"
+echo "Fetching from: $API_URL"
+for tar_file in $(curl -s -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$API_URL" | grep -o '"path":"videos/[^"]*\.tar\.gz"' | cut -d'"' -f4 | cut -d'/' -f2); do
+    echo "Found tar file: $tar_file"
     echo "downloading and extracting $tar_file..."
     curl -L -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_DOWNLOAD/videos/$tar_file" -o "$OUTDIR/videos/$tar_file"
     tar -xzf "$OUTDIR/videos/$tar_file" -C "$OUTDIR"
