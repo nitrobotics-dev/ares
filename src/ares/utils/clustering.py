@@ -92,7 +92,9 @@ def visualize_clusters(
             "y": reduced_embeddings[:, 1],
             "cluster": [str(x) if x != -1 else "Noise" for x in cluster_labels],
             "point_index": range(len(cluster_labels)),
-            "raw_data": [str(x)[:100] for x in raw_data],
+            "raw_data": [
+                str(x)[:100] + "..." if len(str(x)) > 100 else str(x) for x in raw_data
+            ],
             "id": ids if ids is not None else range(len(cluster_labels)),
             "x_coord": reduced_embeddings[:, 0].round(3),
             "y_coord": reduced_embeddings[:, 1].round(3),

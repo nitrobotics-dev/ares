@@ -4,7 +4,9 @@
 #   - embedding_data (EmbeddingDatabase IndexManager)
 #   - annotation_mongodump (AnnotationDatabase MongoDB dump)
 #   - videos (videos and frames)
-# Usage: ./pull_from_hub.sh [output_directory]
+# Usage (from root directory): ./scripts/release/pull_from_hub.sh [output_directory]
+#
+# Note: This script downloads both the databases and the videos, which are separated into different tar files per-dataset.
 
 set -euo pipefail
 
@@ -21,26 +23,27 @@ fi
 
 mkdir -p "$OUTDIR"
 
+# download and restore the StructuredDatabase
 echo "downloading robot_data.db..."
 curl -L -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_DOWNLOAD/robot_data.db" -o "$OUTDIR/robot_data.db"
 
+# download and restore the EmbeddingDatabase
 echo "downloading embedding_data..."
 curl -L -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_DOWNLOAD/embedding_data.tar.gz" -o "$OUTDIR/embedding_data.tar.gz"
 tar -xzf "$OUTDIR/embedding_data.tar.gz" -C "$OUTDIR"
 rm "$OUTDIR/embedding_data.tar.gz"
 
+# download and restore the MongoDB backup AnnotationDatabase
 echo "downloading annotation_mongodump..."
 curl -L -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_DOWNLOAD/annotation_mongodump.tar.gz" -o "$OUTDIR/annotation_mongodump.tar.gz"
 tar -xzf "$OUTDIR/annotation_mongodump.tar.gz" -C "$OUTDIR"
 rm "$OUTDIR/annotation_mongodump.tar.gz"
-
 echo "restoring mongo backup..."
 mongorestore --uri="mongodb://localhost:27017" "$OUTDIR/annotation_mongodump"
 
+# Get list of video dataset tars from HF hub and download, unpack, and remove each tar file
 echo "downloading videos..."
 mkdir -p "$OUTDIR/videos"
-
-# Get list of video dataset tars from HF hub
 echo "fetching video datasets..."
 API_URL="https://huggingface.co/api/datasets/$HF_REPO/tree/main/videos"
 echo "Fetching from: $API_URL"

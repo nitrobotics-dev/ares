@@ -4,7 +4,7 @@
 
 ARES (Automatic Robot Evaluation System) is a open-source (Apache 2.0) platform for automatically ingesting, curating, and evaluating robot data using ML models to quickly and accurately understand policy performance, identify areas for improvement, and generate new robot datasets, all without setting up any heavy infrastructure.
 Researchers tend to chase point-solutions for specific tasks or paper implmentations, but ARES is designed to be a generalized platform for long-term robot research that scales from a laptop to the cloud.
-ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs via model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc., requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. We make our data available on the [Hugging Face Hub](https://huggingface.co/datasets/jacobphillips99/ares-data), which contains roughly 5000 rollouts from the Open X-Embodiment project.
+ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs via model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc., requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. We make our data available on the [Hugging Face Hub](https://huggingface.co/datasets/jacobphillips99/ares-data), which contains roughly 5000 rollouts from the Open X-Embodiment project. See the [Data](#data) section for more details.
 
 At a high level, ARES is composed of three main components: 
 - Ingestion: automatically transform raw robot data into a structured format with VLMs
@@ -79,7 +79,7 @@ In order to use the AnnotationDatabase, you will need to set up a MongoDB instan
 ```bash
 docker-compose -f mongo-docker-compose.yml up -d
 ```
-in the root directory. This will start the MongoDB instance and expose it to the host machine on port 27017; the instance will automatically restart on container restart.
+in shell in the root directory. This will start the MongoDB instance in detached mode and expose it to the host machine on port 27017; the instance will automatically restart on container restart.
 
 ### Environment Variables
 ARES uses environment variables to configure secrets like API keys. We mount these environment variables into the devcontainer using the `devcontainer.json` file. We copy over variables like API keys and credentials. If needed, you can also add your own certificates to the `/etc/ssl/certs` directory, which is also mounted into the container.
