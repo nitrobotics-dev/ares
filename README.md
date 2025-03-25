@@ -1,4 +1,5 @@
 # ARES: Automatic Robot Evaluation System
+Created by [Jacob Phillips](https://jacobphillips99.github.io/)
 
 <img src="assets/ares_system_diagram.png" alt="ARES System Diagram"/> 
 
@@ -35,6 +36,7 @@ You can use ARES to:
 - [🔍 Curation and Analysis](#curation-and-analysis)
 - [🤖 Training and Export](#training-and-export)
 - [📈 Evaluation](#evaluation)
+- [🧰 Case Studies](#case-studies)
 - [🎉 Extras](#extras)
 - [💰 Costs](#costs)
 - [🔮 Limitations and Next Steps](#limitations-and-next-steps)
@@ -121,9 +123,9 @@ We adopt the OpenXEmbodiment specification as the starting point for ingestion, 
 The general ingestion pipeline can be found in `main.py`, which runs structured, embedding, and grounding ingestion. An example of ingesting a user-defined dataset can be found in `ares/scripts/pi_demo_ingestion.py`. This script contains the details on ingesting a series of demonstrations from a [Physical Intelligence blogpost](https://www.physicalintelligence.company/blog/pi0), hereafter referred to as the "PI Demos".
 
 ### Structured Ingestion
-The script for structured ingestion can be found in `ares/scripts/run_structured_ingestion.py`. The script iterates through asynchronous batches of episodes, extracting structured, hard-coded information from each episode and "filling in the blanks" for estimated fields like `description_estimate`, `surface_estimate`, `success_estimate` etc. The information from the VLM populates a `Rollout` object, which is then flattened into the `RolloutSQLModel` object and dumped into the SQL database. Our `StrucutredDatabase` contains columns that match the recursively flattened `Rollout` object, enabling retrieval over the entire dataset. This yields long-term, structured metadata about the rollouts, which can be used for downstream analysis and curation.
+The script for structured ingestion can be found in `ares/scripts/run_structured_ingestion.py`. The script iterates through asynchronous batches of episodes, extracting structured, hard-coded information from each episode and "filling in the blanks" for estimated fields like `description_estimate`, `surface_estimate`, `success_estimate` etc. The information from the VLM populates a `Rollout` object, which is then flattened into the `RolloutSQLModel` object and dumped into the SQL database. Our `StructuredDatabase` contains columns that match the recursively flattened `Rollout` object, enabling retrieval over the entire dataset. This yields long-term, structured metadata about the rollouts, which can be used for downstream analysis and curation.
 ```bash
-VLM(video, task, Field Annotations) -> Rollout -> Flattened RolloutSQLModel -> SQL Database
+VLM(video, task, Field Annotations) -> Rollout -> Flattened RolloutSQLModel -> SQL Database Row
 ```
 
 ### Embedding Ingestion
@@ -163,7 +165,7 @@ We can also examine trajectories to find in- and out-of-distribution rollouts. W
 After curating and analyzing a dataset, we provide functionality for the user to export a curated slice. This export can be the graphical depiction of the dashboard saved to PDF or HTML; alternatively, you can export the data to CSV or Parquet files. These CSV and Parquet files can also be used as a pre-processsed dataset for training downstream models. We provide a `RolloutDataset` and `RolloutDatasetConfig` class to help train models using the ARES platform. See examples in `ares/training/preprocess.py` and `ares/training/train.py`.
 
 ## Evaluation
-In order to decide which models should be used to power the ARES platform, we developed a benchmark based on the demonstrations released by [Physical Intelligence](https://www.physicalintelligence.company) in the [π₀ release](https://www.physicalintelligence.company/blog/pi0). The benchmark contains 20 videos over 11 tasks, most with both a success and failure rollout (as provided by the PI team). We use this benchmark to evaluate the performance of the ARES platform, as well as to select the best models for use inthe platform. We conduct evaluations over binary success classification, covering a range of VLMs, methods, consensus votes, and frames-per-second. We demonstrate the flexibility of the ARES platform by using the `VLM` object, creating a Pydantic `EvalConfig`, and launching batch asynchronous evaluations. In order to maintain consistent, robust evaluations, we first annotate `success_criteria` for each rollout using a VLM before predicting success. Evaluation results are summarized below, as plotted by `ares/notebooks/eval_nb.ipynb`.
+In order to decide which models should be used to power the ARES platform, we developed a benchmark based on the demonstrations released by [Physical Intelligence](https://www.physicalintelligence.company) in the [π₀ release](https://www.physicalintelligence.company/blog/pi0). The benchmark contains 20 videos over 11 tasks, most with both a success and failure rollout (as provided by the PI team). We use this benchmark to evaluate the performance of the ARES platform, as well as to select the best models for use inthe platform. We conduct evaluations over binary success classification, covering a range of VLMs, methods, consensus votes, and frames-per-second. We demonstrate the flexibility of the ARES platform by using the `VLM` object, creating a Pydantic `EvalConfig`, and launching batch asynchronous evaluations. In order to maintain consistent, robust evaluations, we first annotate `success_criteria` for each rollout using a VLM before predicting success. We run the evaluation script in `scripts/eval.py`. Evaluation results are summarized below, as plotted by `notebooks/eval_nb.ipynb`.
 
 We evaluate over: 
 - **Models**: `claude-3.5-sonnet`, `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2-flash`, `gpt-4-turbo`, `gpt-4o`, and `gpt-4o-mini`
@@ -172,27 +174,74 @@ We evaluate over:
 - **Consensus**: Consensus of either the mean or median of the predictions
 - **N Votes**: Number of votes to take for the consensus prediction, ranging over `1`, `2`, `3`, `4`, `5`
 
-<img src="assets/ares_performance_vlm.png" alt="ARES Performance by VLM"/> 
-<img src="assets/ares_performance_fps.png" alt="ARES Performance by FPS"/> 
-<img src="assets/ares_performance_n.png" alt="ARES Performance by N Votes"/> 
-<img src="assets/ares_performance_method.png" alt="ARES Performance by Method"/> 
+<img src="assets/pi_demos_eval.png" alt="ARES Performance on Physical Intelligence Demos"/> 
 
 We show `gpt-4o` to be the best performing model, with little impact from the number of votes or consensus strategy. Across models, performs seems to be mostly consistent after 0.5 FPS, while some older models actually perform better at very low FPS (e.g. `gemini-1.5-pro` performs best at `0` FPS). We find the `frame_description` method to actually slightly outperform the generalized `video` method, calling into question progress on long-context video benchmarks. However, this method is significantly more expensive and more difficult to run with respect to request-per-minute and token-per-minute rate limits. As such, we adopt the `video` method at 1 FPS with `gpt-4o` for all ARES data ingestion. 
 
+## Case Studies
+
+### Case Study 1: Embodied Chain-of-Thought
+
+[Zawalski et al.'s "Robotic Control via Embodied Chain-of-Thought Reasoning" (ECoT)](https://arxiv.org/abs/2407.08693) demonstrated how composing annotations from multiple sources can create effective reasoning plans for robot control. ARES reimplements this approach with a more modular, scalable architecture that addresses several limitations of the original implementation:
+
+1. **Model Flexibility**: Easy switching between VLMs via LiteLLM integration
+2. **Cloud Scaling**: Modal-based orchestration for detection and segmentation models
+3. **Parallel Processing**: Asynchronous annotation for improved throughput
+4. **Structured Storage**: Database-backed annotations instead of flat files
+
+Our implementation in [`scripts/annotating/run_pseudo_ecot.py`](https://github.com/jacobphillips99/ares/blob/main/scripts/annotating/run_pseudo_ecot.py) demonstrates how ARES generates ECoT-like training data efficiently through a process that:
+
+1. Loads previously generated annotations from the `AnnotationDatabase`:
+   - Scene descriptions, object detections, and success criteria
+   
+2. Composes these annotations with task information into a structured prompt using a Jinja2 template ([`pseudo_ecot.jinja2`](https://github.com/jacobphillips99/ares/blob/main/src/ares/models/prompts/pseudo_ecot.jinja2))
+
+3. Processes results in parallel through the [`orchestrate_annotating`](https://github.com/jacobphillips99/ares/blob/main/src/ares/annotating/orchestration.py) framework, which:
+   - Batches rollouts efficiently to manage memory usage
+   - Handles error tracking and retries for failed annotations
+   - Manages database connections and transactions
+   - Provides detailed statistics on annotation progress and performance
+
+This approach generated 2,500 ECoT-style annotations in approximately 10 minutes at a cost of around $5, demonstrating ARES's efficiency in generating complex annotations at scale.
+
+### Case Study 2: Physical Intelligence Demos
+
+To demonstrate ARES's flexibility for custom dataset ingestion, we ingested demonstrations from [Physical Intelligence's π₀ release](https://www.physicalintelligence.company/blog/pi0). This dataset includes paired success and failure examples for various robot tasks, making it ideal for evaluation purposes.
+
+The ingestion process adapts these videos to work within ARES's framework through several key steps:
+
+1. **Data Preparation**: We transform the PI Demo videos into ARES's standard format by extracting frames from the videos and organizing them with appropriate metadata, including success/failure labels.
+
+2. **Custom Dataset Iterator**: We created a simple iterator that processes each task with both its success and failure variants, allowing ARES to ingest the paired examples efficiently.
+
+3. **Standardized Metadata**: The PI Demo task information is mapped to ARES's expected metadata format, ensuring compatibility with our analysis tools.
+
+4. **Standard Pipeline Integration**: Once prepared, the data flows through the standard ARES ingestion pipeline, benefiting from all the structured, embedding, and grounding capabilities.
+
+After ingestion, the user can choose the `Physical Intelligence Demos` dataset during structured data filtering to view the dataset distribution and results:
+
+<img src="assets/pi_demos_fig.png" alt="Example of ARES pi demos"/>
+
+
+
+This case study demonstrates how ARES can easily adapt to custom datasets with minimal configuration, requiring only the definition of how to extract frames and map metadata. The resulting ingested dataset served as the foundation for our VLM performance evaluation on success/failure classification, as detailed in the [Evaluation](#evaluation) section.
+
+
+# TODO: add viz of pi demos
 
 ## Extras
 We provide some fun extra tools to help with robot research. 
 - The `Rollout` and `RolloutSQLModel` classes can be used to dynamically flatten and reconstruct rollouts, enabled by hierarchical prefix matching. This enables smooth transitions between Pydantic and SQLModel types.
-- The `ares/notebooks` directory contains a few notebooks for visualization; one for VLM results and the other for annotation results.
-- The `ares/scripts` directory provides the top-level entrypoint for interacting with data in ARES, including the main ingestion pipeline. Other scripts include:
-    - `ares/scripts/db_updaters/`: scripts for amending the `AnnotationDatabase` and `StrucutredDatabase`
-    - `ares/scripts/annotating`: scripts for running annotations for in-context-learning, Embodied Chain of Thought, success criteria, and more, including the Modal-based grounding and detection scripts.
-    - `ares/scripts/self_heal.py`: a tool for automatically syncing the `StructuredDatabase` with the `AnnotationDatabase` and `EmbeddingDatabase`. This means that there should never be ingested rollouts without annotations or embeddings.
+- The `notebooks` directory contains a few notebooks for visualization; one for VLM results and the other for annotation results.
+- The `scripts` directory provides the top-level entrypoint for interacting with data in ARES, including the main ingestion pipeline. Other scripts include:
+    - `scripts/db_updaters/`: scripts for amending the `AnnotationDatabase` and `StructuredDatabase`
+    - `scripts/annotating`: scripts for running annotations for in-context-learning, Embodied Chain of Thought, success criteria, and more, including the Modal-based grounding and detection scripts.
+    - `scripts/self_heal.py`: a tool for automatically syncing the `StructuredDatabase` with the `AnnotationDatabase` and `EmbeddingDatabase`. This means that there should never be ingested rollouts without annotations or embeddings.
 - In order to provide robust error tracking during annotation, we provide a `ResultTracker` object that can be used to track the results of an annotation. This is useful for providing feedback on the status of an annotation job, as well as for providing a record of the annotation. See `ares/annotating/annotating_base.py` for more details.
 - Normalization in ARES is dependent on the entire dataset being collected ahead of time. However, in practice, we often want to normalize data on-the-fly. To enable this, we provide the `NormalizationTracker` object to perform batch or online normalization. See `ares/databases/embedding_database.py` for more details.
  
 ## Costs
-Ingesting, annotating, and annotating data can be quite expensive; we aim to use ARES to make robot research as accessible as possible. The original development of ARES was conducted solely on a laptop, using a combination of local resources (CPU and Disk) and cloud APIs. First, we mitigate costs by holding all data strucutres locally, including the `StrucutredDatabase`, `AnnotationDatabase`, and `EmbeddingDatabase`. Second, we downsample frames-per-second while ingesting, running `gpt-4o` at 1 FPS via API, using `grounding-dino-tiny` and `sam-vit-base` at 5 FPS via Modal, and the Nomic Embedder via local CPU. Back-of-the-envelope costs comes out to roughly 1 cent per rollout for `gpt-4o`, as most rollouts are relatively short. Annotating 5000 rollouts at 5 FPS (totaling >100,000 frames) for detection and segmentation costs less than $10 of $30 of monthly free Modal credits. We expect these costs to remain low as the pareto-frontier of efficicent multimodal models continues to bring down the cost of inference.
+Ingesting, annotating, and annotating data can be quite expensive; we aim to use ARES to make robot research as accessible as possible. The original development of ARES was conducted solely on a laptop, using a combination of local resources (CPU and Disk) and cloud APIs. First, we mitigate costs by holding all data strucutres locally, including the `StructuredDatabase`, `AnnotationDatabase`, and `EmbeddingDatabase`. Second, we downsample frames-per-second while ingesting, running `gpt-4o` at 1 FPS via API, using `grounding-dino-tiny` and `sam-vit-base` at 5 FPS via Modal, and the Nomic Embedder via local CPU. Back-of-the-envelope costs comes out to roughly 1 cent per rollout for `gpt-4o`, as most rollouts are relatively short. Annotating 5000 rollouts at 5 FPS (totaling >100,000 frames) for detection and segmentation costs less than $10 of $30 of monthly free Modal credits. We expect these costs to remain low as the pareto-frontier of efficicent multimodal models continues to bring down the cost of inference.
 
 
 ## Limitations and Next Steps
@@ -208,14 +257,9 @@ If using the ARES platform in your work, please cite it to acknowledge the autho
 @software{ARES,
     title = {ARES: Automatic Robot Evaluation System},
     author = {Jacob Phillips},
-    url = {https://github.com/jacobphillips99/ares/tree/main},
+    url = {https://github.com/jacobphillips99/ares},
     version = {insert version number},
     date = {insert date of usage},
     year = {2025},
 }
 ```
-
-You can also cite the whitepaper or blog:
-TODO TODO TODO
-
-

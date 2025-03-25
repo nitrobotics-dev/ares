@@ -215,7 +215,7 @@ def create_similarity_tabs(
     for tab, viz_data in zip(tabs, visualizations):
         with tab:
             if "error" in viz_data:
-                st.warning(viz_data)
+                st.warning(f"Received error: {viz_data['error']}")
                 continue
             similar_cols = st.columns(min(max_cols_in_tab, len(viz_data["ids"])))
             for i, (dist, id_str) in enumerate(
@@ -276,10 +276,9 @@ def generate_robot_array_plot_visualizations(
     keys = keys or TRAJECTORY_INDEX_NAMES
     figs = []
     for key in keys:
-        name_key = row.dataset_name + "-" + row.robot_embodiment + "-" + key
+        name_key = f"{row.dataset_name}-{row.robot_embodiment}-{key}"
         if name_key not in all_vecs:
-            st.warning(f"No data found for name key {name_key}")
-            breakpoint()
+            st.warning(f"No data found for key {name_key}.")
             continue
         these_vecs = all_vecs[name_key]
         these_scores = scores.get(name_key) if scores else None
