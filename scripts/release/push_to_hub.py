@@ -10,6 +10,7 @@ from ares.constants import ARES_DATA_DIR
 from ares.databases.structured_database import ROBOT_DB_NAME
 from ares.databases.embedding_database import EMBEDDING_DB_NAME
 
+# insert your repo name here!
 HF_REPO = "jacobphillips99/ares-data"
 ANNOTATION_DB_BACKUP_NAME = "annotation_mongodump"
 

@@ -7,6 +7,7 @@
 # Usage (from root directory): ./scripts/release/pull_from_hub.sh [output_directory]
 #
 # Note: This script downloads both the databases and the videos, which are separated into different tar files per-dataset.
+# You may need to install the `mongo-db-tools` to restore the MongoDB backup: https://www.mongodb.com/try/download/database-tools
 
 set -euo pipefail
 
@@ -33,12 +34,18 @@ curl -L -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_DOWNLOAD/embedding_
 tar -xzf "$OUTDIR/embedding_data.tar.gz" -C "$OUTDIR"
 rm "$OUTDIR/embedding_data.tar.gz"
 
-# download and restore the MongoDB backup AnnotationDatabase
+# download MongoDB AnnotationDatabase
 echo "downloading annotation_mongodump..."
 curl -L -H "Authorization: Bearer $HUGGINGFACE_API_KEY" "$HF_DOWNLOAD/annotation_mongodump.tar.gz" -o "$OUTDIR/annotation_mongodump.tar.gz"
 tar -xzf "$OUTDIR/annotation_mongodump.tar.gz" -C "$OUTDIR"
 rm "$OUTDIR/annotation_mongodump.tar.gz"
+# restore MongoDB backup
 echo "restoring mongo backup..."
+# check if mongo-db-tools is installed
+if ! command -v mongorestore &> /dev/null; then
+    echo "Error: mongorestore could not be found"
+    exit 1
+fi
 mongorestore --uri="mongodb://localhost:27017" "$OUTDIR/annotation_mongodump"
 
 # Get list of video dataset tars from HF hub and download, unpack, and remove each tar file
