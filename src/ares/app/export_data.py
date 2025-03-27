@@ -111,7 +111,7 @@ def pretty_dashboard_export(
     for i, viz in enumerate(visualizations):
         img_path = os.path.join(img_dir, f"plot_{i}.png")
         if "figure" not in viz:
-            breakpoint()
+            raise ValueError(f"No figure found for visualization {viz['title']}")
         viz["figure"].write_image(img_path)
         html_content.extend(
             [

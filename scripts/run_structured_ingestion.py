@@ -201,8 +201,7 @@ async def run_structured_database_ingestion(
             )
             total_result.update(result)
             if result.n_new == 0 and result.n_skipped == 0 and len(result.fails) != 0:
-                print(f"Batch failed: {result.fails}")
-                breakpoint()
+                raise RuntimeError(f"Batch failed: {result.fails}")
             current_batch = []
 
     # Process final batch if any
@@ -218,8 +217,7 @@ async def run_structured_database_ingestion(
         total_result.update(result)
 
     if total_result.n_new == 0 and total_result.n_skipped == 0:
-        print(f"Total failed: {total_result.fails}")
-        breakpoint()
+        raise RuntimeError(f"No new rollouts found: {total_result.fails}")
 
     print(f"Structured database new rollouts: {total_result.n_new}")
     total_time = time.time() - tic

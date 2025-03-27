@@ -421,8 +421,7 @@ class IndexManager:
         try:
             index.add_vector(vector, entry_id)
         except Exception as e:
-            print(f"Error adding vector to index {name}: {e}; {traceback.format_exc()}")
-            breakpoint()
+            raise ValueError(f"Error adding vector to index {name}: {e}")
         self.metadata[name]["n_entries"] += 1
 
     def add_matrix(self, name: str, matrix: np.ndarray, entry_id: str) -> None:
@@ -613,5 +612,4 @@ class IndexManager:
 if __name__ == "__main__":
     db = IndexManager(EMBEDDING_DB_PATH, FaissIndex)
     print(db.get_overall_stats())
-
-    breakpoint()
+    breakpoint()  # breakpoint to allow exploration of preview statistics

@@ -263,7 +263,8 @@ def delete_rows_by_dataset_name(engine: Engine, dataset_name: str) -> None:
     len_existing = len(get_dataset_rollouts(engine, dataset_name))
     print(f"Are you sure you want to delete all rows for dataset {dataset_name}?")
     print(f"There are {len_existing} rows in the dataset.")
-    breakpoint()
+    print("Press c to continue.")
+    breakpoint()  # breakpoint to confirm action before deleting rows
     with engine.begin() as conn:
         conn.execute(
             text(f"DELETE FROM rollout WHERE dataset_name = :dataset_name"),
@@ -278,4 +279,4 @@ if __name__ == "__main__":
 
     first_id = df.iloc[0].id
     first_rollout = get_rollouts_by_ids(engine, [first_id])[0]
-    breakpoint()
+    breakpoint()  # breakpoint to allow exploration of database

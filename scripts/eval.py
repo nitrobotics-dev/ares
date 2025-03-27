@@ -1,7 +1,7 @@
-""" 
+"""
 Script to evaluate the performance of leading API models on the Physical Intelligence Demos dataset. See `notebooks/eval_nb.ipynb` for more details.
 We generate a success constraint for the task based on the first frame and then evaluate the performance of the model at the task.
-We evaluate two methods: 
+We evaluate two methods:
 - `video`: analyze the stream of frames all at once, aka [image 1, image 2, image 3, ...]
 - `frame_descriptions`: generate a description for each frame, then process only text descriptions. [image 1] -> description 1, [image 2] -> description 2, ... and then process [description 1, description 2, ...]
 
@@ -257,25 +257,37 @@ if __name__ == "__main__":
         get_gpt_o1_mini,
     )
 
+    """
+    Setup relevant variables over FPS, VLMs, and methods
+    """
     # FPS of 0 just means first and last frames
-    fps_options = [0]  # , 0.25, 0.5, 1, 2]
+    fps_options = [0, 0.25, 0.5, 1, 2]
     dataset_filename = "pi_demos"
     dataset_info = get_dataset_info_by_key("dataset_filename", dataset_filename)
     dataset_formalname = dataset_info["dataset_formalname"]
 
-    # vlm_options = [get_gpt_4o_mini()]
-    # vlm_options = [get_gpt_4o()]
-    # vlm_options = [get_gemini_15_flash()]
-    # vlm_options = [get_gemini_2_flash()]
-    # methods = ["frame_descriptions", "video"]
-    vlm_options = [get_gemini_2_pro()]
-    methods = ["video"]
-    output_format = "\n".join(pydantic_to_field_instructions(EvalConfig))
+    vlm_options = [
+        get_claude_3_5_sonnet(),
+        get_gemini_2_flash(),
+        get_gemini_2_pro(),
+        get_gemini_15_flash(),
+        get_gemini_15_pro(),
+        get_gpt_4_turbo(),
+        get_gpt_4o(),
+        get_gpt_4o_mini(),
+        get_gpt_o1_mini(),
+    ]
+    methods = ["frame_descriptions", "video"]
 
+    """
+    Setup the prompt output format, database, and rollouts for PI Demos dataset
+    """
+    output_format = "\n".join(pydantic_to_field_instructions(EvalConfig))
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     rollouts = setup_rollouts(engine, dataset_formalname)
 
-    all_results = asyncio.run(
+    # launch the evaluation pipeline
+    asyncio.run(
         main(
             rollouts,
             dataset_filename,
@@ -285,5 +297,3 @@ if __name__ == "__main__":
             fps_options,
         )
     )
-    print(f"found {len(all_results)} results")
-    breakpoint()

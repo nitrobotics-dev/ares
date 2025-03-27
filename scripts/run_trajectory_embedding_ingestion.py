@@ -50,21 +50,20 @@ def ingest_trajectory_matrices_from_rollouts_per_dataset(
             ]
             embeddings = np.concatenate(packs) if packs else None
         except Exception as e:
-            print(e)
-            breakpoint()
+            raise ValueError(f"Error concatenating embeddings for {k}: {e}")
 
         # Check if embeddings array contains all None values
         if embeddings is None or all(x is None for x in embeddings.flatten()):
             print(f"Skipping {k} - embeddings array contains all None values")
             continue
         print(f"found {embeddings.shape} for {k}; (N,K)")
+
         # find normalizing constants
         try:
             means = np.mean(embeddings, axis=0)
             stds = np.std(embeddings, axis=0)
         except Exception as e:
-            print(e)
-            breakpoint()
+            raise ValueError(f"Error finding normalizing constants for {k}: {e}")
         feature_dim = embeddings.shape[1]
         print(f"found means {means.shape} and stds {stds.shape}")
         # setup index if not already existing

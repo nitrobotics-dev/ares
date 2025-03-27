@@ -1,5 +1,5 @@
 """
-Orchestration script to run a simpler version of the 'Embodied Chain of Thought' paper. 
+Orchestration script to run a simpler version of the 'Embodied Chain of Thought' paper.
 See original code https://github.com/MichalZawalski/embodied-CoT/blob/main/scripts/generate_embodied_data/full_reasonings.py
 
 We utilize the `grounding_string`, `detections`, and `success_criteria` annotations (see other annotating scripts!) + rollout fields to generate a pseudo-ECoT in a similar fashion.
@@ -119,4 +119,3 @@ if __name__ == "__main__":
     print(f"OVERALL STATS")
     overall_tracker.print_stats()
     print(f"Number of failures: {len(overall_failures)}")
-    breakpoint()

@@ -12,12 +12,6 @@ At a high level, ARES is composed of three main components:
 - Annotation: annotate the rollouts with pseduo-labels for downstream tasks
 - Curation and Modeling: understand data distributions and select data for training or evaluation
 
-[Demo Video](https://example.com/demo) TODO!
-
-[Blog Post](https://example.com/blog) TODO! 
-
-[Arxiv Paper](https://arxiv.org/) TODO!
-
 ## Who and what is ARES for?
 
 ARES is a platform for understanding robot data, targeted at robot developers and researchers. Researchers and developers suffer from two main problems: building point-solutions for specific tasks or papers and transitioning from research-scripts to production-tools. ARES aims to solve both of these problems by providing a *platform* for robot data understanding, enabling rapid development of new robot systems.

@@ -74,4 +74,3 @@ if __name__ == "__main__":
     print(f"OVERALL STATS")
     overall_tracker.print_stats()
     print(f"Number of failures: {len(overall_failures)}")
-    breakpoint()

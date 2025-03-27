@@ -1,7 +1,7 @@
 """
-Inspired by `InstantPolicy` and `R+X: Retrieval and Execution from Everyday Human Videos`, we demonstrate creating rollout annotations for 
+Inspired by `InstantPolicy` and `R+X: Retrieval and Execution from Everyday Human Videos`, we demonstrate creating rollout annotations for
 in-context learning by retrieving similar rollouts from the dataset. We can do this for several keys, such as the task, the text
-description of the rollout, or the state and action trajectories of the robot. 
+description of the rollout, or the state and action trajectories of the robot.
 """
 
 import os
@@ -166,4 +166,3 @@ if __name__ == "__main__":
     print(f"OVERALL STATS")
     overall_tracker.print_stats()
     print(f"Number of failures: {len(overall_failures)}")
-    breakpoint()

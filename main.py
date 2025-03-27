@@ -54,14 +54,14 @@ def run_ingestion_pipeline(
         )
     )
 
-    # we cant accumulate rollouts and episodes in memory at the same time, so save rollouts
+    # we can't accumulate rollouts and episodes in memory at the same time, so save rollouts
     # to db and videos to disk then reconstitute rollouts for indexing
     rollouts = setup_rollouts(engine, dataset_formalname)
     if new_rollout_ids is not None:
         rollouts = [r for r in rollouts if r.id in new_rollout_ids]
 
     if len(rollouts) == 0:
-        breakpoint()
+        raise ValueError(f"No rollouts found for {dataset_formalname} in {split}")
     run_embedding_database_ingestion_per_dataset(
         rollouts, embedder, index_path=EMBEDDING_DB_PATH
     )

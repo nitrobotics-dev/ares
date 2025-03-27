@@ -186,7 +186,7 @@ def create_embedding_similarity_visualization(
             )
 
         if np.any(np.isnan(distances)):
-            breakpoint()
+            raise ValueError(f"NaN distances found in {name} for id: {row.id}")
         # check index of id_str to see if it matches row.id then remove that index
         idx = np.where(ids == str(row.id))
         if len(idx[0]) != 0:

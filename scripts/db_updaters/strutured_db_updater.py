@@ -43,8 +43,8 @@ if __name__ == "__main__":
         print(f"prepped {len(input_mapping)} to add to db:")
         print(f"e.g. {set(np.random.choice(list(input_mapping.values()), 50))}")
         print(f"under new name {new_cols_flat_names[i]}")
-        print("...confirm?")
-        breakpoint()  # break to check things look right before updating db
+        print("...confirm? Press c to continue.")
+        breakpoint()  # breakpoint to check things look right before updating db
 
         add_column_with_vals_and_defaults(
             engine=engine,

@@ -274,7 +274,7 @@ def main(preprocessed_path: str, extra_info_cols: list[str]) -> None:
         if i == 0:
             print(inputs.keys())
             print(outputs.keys())
-            breakpoint()
+            breakpoint()  # breakpoint to explore loaded batch of data
 
         preds = MOCK_MODEL(inputs)
 

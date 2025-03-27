@@ -219,7 +219,6 @@ def show_hero_display(
         except Exception as e:
             st.error(f"Error retrieving annotation data: {str(e)}")
             st.error(traceback.format_exc())
-            breakpoint()
 
     # Row 3: n tabs covering most similar based on state, action, text
     st.write(f"**Similar Examples**")

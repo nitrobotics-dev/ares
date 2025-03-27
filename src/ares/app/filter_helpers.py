@@ -2,7 +2,7 @@
 General helpers for building filters for our data. Inferring data types can be messy, so see `ares.app.data_analysis.infer_visualization_type` for tricks.
 
 For structured data, We focus on categorical data with low cardinality and ranges of numberical data.
-For unstructured (embedding) data, we focus on tools to explore and select ranges of the reduced embedding space, 
+For unstructured (embedding) data, we focus on tools to explore and select ranges of the reduced embedding space,
 including a `summarize` tool to quickly understand a cluster.
 
 Note: we maintain sets of `temp` and `active` filter states to try and avoid re-rendering streamlit as much as possible.
@@ -232,7 +232,7 @@ def create_structured_data_filters(
 
     if len(filtered_df) == 0:
         print(f"No rows left after filtering: {skipped_cols}")
-        breakpoint()
+        raise ValueError(f"No rows left after filtering: {skipped_cols}")
     return filtered_df, skipped_cols
 
 
@@ -524,7 +524,7 @@ def create_embedding_data_filter_display(
             )
         )
     except Exception as e:
-        print(e)
-        print(traceback.format_exc())
-        breakpoint()
+        raise ValueError(
+            f"Error creating embedding data filter display: {e}; {traceback.format_exc()}"
+        )
     return filtered_df, cluster_fig

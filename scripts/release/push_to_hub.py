@@ -34,6 +34,7 @@ def backup_mongodb() -> None:
     print(
         f"Please run this command in your shell from root directory outside the container (or press c to skip): \n\n"
         f"mongodump --uri=mongodb://localhost:27017 --out={backup_path}\n\n"
+        f"Press c to continue."
     )
     breakpoint()
     print("MongoDB backup complete")
