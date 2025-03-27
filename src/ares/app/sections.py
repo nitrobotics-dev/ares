@@ -66,7 +66,7 @@ def embedding_data_filters_section(
     df: pd.DataFrame,
     structured_filtered_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    st.subheader(f"Embedding Filters")
+    st.subheader(f"Unstructured Data Filters")
     embedding_figs = dict()
     embedding_filtered_dfs = []
 
