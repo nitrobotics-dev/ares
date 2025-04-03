@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="ares",
-    version="0.0",
+    version="0.1.0",
     description="A system for automatically evaluating robot data",
     author="Jacob Phillips",
     author_email="jacob.phillips8905@gmail.com",
