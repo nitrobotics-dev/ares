@@ -238,7 +238,7 @@ Right now, ARES is a platform to accelerate robot researchers. However, we need 
 
 
 ## Acknowledgements and Citation
-This project was developed by [Jacob Phillips](jacobdphillips.com) as a part of the [Andreessen Horowitz American Dynamism Engineering Fellows program](https://a16z.com/the-american-dynamism-engineering-fellows-program/). Special thanks to the American Dynamism team for their support and feedback on the project.
+This project was developed by [Jacob Phillips](https://jacobdphillips.com) as a part of the [Andreessen Horowitz American Dynamism Engineering Fellows program](https://a16z.com/the-american-dynamism-engineering-fellows-program/). Special thanks to the American Dynamism team for their support and feedback on the project.
 
 If using the ARES platform in your work, please cite it to acknowledge the authors. Suggested format:
 
