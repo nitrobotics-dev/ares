@@ -1,5 +1,5 @@
 # ARES: Automatic Robot Evaluation System
-Created by [Jacob Phillips](https://jacobphillips99.github.io/)
+Created by [Jacob Phillips](https://jacobdphillips.com/)
 
 <img src="assets/ares_system_diagram.png" alt="ARES System Diagram"/> 
 
