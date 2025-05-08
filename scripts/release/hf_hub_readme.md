@@ -37,9 +37,17 @@ This dataset contains the data and databases for the ARES project. It is a colle
 
 ## Usage
 
-The data can be downloaded and restored using the [`release`](https://github.com/jacobphillips99/ares/tree/main/scripts/release) scripts in the ARES repository. First, follow the instructions in the [README](https://github.com/jacobphillips99/ares/tree/main/README.md) to set up the environment. Then, run the following command to download and restore the databases:
+The databases can be downloaded and restored using the [`release scripts`](https://github.com/jacobphillips99/ares/tree/main/scripts/release) in the ARES repository. First, follow the instructions in the [README](https://github.com/jacobphillips99/ares/tree/main/README.md) to set up the environment. Then, run the following command to download and restore the databases:
 
 ```bash
 cd scripts/release
 ./pull_from_hub.sh
+```
+
+Alternatively, the parquet file can be used natively in `transformers` with:
+
+```python
+from datasets import load_dataset
+
+dataset = load_dataset("jacobphillips99/ares-data")
 ```
