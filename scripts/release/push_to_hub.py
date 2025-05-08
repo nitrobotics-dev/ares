@@ -7,22 +7,37 @@ import os
 import tarfile
 from huggingface_hub import HfApi, upload_file
 from ares.constants import ARES_DATA_DIR
-from ares.databases.structured_database import ROBOT_DB_NAME
+from ares.databases.structured_database import (
+    ROBOT_DB_NAME,
+    ROBOT_DB_PATH,
+    RolloutSQLModel,
+    setup_database,
+    write_db_to_parquet,
+)
 from ares.databases.embedding_database import EMBEDDING_DB_NAME
 
 # insert your repo name here!
 HF_REPO = "jacobphillips99/ares-data"
 ANNOTATION_DB_BACKUP_NAME = "annotation_mongodump"
+SQL_PARQUET_NAME = "robot_data.parquet"
+HF_HUB_README_PATH = "hf_hub_readme.md"
 
 UPLOAD_CONFIGS = [
-    # {"type": "file", "source": ROBOT_DB_NAME, "dest": ROBOT_DB_NAME},
+    {"type": "file", "source": ROBOT_DB_NAME, "dest": ROBOT_DB_NAME},
     {
         "type": "folder",
         "source": ANNOTATION_DB_BACKUP_NAME,
         "dest": ANNOTATION_DB_BACKUP_NAME,
     },
     {"type": "folder", "source": EMBEDDING_DB_NAME, "dest": EMBEDDING_DB_NAME},
-    # {"type": "folder", "source": "videos", "dest": "videos"},
+    {"type": "folder", "source": "videos", "dest": "videos"},
+    {"type": "file", "source": SQL_PARQUET_NAME, "dest": SQL_PARQUET_NAME},
+    {
+        "type": "file",
+        "source": HF_HUB_README_PATH,
+        "dest": "README.md",
+        "dir": os.path.dirname(__file__),
+    },
 ]
 
 
@@ -36,8 +51,13 @@ def backup_mongodb() -> None:
         f"mongodump --uri=mongodb://localhost:27017 --out={backup_path}\n\n"
         f"Press c to continue."
     )
-    breakpoint()
     print("MongoDB backup complete")
+
+
+def backup_sqldb_parquet() -> None:
+    """Create a SQL database parquet file in the data directory."""
+    engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
+    write_db_to_parquet(engine, os.path.join(ARES_DATA_DIR, SQL_PARQUET_NAME))
 
 
 def create_tarfile(source_dir: str, output_filename: str) -> str:
@@ -52,7 +72,7 @@ def create_tarfile(source_dir: str, output_filename: str) -> str:
 
 
 def upload_to_hf(config: dict[str, str], token: str) -> None:
-    source_path = os.path.join(ARES_DATA_DIR, config["source"])
+    source_path = os.path.join(config.get("dir", ARES_DATA_DIR), config["source"])
 
     if config["type"] == "file":
         # Direct file upload
@@ -121,7 +141,10 @@ if __name__ == "__main__":
         print(f"Repo {HF_REPO} already exists")
 
     # Create MongoDB backup
-    # backup_mongodb()
+    backup_mongodb()
+
+    # Create SQL parquet
+    backup_sqldb_parquet()
 
     # Upload each item in the upload config
     for item in UPLOAD_CONFIGS:

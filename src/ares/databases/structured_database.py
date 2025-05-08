@@ -272,6 +272,17 @@ def delete_rows_by_dataset_name(engine: Engine, dataset_name: str) -> None:
         )
 
 
+def write_db_to_parquet(engine: Engine, output_path: str) -> None:
+    """Write the entire database contents to a parquet file.
+
+    Args:
+        engine: SQLAlchemy engine instance
+        output_path: Path where the parquet file should be saved
+    """
+    df = db_to_df(engine)
+    df.to_parquet(output_path, index=False)
+
+
 if __name__ == "__main__":
     engine = setup_database(RolloutSQLModel, path=ROBOT_DB_PATH)
     df = db_to_df(engine)
