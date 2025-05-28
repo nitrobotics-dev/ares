@@ -4,8 +4,8 @@ Created by [Jacob Phillips](https://jacobdphillips.com/)
 <img src="assets/ares_system_diagram.png" alt="ARES System Diagram"/> 
 
 ARES (Automatic Robot Evaluation System) is a open-source (Apache 2.0) platform for automatically ingesting, curating, and evaluating robot data using ML models to quickly and accurately understand policy performance, identify areas for improvement, and generate new robot datasets, all without setting up any heavy infrastructure.
-Researchers tend to chase point-solutions for specific tasks or paper implmentations, but ARES is designed to be a generalized platform for long-term robot research that scales from a laptop to the cloud.
-ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs via model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc., requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. We make our data available on the [Hugging Face Hub](https://huggingface.co/datasets/jacobphillips99/ares-data), which contains roughly 5000 rollouts from the Open X-Embodiment project. See the [Data](#data) section for more details.
+Researchers tend to chase point-solutions for specific tasks or paper implementations, but ARES is designed to be a generalized platform for long-term robot research that scales from a laptop to the cloud.
+ARES is built to be simple and scalable, with a special focus on ease of use. All computation and model inference can be run through local resources or cloud APIs via model providers like OpenAI, Anthropic, Gemini, Modal, Replicate, etc., requiring only a credit card for access - no complex cloud infrastructure or GPU setup needed. 
 
 At a high level, ARES is composed of three main components: 
 - Ingestion: automatically transform raw robot data into a structured format with VLMs

@@ -28,7 +28,9 @@ from ares.utils.image_utils import load_video_frames
 def construct_pseudo_ecot_info(
     rollout: Rollout, ann_db: AnnotationDatabase
 ) -> dict[str, t.Any]:
-    # we want the grounding string, detections, and success criteria
+    """
+    Collect all the composable annotations and rollout fields to generate a pseudo-ECoT prompt
+    """
     video_id = get_video_id(rollout.dataset_filename, rollout.filename)
     anns = ann_db.get_annotations(video_id)
 

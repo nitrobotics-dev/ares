@@ -13,7 +13,7 @@ from ares.utils.image_utils import load_video_frames
 
 
 class SuccessCriteriaAnnotatingFn(APIAnnotatingFn):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(annotation_key="string", annotation_type="success_criteria")
 
     async def run_query(
