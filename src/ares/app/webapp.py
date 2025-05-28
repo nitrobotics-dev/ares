@@ -71,7 +71,6 @@ def timer_context(section_name: str) -> t.Any:
 # Note: streamlit displays standalone-strings like `"""..."""` as markdown!
 # Use `#` for comments in the streamlit context.
 def main() -> None:
-    print("Starting main")
     ######################################################################
     # Load data and setup state info
     ######################################################################

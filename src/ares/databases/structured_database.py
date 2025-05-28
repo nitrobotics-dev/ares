@@ -280,6 +280,7 @@ def write_db_to_parquet(engine: Engine, output_path: str) -> None:
         output_path: Path where the parquet file should be saved
     """
     df = db_to_df(engine)
+    df.id = df.id.astype(str)
     df.to_parquet(output_path, index=False)
 
 
