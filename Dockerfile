@@ -24,10 +24,15 @@ RUN apt-get update && \
 ENV TRANSFORMERS_CACHE=/cache/huggingface
 RUN mkdir -p /cache/huggingface
 
+# RUN apt-get update && apt-get install -y \
+#    libgl1-mesa-glx \
+#    htop \
+#    wkhtmltopdf
+
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    htop \
-    wkhtmltopdf
+    libgl1 \
+    libglx-mesa0 \
+    htop
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt --retries 10
